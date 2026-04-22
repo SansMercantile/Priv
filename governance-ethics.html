@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="robots" content="index,follow" />
+  <title>Governance & Ethics — Hidden</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="header-placeholder"></div>
+  <main class="main-wrap">
+    <section style="padding:2.5rem 1.25rem; max-width:1100px; margin:1.5rem auto; text-align:left;">
+      <h1 class="font-display">Governance & Ethics</h1>
+      <p class="lead">Consent-first design, emotional disarmament, and psychologist-reviewed flows—documented and ready for review.</p>
+
+      <h3>Core Principles</h3>
+      <ul>
+        <li>Consent & Transparency</li>
+        <li>Psychologist-Reviewed Interaction Patterns</li>
+        <li>Auditable Decision Trees</li>
+      </ul>
+
+      <h3 style="margin-top:1rem;">System Flow (Diagram placeholder)</h3>
+      <div class="feature-card" style="padding:1rem;margin-top:0.75rem;">
+        <img src="/img/diagrams/consent-flow.svg" alt="Consent flow diagram" style="width:100%;border-radius:8px;" />
+        <p style="color:var(--color-text-secondary);margin-top:0.5rem;">Diagram shows consent capture & audit flows (placeholder).</p>
+      </div>
+
+      <h3 style="margin-top:1rem;">Decision Flow Accordion</h3>
+      <div>
+        <button class="toggle-accordion cta" onclick="togglePanel('p1')">Consent Capture — click to expand</button>
+        <div id="p1" style="display:none;padding:0.75rem 0;color:var(--color-text-secondary);">We record consent with a clear explanation of purpose, data retained, and revocation process.</div>
+
+        <button class="toggle-accordion cta" onclick="togglePanel('p2')" style="margin-top:0.5rem;">Psychologist Review — click to expand</button>
+        <div id="p2" style="display:none;padding:0.75rem 0;color:var(--color-text-secondary);">Interaction patterns reviewed to minimize emotional harm and ensure clarity.</div>
+      </div>
+
+      <h4 style="margin-top:1rem;">Open-source projects</h4>
+      <ul>
+        <li><a href="#">Mezzo Anima (placeholder)</a></li>
+      </ul>
+    </section>
+  </main>
+  <div id="footer-placeholder"></div>
+  <script src="js/main.js"></script>
+  <script>
+    function togglePanel(id){
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+  </script>
+</body>
+</html>

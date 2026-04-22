@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" width="900" height="300">
+  <style>text{font-family:Inter, sans-serif;fill:#fff;} .card{fill:#110000;stroke:#781f25;stroke-width:2;}</style>
+  <rect class="card" x="30" y="40" width="240" height="90" rx="10"/>
+  <text x="60" y="95" font-size="16">AGI Core</text>
+  <rect class="card" x="330" y="40" width="240" height="90" rx="10"/>
+  <text x="380" y="95" font-size="16">AI Core</text>
+  <rect class="card" x="630" y="40" width="240" height="90" rx="10"/>
+  <text x="670" y="95" font-size="16">Execution Layer</text>
+  <path d="M270 85 L330 85" stroke="#fc7642" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M570 85 L630 85" stroke="#fc7642" stroke-width="3" marker-end="url(#arrow)"/>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#fc7642" />
+    </marker>
+  </defs>
+</svg>

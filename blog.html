@@ -1,0 +1,163 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="img/logo.svg" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sans Mercantile™ | Thought Leadership</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <meta name="description" content="Dive into Sans Mercantile's™ research, expert analysis, and thought leadership on AI-powered trading, compliance, and inclusive market development." />
+
+  <script>
+    const allPosts = [
+  {
+    "title": "The Power of Predictive Analytics in Emerging Economies | Sans Mercantile™",
+    "description": "Learn how Sans Mercantile's AI-driven predictive models are transforming supply chains and credit access in underserved markets.",
+    "href": "/blogs/blog-ai-revolution.html",
+    "tags": [
+      "#AITrading",
+      "#CFDMarkets",
+      "#MachineLearning",
+      "#QuantFinance"
+    ]
+  },
+  {
+    "title": "Compliance Isn’t a Checkbox. It’s a Framework. | Sans Mercantile™",
+    "description": "Why built-in governance matters—and how Sans Mercantile™ approaches compliance as a trust-building opportunity, not a hurdle.",
+    "href": "/blogs/blog-compliance-framework.html",
+    "tags": [
+      "#RegulatoryCompliance",
+      "#GovernanceTech",
+      "#TrustByDesign",
+      "#FintechFrameworks"
+    ]
+  },
+  {
+    "title": "Beyond Algorithms: The Human Edge in AI-Driven Finance | Sans Mercantile™",
+    "description": "Discover how Sans Mercantile™ fuses AI-driven intelligence with human expertise to maximize trading profits and ensure ethical AI adoption.",
+    "href": "/blogs/blog-human-edge.html",
+    "tags": [
+      "#EthicalAI",
+      "#HumanCenteredTech",
+      "#AILeadership",
+      "#FintechInnovation"
+    ]
+  },
+  {
+    "title": "Redefining Risk: Why Township Markets Deserve Better Infrastructure | Sans Mercantile™",
+    "description": "A deep dive into how Sans Mercantile's AI engine mitigates structural volatility while unlocking scalable growth for communities long overlooked by traditional finance.",
+    "href": "/blogs/redefining-risk.html",
+    "tags": [
+      "#EmergingMarkets",
+      "#InclusiveFinance",
+      "#AIInfrastructure",
+      "#MarketResilience"
+    ]
+  }
+];
+    localStorage.setItem('sansBlogPostsData', JSON.stringify(allPosts));
+  </script>
+</head>
+<body>
+  <div id="header-placeholder"></div>
+
+  <main role="main" class="main-wrap">
+    <section class="blog-hero" data-aos="fade-up">
+      <h2>Insights & Innovation: Shaping the Future of AI Finance</h2>
+      <p>Dive into Sans Mercantile’s™ research, expert analysis, and thought leadership on AI-powered trading, compliance, and inclusive market development.</p>
+    </section>
+
+    <section class="blog-articles-grid" id="blogGrid" data-aos="fade-up" data-aos-delay="150"></section>
+
+    <section class="blog-categories" data-aos="fade-up" data-aos-delay="200">
+      <h3>Explore by Category</h3>
+      <div class="category-tags" id="tagBar">
+        <a href="#" class="tag">#AITrading</a>
+<a href="#" class="tag">#CFDMarkets</a>
+<a href="#" class="tag">#MachineLearning</a>
+<a href="#" class="tag">#QuantFinance</a>
+<a href="#" class="tag">#RegulatoryCompliance</a>
+<a href="#" class="tag">#GovernanceTech</a>
+<a href="#" class="tag">#TrustByDesign</a>
+<a href="#" class="tag">#FintechFrameworks</a>
+<a href="#" class="tag">#EthicalAI</a>
+<a href="#" class="tag">#HumanCenteredTech</a>
+<a href="#" class="tag">#AILeadership</a>
+<a href="#" class="tag">#FintechInnovation</a>
+<a href="#" class="tag">#EmergingMarkets</a>
+<a href="#" class="tag">#InclusiveFinance</a>
+<a href="#" class="tag">#AIInfrastructure</a>
+<a href="#" class="tag">#MarketResilience</a>
+      </div>
+      <button id="seeMoreBtn" class="cta hidden">See More</button>
+    </section>
+  </main>
+
+  <div id="footer-placeholder"></div>
+
+  <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+  <script src="/js/main.js"></script>
+  <script src="js/blog-navigation.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      AOS.init();
+
+      const blogGrid = document.querySelector('.blog-articles-grid');
+      const tagBar = document.getElementById('tagBar');
+      const seeMoreBtn = document.getElementById('seeMoreBtn');
+
+      const allPosts = JSON.parse(localStorage.getItem('sansBlogPostsData') || '[]');
+      let currentTag = null;
+
+      function renderPosts(posts) {
+        blogGrid.innerHTML = posts.map(post => `
+          <article class="blog-card" data-tags="${post.tags.join(',')}">
+            <h3>${post.title}</h3>
+            <p>${post.description}</p>
+            <a href="${post.href}" class="blog-link">Read More &rarr;</a>
+          </article>
+        `).join('');
+      }
+
+      function showRandomPosts() {
+        const shuffled = [...allPosts].sort(() => 0.5 - Math.random());
+        renderPosts(shuffled.slice(0, 4));
+        seeMoreBtn.classList.add('hidden');
+        currentTag = null;
+      }
+
+      function filterByTag(tag) {
+        currentTag = tag;
+        const filtered = allPosts.filter(post => post.tags.includes(tag));
+        renderPosts(filtered.slice(0, 2));
+        seeMoreBtn.classList.remove('hidden');
+      }
+
+      function showAllForTag() {
+        const filtered = allPosts.filter(post => post.tags.includes(currentTag));
+        renderPosts(filtered);
+        seeMoreBtn.classList.add('hidden');
+      }
+
+      tagBar.addEventListener('click', e => {
+        if (e.target.classList.contains('tag')) {
+          e.preventDefault();
+          filterByTag(e.target.textContent.trim());
+        }
+      });
+
+      seeMoreBtn.addEventListener('click', showAllForTag);
+      showRandomPosts();
+
+      setInterval(() => {
+        if (!currentTag) showRandomPosts();
+      }, 10000);
+
+      const blogLinks = allPosts.map(post => post.href);
+      localStorage.setItem('sansBlogPosts', JSON.stringify(blogLinks));
+    });
+  </script>
+</body>
+</html>

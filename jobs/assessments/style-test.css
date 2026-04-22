@@ -1,0 +1,414 @@
+/* Variables - from style.css */
+:root {
+  --color-black-cherry: #3d0917;
+  --color-burgundy-black: #1f0000;
+  --color-crimson-noir: #490c09;
+  --color-velvet-red-black: #310816;
+  --color-dark-scarlet: #781f25;
+  --color-orange: #fc7642;
+  --color-white: #fff;
+  --color-black: #000;
+  --color-silver: #f0f0f0;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Global Styles - from style.css */
+*,
+html,
+body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--color-burgundy-black);
+  color: var(--color-white);
+  overflow-x: hidden;
+}
+
+/* Typography - from style.css */
+h1,
+h2,
+h3,
+h4 {
+  color: var(--color-white);
+  line-height: 1.2;
+}
+
+h2 {
+  font-size: 3rem;
+  margin-bottom: 1.5rem;
+  letter-spacing: -0.5px;
+}
+
+h3 {
+  font-size: 2.2rem;
+  margin-bottom: 1.2rem;
+  line-height: 1.3;
+  letter-spacing: -0.2px;
+}
+
+h4 {
+  font-size: 1.5rem;
+  margin-bottom: 0.8rem;
+  line-height: 1.4;
+}
+
+p {
+  font-size: 1.1rem;
+  line-height: 1.7;
+  max-width: 800px;
+  margin: 0 auto 1.5rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Links & Buttons - from style.css */
+.cta {
+  background-color: var(--color-crimson-noir);
+  color: var(--color-white);
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 1rem 1.75rem;
+  text-decoration: none;
+  display: inline-block;
+  transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  letter-spacing: 0.5px;
+  cursor: pointer; /* Added for buttons */
+}
+
+.cta:hover {
+  background-color: var(--color-dark-scarlet);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* Header - from style.css */
+header {
+  background-color: var(--color-burgundy-black);
+  color: var(--color-white);
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  backdrop-filter: blur(8px);
+  background-color: rgba(110, 30, 42, 0.95);
+  transition: background-color 0.3s ease;
+}
+
+.logo {
+  font-size: 1.75rem;
+  font-weight: 800;
+}
+
+.logo span.sans {
+  color: var(--color-orange);
+}
+
+.logo span.mercantile {
+  color: var(--color-silver);
+}
+
+nav a {
+  color: var(--color-silver);
+  margin: 0 1rem;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.3s ease, transform 0.3s ease;
+}
+
+nav a:hover {
+  color: var(--color-orange);
+  transform: translateY(-2px);
+}
+
+/* Footer - from style.css (simplified for test pages) */
+footer {
+  background-color: var(--color-burgundy-black);
+  color: var(--color-white);
+  padding: 1rem 2rem;
+  display: flex;
+  flex-direction: column; /* Changed for simplicity on test pages */
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  text-align: center;
+}
+
+footer p {
+  margin: 1rem auto 0.5rem; /* Adjusted */
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.language-selector {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+}
+
+.language-selector select {
+  background-color: var(--color-black-cherry);
+  color: var(--color-silver);
+  padding: 0.5rem 2rem 0.5rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-dark-scarlet);
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.language-selector::after {
+  content: '▼';
+  font-size: 0.8rem;
+  color: var(--color-silver);
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+
+/* Legal Page specific styles - from style.css (for legal-hero section) */
+.legal-page section {
+    padding: 5rem 2rem;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+}
+
+.legal-hero {
+  background-color: var(--color-burgundy-black);
+  color: var(--color-white);
+}
+
+.legal-hero h2 {
+  color: var(--color-white);
+}
+
+.legal-hero p {
+  font-size: 1.15rem;
+  max-width: 900px;
+}
+
+/* Alternating section backgrounds - from style.css */
+.main-wrap > section:nth-child(odd):not(.legal-hero) {
+  background-color: var(--color-burgundy-black);
+  color: var(--color-white);
+}
+
+.main-wrap > section:nth-child(even):not(.legal-hero) {
+  background-color: var(--color-white);
+  color: var(--color-black);
+}
+
+.main-wrap > section:nth-child(even):not(.legal-hero) h3,
+.main-wrap > section:nth-child(even):not(.legal-hero) h2 {
+  color: var(--color-crimson-noir);
+}
+
+.main-wrap > section:nth-child(even):not(.legal-hero) p {
+  color: #444;
+}
+
+.main-wrap > section:nth-child(odd):not(.legal-hero) h3,
+.main-wrap > section:nth-child(odd):not(.legal-hero) h2 {
+  color: var(--color-orange);
+}
+
+/* New styles for the test questions */
+.quiz-container {
+    max-width: 900px;
+    margin: 2rem auto;
+    background-color: var(--color-black-cherry);
+    padding: 3rem;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    text-align: left;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.quiz-question {
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.quiz-question:last-child {
+    border-bottom: none;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0;
+}
+
+.quiz-question h4 {
+    color: var(--color-orange);
+    margin-bottom: 1.2rem;
+    font-size: 1.6rem;
+}
+
+.options label {
+    display: block;
+    background-color: var(--color-velvet-red-black);
+    padding: 1rem 1.5rem;
+    margin-bottom: 0.8rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--color-silver);
+    font-size: 1.05rem;
+}
+
+.options label:hover {
+    background-color: var(--color-dark-scarlet);
+    transform: translateX(5px);
+}
+
+.options input[type="radio"] {
+    margin-right: 1rem;
+    accent-color: var(--color-orange); /* Style the radio button itself */
+}
+
+.submit-btn {
+    width: 100%;
+    text-align: center;
+    margin-top: 3rem;
+}
+
+#timer {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--color-orange);
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+#result {
+    margin-top: 2rem;
+    font-size: 1.4rem;
+    font-weight: 600;
+    text-align: center;
+    color: var(--color-white);
+}
+
+#result span.score {
+    color: var(--color-orange);
+    font-size: 2rem;
+}
+
+#completion-message {
+  margin-top: 2rem;
+  font-size: 1.1rem;
+  text-align: center;
+  color: var(--color-white);
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Styles for short-form rationale */
+.rationale-input {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    border: 1px solid var(--color-dark-scarlet);
+    border-radius: 6px;
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--color-white);
+    font-size: 1rem;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    min-height: 80px;
+    resize: vertical;
+    margin-top: 1rem;
+}
+
+.rationale-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.rationale-input:focus {
+  border-color: var(--color-orange);
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(252, 118, 66, 0.3);
+}
+
+/* Media Queries - from style.css */
+@media screen and (max-width: 992px) {
+  h2 {
+    font-size: 2.5rem;
+  }
+
+  h3 {
+    font-size: 2rem;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  header,
+  footer {
+    flex-direction: column;
+    text-align: center;
+    padding: 1rem;
+  }
+
+  nav {
+    margin-top: 1rem;
+  }
+
+  nav a {
+    margin: 0.5rem 0.8rem;
+  }
+
+  .cta {
+    padding: 0.8rem 1.2rem;
+    font-size: 0.9rem;
+  }
+
+  section {
+    padding: 3rem 1rem;
+  }
+
+  h2 {
+    font-size: 2rem;
+  }
+
+  h3 {
+    font-size: 1.8rem;
+  }
+
+  p {
+    font-size: 1rem;
+  }
+
+  .quiz-container {
+    padding: 1.5rem;
+  }
+
+  .quiz-question h4 {
+    font-size: 1.3rem;
+  }
+
+  .options label {
+    padding: 0.8rem 1rem;
+    font-size: 0.95rem;
+  }
+
+  #timer {
+    font-size: 1.5rem;
+  }
+
+  #result {
+    font-size: 1.2rem;
+  }
+
+  #result span.score {
+      font-size: 1.8rem;
+  }
+}

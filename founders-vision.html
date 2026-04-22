@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="robots" content="index,follow" />
+  <title>Founder’s Vision — Hidden</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="header-placeholder"></div>
+  <main class="main-wrap">
+    <section class="platform-hero" style="padding:2rem 1rem; text-align:left;">
+      <div style="max-width:1100px;margin:0 auto;">
+        <h1 class="font-display">Founder’s Vision</h1>
+        <p class="lead">A quiet collection of essays, curated excerpts, and reflections that form the emotional and strategic backbone of Sans Mercantile™.</p>
+
+        <div style="display:flex;flex-wrap:wrap;gap:1.25rem;margin-top:1.5rem;">
+          <div style="flex:1 1 320px;">
+            <img src="img/human-ai-edge.webp" alt="Founder" style="width:100%;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.4);"/>
+          </div>
+          <div style="flex:1 1 360px;">
+            <h3>Founder’s Voice & Philosophy</h3>
+            <p>Our writing blends emotional clarity with practical strategy. Below are curated excerpts from long-form pieces.</p>
+            <div class="feature-card" style="margin-top:1rem;">
+              <h4>From Kasi to Suburbia</h4>
+              <p class="quote">"Markets and memory must reconcile — we rebuild with empathy, not extraction."</p>
+            </div>
+            <div class="feature-card" style="margin-top:1rem;">
+              <h4>Mezzo Materna</h4>
+              <p class="quote">"Design for consent. Design for care. Economic tools are instruments of culture, not just revenue."</p>
+            </div>
+          </div>
+        </div>
+
+        <h2 style="margin-top:2rem;">Curated Excerpts</h2>
+        <div class="feature-grid" style="margin-top:1rem;">
+          <div class="feature-card">
+            <h4>From Kasi to Suburbia — excerpt</h4>
+            <p>A reflective excerpt on belonging and rebuilding markets with dignity.</p>
+            <button class="cta" onclick="toggleExcerpt('ex1')">Read excerpt</button>
+            <div id="ex1" class="hidden" style="margin-top:0.75rem;">
+              <p class="quote">"The work of rebuilding is not only technical — it is moral. Markets must heal, and communities must be invited into that healing with dignity and purpose."</p>
+            </div>
+          </div>
+
+          <div class="feature-card">
+            <h4>Mezzo Materna — excerpt</h4>
+            <p>Thoughts on empathy-first design and governance.</p>
+            <button class="cta" onclick="toggleExcerpt('ex2')">Read excerpt</button>
+            <div id="ex2" class="hidden" style="margin-top:0.75rem;">
+              <p class="quote">"Empathy is not a feature; it is the architecture of a system that lasts."</p>
+            </div>
+          </div>
+        </div>
+
+        <p style="margin-top:1.5rem;color:rgba(255,255,255,0.75);">This page is hidden from navigation and search engines. When you're ready to publish, uncomment the link in the header.</p>
+      </div>
+    </section>
+  </main>
+  <div id="footer-placeholder"></div>
+  <script src="js/main.js"></script>
+  <script>
+    function toggleExcerpt(id){
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.classList.toggle('hidden');
+    }
+  </script>
+</body>
+</html>

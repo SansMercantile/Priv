@@ -1,0 +1,205 @@
+# .github/workflows/build-for-github.yml
+
+name: Build and Test on GitHub
+permissions:
+  contents: write
+  packages: write
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy-frontend-gh-pages:
+    name: Build and Deploy Frontend to GitHub Pages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Private Repository
+        uses: actions/checkout@v3
+        with:
+          repository: 'SansMercantile/mpeti-core' 
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies and Build Frontend
+        working-directory: ./sans-mercantile-app
+        env:
+          REACT_APP_BACKEND_API_URL: ${{ secrets.REACT_APP_BACKEND_API_URL }}
+          REACT_APP_FIREBASE_API_KEY: ${{ secrets.REACT_APP_FIREBASE_API_KEY }}
+          REACT_APP_FIREBASE_APP_ID: ${{ secrets.REACT_APP_FIREBASE_APP_ID }}
+          REACT_APP_FIREBASE_AUTH_DOMAIN: ${{ secrets.REACT_APP_FIREBASE_AUTH_DOMAIN }}
+          REACT_APP_FIREBASE_MEASUREMENT_ID: ${{ secrets.REACT_APP_FIREBASE_MEASUREMENT_ID }}
+          REACT_APP_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.REACT_APP_FIREBASE_MESSAGING_SENDER_ID }}
+          REACT_APP_FIREBASE_PROJECT_ID: ${{ secrets.REACT_APP_FIREBASE_PROJECT_ID }}
+          REACT_APP_FIREBASE_STORAGE_BUCKET: ${{ secrets.REACT_APP_FIREBASE_STORAGE_BUCKET }}
+          REACT_APP_INITIAL_AUTH_TOKEN: ${{ secrets.REACT_APP_INITIAL_AUTH_TOKEN }}
+        run: |
+          npm install firebase lucide-react
+          npm install
+          npm run build
+
+      - name: Deploy Frontend to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./sans-mercantile-app/build
+
+  build-and-push-services-ghcr:
+    name: Build and Push Services to GHCR
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - { name: 'priv-core', context: '.', file: './sans-mercantile-app/backend/priv-core/Dockerfile' }
+          - { name: 'mpeti-core', context: '.', file: './Dockerfile' }
+          - { name: 'cpp-financial-service', context: './sans-mercantile-app/backend/cpp_module', file: './sans-mercantile-app/backend/cpp_module/Dockerfile' }
+          - { name: 'go-status-service', context: './sans-mercantile-app/go_module', file: './sans-mercantile-app/go_module/Dockerfile' }
+          - { name: 'mpeti-orchestrator', context: './sans-mercantile-app/backend/mpeti_orchestrator', file: './sans-mercantile-app/backend/mpeti_orchestrator/Dockerfile' }
+          - { name: 'r-module', context: './sans-mercantile-app/backend/r_module', file: './sans-mercantile-app/backend/r_module/Dockerfile' }
+          - { name: 'java-module', context: './sans-mercantile-app/backend/java_module', file: './sans-mercantile-app/backend/java_module/Dockerfile' }
+          - { name: 'julia-module', context: './sans-mercantile-app/backend/julia_module', file: './sans-mercantile-app/backend/julia_module/Dockerfile' }
+          - { name: 'swift-module', context: './sans-mercantile-app/swift_module', file: './sans-mercantile-app/swift_module/Dockerfile' }
+          - { name: 'rust-zkp-module', context: './sans-mercantile-app/priv_zkp_rust', file: './sans-mercantile-app/priv_zkp_rust/Dockerfile.rust' }
+
+    steps:
+      - name: Checkout Private Repository
+        uses: actions/checkout@v3
+        with:
+          repository: 'SansMercantile/mpeti-core'
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+
+      - name: Set Lowercase Repository Owner
+        run: echo "repo_owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Push Docker Image for ${{ matrix.service.name }}
+        uses: docker/build-push-action@v4
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.file }}
+          push: true
+          tags: ghcr.io/${{ env.repo_owner }}/${{ matrix.service.name }}:latest
+          no-cache: true
+          build-args: |
+            ACCESS_KEY_ID=${{ secrets.ACCESS_KEY_ID }}
+            ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}
+            ALPACA_BASE_URL=${{ secrets.ALPACA_BASE_URL }}
+            ALPACA_PAPER_API_KEY_ID=${{ secrets.ALPACA_PAPER_API_KEY_ID }}
+            ALPACA_PAPER_SECRET_KEY=${{ secrets.ALPACA_PAPER_SECRET_KEY }}
+            ALPACA_SANDBOX_API_KEY_ID=${{ secrets.ALPACA_SANDBOX_API_KEY_ID }}
+            ALPACA_SANDBOX_SECRET_KEY=${{ secrets.ALPACA_SANDBOX_SECRET_KEY }}
+            ALPHA_VANTAGE_API=${{ secrets.ALPHA_VANTAGE_API }}
+            AZURE_OPENAI_API_VERSION=${{ secrets.AZURE_OPENAI_API_VERSION }}
+            AZURE_OPENAI_DEPLOYMENT_NAME=${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
+            AZURE_OPENAI_ENDPOINT=${{ secrets.AZURE_OPENAI_ENDPOINT }}
+            AZURE_OPENAI_KEY=${{ secrets.AZURE_OPENAI_KEY }}
+            BINANCE_API_KEY=${{ secrets.BINANCE_API_KEY }}
+            BINANCE_BASE_URL=${{ secrets.BINANCE_BASE_URL }}
+            BINANCE_SECRET_KEY=${{ secrets.BINANCE_SECRET_KEY }}
+            BINANCE_WEBSOCKET_URL=${{ secrets.BINANCE_WEBSOCKET_URL }}
+            DB_NAME=${{ secrets.DB_NAME }}
+            DB_PASS=${{ secrets.DB_PASS }}
+            DB_USER=${{ secrets.DB_USER }}
+            DERIV_APP_CONSOLE_API_TOKEN=${{ secrets.DERIV_APP_CONSOLE_API_TOKEN }}
+            DERIV_APP_CONSOLE_APP_ID=${{ secrets.DERIV_APP_CONSOLE_APP_ID }}
+            DERIV_APP_NAME=${{ secrets.DERIV_APP_NAME }}
+            DERIV_PRIV1_API_TOKEN=${{ secrets.DERIV_PRIV1_API_TOKEN }}
+            DERIV_PRIV1_APP_ID=${{ secrets.DERIV_PRIV1_APP_ID }}
+            D_ID_API_KEY=${{ secrets.D_ID_API_KEY }}
+            ENABLE_ALPACA_ADAPTER=${{ secrets.ENABLE_ALPACA_ADAPTER }}
+            ENABLE_ALPACA_PAPER_ADAPTER=${{ secrets.ENABLE_ALPACA_PAPER_ADAPTER }}
+            ENABLE_ALPACA_SANDBOX_ADAPTER=${{ secrets.ENABLE_ALPACA_SANDBOX_ADAPTER }}
+            ENABLE_AZURE_OPENAI_ADAPTER=${{ secrets.ENABLE_AZURE_OPENAI_ADAPTER }}
+            ENABLE_DERIV_ADAPTER=${{ secrets.ENABLE_DERIV_ADAPTER }}
+            ENABLE_DERIV_APP_CONSOLE_ADAPTER=${{ secrets.ENABLE_DERIV_APP_CONSOLE_ADAPTER }}
+            ENABLE_DERIV_PRIV1_ADAPTER=${{ secrets.ENABLE_DERIV_PRIV1_ADAPTER }}
+            ENABLE_MOCK_ADAPTER=${{ secrets.ENABLE_MOCK_ADAPTER }}
+            ENABLE_MT5_ADAPTER=${{ secrets.ENABLE_MT5_ADAPTER }}
+            EODHD_API_KEY=${{ secrets.EODHD_API_KEY }}
+            EODHD_BASE_URL=${{ secrets.EODHD_BASE_URL }}
+            FBS_COMPANY_NAME_IN_MT=${{ secrets.FBS_COMPANY_NAME_IN_MT }}
+            FBS_DEMO_LOGIN_ID=${{ secrets.FBS_DEMO_LOGIN_ID }}
+            FBS_DEMO_PASSWORD=${{ secrets.FBS_DEMO_PASSWORD }}
+            FBS_DEMO_SEVER=${{ secrets.FBS_DEMO_SEVER }}
+            FBS_IB_LINK=${{ secrets.FBS_IB_LINK }}
+            FBS_REAL_LOGIN_ID=${{ secrets.FBS_REAL_LOGIN_ID }}
+            FBS_REAL_PASSWORD=${{ secrets.FBS_REAL_PASSWORD }}
+            FBS_REAL_SEVER=${{ secrets.FBS_REAL_SEVER }}
+            FINNHUB_API_KEY=${{ secrets.FINNHUB_API_KEY }}
+            FINNHUB_SECRET=${{ secrets.FINNHUB_SECRET }}
+            GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}
+            GCP_REGION=${{ secrets.GCP_REGION }}
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            GMAIL_SERVICE_ACCOUNT_SECRET_NAME=${{ secrets.GMAIL_SERVICE_ACCOUNT_SECRET_NAME }}
+            INSTANCE_CONNECTION_NAME=${{ secrets.INSTANCE_CONNECTION_NAME }}
+            KILL_SWITCH_AI_TRADING=${{ secrets.KILL_SWITCH_AI_TRADING }}
+            LLM_MODEL_NAME=${{ secrets.LLM_MODEL_NAME }}
+            MPETI_EMAIL_ADDRESS=${{ secrets.MPETI_EMAIL_ADDRESS }}
+            MT5_ACCOUNT=${{ secrets.MT5_ACCOUNT }}
+            MT5_PASSWORD=${{ secrets.MT5_PASSWORD }}
+            MT5_SERVER=${{ secrets.MT5_SERVER }}
+            NEWS_API_KEY_AI=${{ secrets.NEWS_API_KEY_AI }}
+            NEWS_API_KEY_ORG=${{ secrets.NEWS_API_KEY_ORG }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            POLYGON_ACCESS_KEY_ID=${{ secrets.POLYGON_ACCESS_KEY_ID }}
+            POLYGON_API_KEY=${{ secrets.POLYGON_API_KEY }}
+            POLYGON_BUCKET=${{ secrets.POLYGON_BUCKET }}
+            POLYGON_NAME=${{ secrets.POLYGON_NAME }}
+            POLYGON_S3_ENDPOINT=${{ secrets.POLYGON_S3_ENDPOINT }}
+            PUBLIC_IP_ADDRESS=${{ secrets.PUBLIC_IP_ADDRESS }}
+            SECRET=${{ secrets.SECRET }}
+            SIMFIN_API_KEY=${{ secrets.SIMFIN_API_KEY }}
+            SIMFIN_BASE_URL=${{ secrets.SIMFIN_BASE_URL }}
+            TRADING_STRATEGY_MODE=${{ secrets.TRADING_STRATEGY_MODE }}
+            TWELVEDATA_API_KEY=${{ secrets.TWELVEDATA_API_KEY }}
+            TWELVEDATA_API_KEY=${{ secrets.TWELVEDATA_API_KEY }}
+            
+  build-matlab-service:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Private Repository
+        uses: actions/checkout@v3
+        with:
+          repository: 'SansMercantile/mpeti-core'
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+
+      - name: Set Lowercase Repository Owner
+        run: echo "repo_owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Download MATLAB Runtime
+        run: |
+          echo "Downloading MATLAB Runtime installer..."
+          # The installer will be placed in the correct directory for the Docker build context.
+          wget -q -O ./sans-mercantile-app/matlab_module/MATLAB_Runtime_R2023a_Update_8_glnxa64.zip "${{ secrets.MATLAB_RUNTIME_DOWNLOAD_URL }}"
+          echo "Download complete."
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push MATLAB Module Docker Image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./sans-mercantile-app/matlab_module
+          file: ./sans-mercantile-app/matlab_module/Dockerfile
+          push: true
+          tags: ghcr.io/${{ env.repo_owner }}/matlab-module:latest
+          no-cache: true

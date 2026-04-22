@@ -1,0 +1,1486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sans Mercantile - Admin Portal</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React and Babel for JSX compilation -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Google Fonts: Inter & Playfair Display -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    
+    <!-- Quill Rich Text Editor -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Your actual Firebase project configuration is now included.
+        const firebaseConfig = {
+            apiKey: "AIzaSyCOFO_bhkY-BvWimABJh-RWf0q084XHVdU",
+            authDomain: "sans-mercantile.firebaseapp.com",
+            projectId: "sans-mercantile",
+            storageBucket: "sans-mercantile.appspot.com",
+            messagingSenderId: "829965275751",
+            appId: "1:829965275751:web:c53395cceb69f6ba5d7ac2",
+            measurementId: "G-FVEEDYCZFH"
+        };
+        
+        window.firebaseConfig = firebaseConfig;
+        window.appId = firebaseConfig.appId || 'default-app-id';
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            --color-text-primary: #1f0000; /* burgundy-black */
+            --color-accent-primary: #FC7642; /* orange */
+            --color-bg-main: #f0f0f0; /* silver */
+            --color-border-focus: #4b5563; /* A classy, darker gray for focus */
+        }
+        h1, h2, h3, .font-display {
+            font-family: 'Playfair Display', serif;
+        }
+        .btn-primary {
+            background-color: var(--color-text-primary);
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #490c09; /* crimson-noir */
+        }
+        .btn-primary:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background-color: #e5e7eb;
+            color: #1f2937;
+        }
+        .btn-secondary:hover {
+            background-color: #d1d5db;
+        }
+        .text-accent {
+            color: var(--color-accent-primary);
+        }
+        .input-focus:focus {
+            outline: none;
+            border-color: var(--color-border-focus);
+            box-shadow: 0 0 0 1px var(--color-border-focus);
+        }
+        .ql-editor {
+            min-height: 350px;
+            font-size: 16px;
+        }
+        .ql-toolbar {
+            border-top-left-radius: 0.5rem;
+            border-top-right-radius: 0.5rem;
+        }
+        .ql-container {
+             border-bottom-left-radius: 0.5rem;
+            border-bottom-right-radius: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendEmailVerification } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, getDocs, collection, addDoc, updateDoc, serverTimestamp, query, onSnapshot, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+        const { useState, useEffect, useCallback, useRef } = React;
+
+        let app, auth, db, storage;
+        let firebaseError = null;
+        try {
+            if (window.firebaseConfig && window.firebaseConfig.apiKey) {
+                app = initializeApp(window.firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                storage = getStorage(app);
+            } else {
+                throw new Error("Firebase configuration is missing or invalid.");
+            }
+        } catch (e) {
+            console.error("Firebase initialization error:", e);
+            firebaseError = e.message;
+        }
+
+        const Lock = (props) => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}> <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect> <path d="M7 11V7a5 5 0 0 1 10 0v4"></path> </svg> );
+        const Mail = (props) => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}> <rect width="20" height="16" x="2" y="4" rx="2"></rect> <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path> </svg> );
+        const User = (props) => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}> <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path> <circle cx="12" cy="7" r="4"></circle> </svg> );
+        const Building = (props) => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}> <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect> <path d="M9 22v-4h6v4"></path><path d="M8 6h.01"></path><path d="M16 6h.01"></path><path d="M12 6h.01"></path><path d="M12 10h.01"></path><path d="M12 14h.01"></path><path d="M16 10h.01"></path><path d="M16 14h.01"></path><path d="M8 10h.01"></path><path d="M8 14h.01"></path> </svg> );
+        const Sparkles = (props) => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m12 3-1.9 5.8-5.8 1.9 5.8 1.9 1.9 5.8 1.9-5.8 5.8-1.9-5.8-1.9z"/></svg>);
+
+        const WordLogo = ({ onDarkBg = false, className = '' }) => {
+            const mercantileColor = onDarkBg ? 'var(--color-bg-main)' : 'var(--color-text-primary)';
+            return (
+                <div className={"font-display font-bold tracking-tight " + className}>
+                    <span style={{ color: 'var(--color-accent-primary)' }}>Sans</span>
+                    <span style={{ color: mercantileColor }}>
+                        Mercantile<sup className="font-normal">&trade;</sup>
+                    </span>
+                </div>
+            );
+        };
+
+        // --- Virtual Office Platform Main App ---
+        function App() {
+            const [user, setUser] = useState(null);
+            const [isLoading, setIsLoading] = useState(true);
+            const [view, setView] = useState('login');
+            const [userType, setUserType] = useState('individual');
+            const [error, setError] = useState('');
+            const [success, setSuccess] = useState('');
+            const PRIMARY_ADMIN_EMAIL = "hello@sansmercantile.com";
+
+            useEffect(() => {
+                if (!auth) {
+                    setIsLoading(false);
+                    return;
+                }
+                const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+                    setUser(currentUser);
+                    setIsLoading(false);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                setError('');
+                const email = e.target.email.value;
+                const password = e.target.password.value;
+                try {
+                    await signInWithEmailAndPassword(auth, email, password);
+                } catch (err) {
+                    setError(err.message);
+                }
+            };
+
+            const handleSignup = async (e) => {
+                e.preventDefault();
+                setError('');
+                setSuccess('');
+                const email = e.target.email.value;
+                const password = e.target.password.value;
+                const isOrg = userType === 'organization';
+                const userData = {
+                    email,
+                    role: 'editor', // default role
+                    type: userType,
+                    createdAt: serverTimestamp(),
+                };
+                if (isOrg) {
+                    userData.orgName = e.target.orgName.value;
+                    userData.orgReg = e.target.orgReg.value;
+                    userData.contactPerson = e.target.contactPerson.value;
+                }
+
+                try {
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                    const userRef = doc(db, `artifacts/${window.appId}/users`, userCredential.user.uid);
+                    await setDoc(userRef, userData);
+                    await sendEmailVerification(userCredential.user);
+                    setSuccess('Verification email sent! Please check your inbox.');
+                    setView('login');
+                } catch (err) {
+                    setError(err.message);
+                }
+            };
+
+            if (firebaseError) {
+                return <div className="min-h-screen flex items-center justify-center text-red-500 font-bold p-8 text-center">{firebaseError}</div>;
+            }
+            if (isLoading) {
+                return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+            }
+            const isVerified = user && (user.email === PRIMARY_ADMIN_EMAIL || user.emailVerified);
+            if (user && isVerified) {
+                return <MainLayout user={user} onSignOut={async () => { await signOut(auth); }} />;
+            }
+            return (
+                <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+                    <div className="w-full max-w-md space-y-8">
+                        <div className="text-center">
+                            <WordLogo className="text-4xl justify-center flex" />
+                            <h2 className="mt-6 text-center text-2xl font-display text-gray-700">
+                                {view === 'login' ? 'Portal Sign In' : 'Account Registration'}
+                            </h2>
+                        </div>
+                        {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">{error}</div>}
+                        {success && <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">{success}</div>}
+                        {view === 'login' ? <LoginForm handleLogin={handleLogin} setView={setView} /> : <SignupForm handleSignup={handleSignup} setView={setView} userType={userType} setUserType={setUserType} />}
+                    </div>
+                </div>
+            );
+        }
+
+        function LoginForm({ handleLogin, setView }) {
+            return (
+                <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+                     <div className="rounded-md shadow-sm space-y-4">
+                        <InputField id="email-address" name="email" type="email" placeholder="Email address" icon={Mail} />
+                        <InputField id="password" name="password" type="password" placeholder="Password" icon={Lock} />
+                    </div>
+                    <div><button type="submit" className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md btn-primary transition-colors">Sign in</button></div>
+                    <p className="mt-2 text-center text-sm text-gray-600">Need an account?{' '}<a href="#" onClick={(e) => { e.preventDefault(); setView('signup'); }} className="font-medium text-accent hover:underline">Register</a></p>
+                </form>
+            );
+        }
+
+        function SignupForm({ handleSignup, setView, userType, setUserType }) {
+            return (
+                <form className="mt-8 space-y-6" onSubmit={handleSignup}>
+                    <div className="flex justify-center rounded-md border border-gray-300 p-1 bg-gray-200">
+                        <button type="button" onClick={() => setUserType('individual')} className={"w-1/2 py-2 text-sm font-medium rounded-md " + (userType === 'individual' ? 'bg-white text-accent shadow' : 'text-gray-600')}>Employee</button>
+                        <button type="button" onClick={() => setUserType('organization')} className={"w-1/2 py-2 text-sm font-medium rounded-md " + (userType === 'organization' ? 'bg-white text-accent shadow' : 'text-gray-600')}>Organization</button>
+                    </div>
+                    {userType === 'individual' ? <IndividualFields /> : <OrganizationFields />}
+                    <div><button type="submit" className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md btn-primary transition-colors">Register</button></div>
+                    <p className="mt-2 text-center text-sm text-gray-600">Already have an account?{' '}<a href="#" onClick={(e) => { e.preventDefault(); setView('login'); }} className="font-medium text-accent hover:underline">Sign In</a></p>
+                </form>
+            );
+        }
+
+        const InputField = ({ id, name, type, placeholder, icon: Icon, value, onChange, required = true }) => (
+            <div className="relative">
+                {Icon && <Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />}
+                <input id={id} name={name} type={type} required={required} value={value} onChange={onChange} className="appearance-none rounded-md relative block w-full px-3 py-3 pl-10 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none input-focus sm:text-sm" placeholder={placeholder} />
+            </div>
+        );
+
+        function IndividualFields() {
+            return (
+                <div className="space-y-4">
+                    <InputField name="email" type="email" placeholder="Company Email" icon={Mail} />
+                    <InputField name="password" type="password" placeholder="Create a Password" icon={Lock} />
+                </div>
+            );
+        }
+
+        function OrganizationFields() {
+            return (
+                <div className="space-y-4">
+                    <InputField name="orgName" type="text" placeholder="Organization Name" icon={Building} />
+                    <InputField name="email" type="email" placeholder="Business Email" icon={Mail} />
+                    <InputField name="password" type="password" placeholder="Create a Password" icon={Lock} />
+                    <InputField name="orgReg" type="text" placeholder="Company Registration Number" icon={Building} />
+                    <InputField name="contactPerson" type="text" placeholder="Contact Person Name" icon={User} />
+                </div>
+            );
+        }
+
+        // --- Blog Components ---
+        function AIAssistant({ quill, onApplySuggestion, onInsertImage }) {
+            const [activeTab, setActiveTab] = useState('review');
+            const [suggestions, setSuggestions] = useState([]);
+            const [isReviewLoading, setReviewLoading] = useState(false);
+            const [imagePrompt, setImagePrompt] = useState('');
+            const [generatedImageUrl, setGeneratedImageUrl] = useState(null);
+            const [isImageLoading, setImageLoading] = useState(false);
+            const [error, setError] = useState('');
+
+            // Use backend OpenAI proxy for review
+            const handleReviewText = async () => {
+                if (!quill) return;
+                setReviewLoading(true);
+                setError('');
+                setSuggestions([]);
+                const text = quill.getText();
+                const prompt = `You are an expert blog editor for a fintech company. Review the following blog post for clarity, grammar, and engagement. Provide a list of specific suggestions for improvement. For each suggestion, provide the original text to be replaced, the suggested new text, and a brief reason for the change. Respond in a JSON array of objects with keys: originalText, suggestedText, reason. Here is the text: ${text}`;
+                try {
+                    const apiUrl = '/api/openai';
+                    const payload = {
+                        model: 'gpt-4',
+                        messages: [
+                            { role: 'system', content: 'You are a helpful assistant.' },
+                            { role: 'user', content: prompt }
+                        ],
+                        temperature: 0.2,
+                        max_tokens: 1024
+                    };
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) {
+                        throw new Error(`OpenAI proxy request failed with status ${response.status}`);
+                    }
+                    const result = await response.json();
+                    let aiText = result.choices?.[0]?.message?.content;
+                    let parsedSuggestions = [];
+                    try {
+                        parsedSuggestions = JSON.parse(aiText);
+                    } catch (e) {
+                        const match = aiText.match(/```json([\s\S]*?)```/);
+                        if (match) {
+                            parsedSuggestions = JSON.parse(match[1]);
+                        } else {
+                            throw new Error('AI response was not valid JSON.');
+                        }
+                    }
+                    setSuggestions(parsedSuggestions);
+                } catch (err) {
+                    console.error('AI review failed:', err);
+                    setError('Could not get suggestions. Please check your OpenAI proxy and try again.');
+                } finally {
+                    setReviewLoading(false);
+                }
+            };
+
+            const handleGenerateImage = async () => {
+                if (!imagePrompt) return;
+                setImageLoading(true);
+                setError('');
+                setGeneratedImageUrl(null);
+                
+                try {
+                    const payload = { instances: [{ prompt: imagePrompt }], parameters: { "sampleCount": 1 } };
+                    const apiKey = "";
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`API request failed with status ${response.status}`);
+                    }
+
+                    const result = await response.json();
+
+                    if (result.predictions && result.predictions[0].bytesBase64Encoded) {
+                        const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                        setGeneratedImageUrl(imageUrl);
+                    } else {
+                        throw new Error("Failed to generate image.");
+                    }
+                } catch (err) {
+                    console.error("Image generation failed:", err);
+                    setError("Could not generate image. Please ensure the 'Generative Language API' is enabled and try again.");
+                } finally {
+                    setImageLoading(false);
+                }
+            };
+
+            return (
+                <div className="bg-white p-4 rounded-lg shadow-md border w-full md:w-80">
+                    <div className="flex items-center space-x-2 mb-4">
+                        <Sparkles className="text-accent" />
+                        <h3 className="text-lg font-display font-bold">AI Assistant</h3>
+                    </div>
+                    <div className="flex border-b mb-4">
+                        <button onClick={() => setActiveTab('review')} className={"flex-1 py-2 text-sm font-semibold " + (activeTab === 'review' ? 'border-b-2 border-accent text-accent' : 'text-gray-500')}>Review & Edit</button>
+                        <button onClick={() => setActiveTab('image')} className={"flex-1 py-2 text-sm font-semibold " + (activeTab === 'image' ? 'border-b-2 border-accent text-accent' : 'text-gray-500')}>Generate Image</button>
+                    </div>
+
+                    {activeTab === 'review' && (
+                        <div>
+                            <button onClick={handleReviewText} disabled={isReviewLoading} className="btn-primary w-full py-2 rounded-md text-sm font-semibold mb-4">
+                                {isReviewLoading ? 'Analyzing...' : 'Review with AI'}
+                            </button>
+                            <div className="space-y-3 max-h-96 overflow-y-auto">
+                                {suggestions.map((s, index) => (
+                                    <div key={index} className="bg-gray-50 p-3 rounded-md border">
+                                        <p className="text-xs text-gray-500">Suggestion:</p>
+                                        <p className="text-sm font-semibold my-1">"{s.suggestedText}"</p>
+                                        <p className="text-xs text-gray-600 italic mb-2">{s.reason}</p>
+                                        <button onClick={() => onApplySuggestion(s)} className="bg-green-500 text-white px-2 py-1 text-xs rounded hover:bg-green-600">Apply</button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'image' && (
+                        <div className="space-y-4">
+                            <textarea value={imagePrompt} onChange={(e) => setImagePrompt(e.target.value)} placeholder="Describe the image you want to create..." className="w-full p-2 border rounded-md text-sm h-24"></textarea>
+                            <button onClick={handleGenerateImage} disabled={isImageLoading} className="btn-primary w-full py-2 rounded-md text-sm font-semibold">
+                                {isImageLoading ? 'Generating...' : 'Generate Image'}
+                            </button>
+                            {isImageLoading && <div className="text-center text-sm text-gray-500">Creating image, please wait...</div>}
+                            {generatedImageUrl && (
+                                <div>
+                                    <img src={generatedImageUrl} alt="AI generated" className="rounded-md border" />
+                                    <button onClick={() => onInsertImage(generatedImageUrl)} className="bg-blue-500 text-white w-full mt-2 py-2 rounded-md text-sm font-semibold hover:bg-blue-600">Insert Image</button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    {error && <p className="text-red-500 text-xs mt-4">{error}</p>}
+                </div>
+            );
+        }
+
+        function BlogEditor({ post, onSave }) {
+            const [title, setTitle] = useState(post?.title || '');
+            const [content, setContent] = useState(post?.content || '');
+            const [description, setDescription] = useState(post?.description || '');
+            const [tags, setTags] = useState(post?.tags?.join(', ') || '');
+            const [metaImage, setMetaImage] = useState(post?.metaImage || '');
+            const [isSaving, setIsSaving] = useState(false);
+            const quillRef = useRef();
+            const formRef = useRef();
+
+            const imageHandler = useCallback(() => { const input = document.createElement('input'); input.setAttribute('type', 'file'); input.setAttribute('accept', 'image/*'); input.click(); input.onchange = async () => { const file = input.files[0]; if (!file) return; const quill = quillRef.current; const range = quill.getSelection(true); quill.enable(false); try { const storageRef = ref(storage, `blogs/${Date.now()}_${file.name}`); const snapshot = await uploadBytes(storageRef, file); const url = await getDownloadURL(snapshot.ref); quill.enable(true); quill.insertEmbed(range.index, 'image', url); quill.setSelection(range.index + 1); } catch (error) { console.error("Image upload failed:", error); quill.enable(true); } }; }, []);
+
+            useEffect(() => {
+                if (quillRef.current) return;
+                const editor = new Quill('#editor', { theme: 'snow', modules: { toolbar: { container: [ [{ 'header': [1, 2, 3, false] }], ['bold', 'italic', 'underline', 'strike'], [{'list': 'ordered'}, {'list': 'bullet'}], ['link', 'image', 'video'], ['clean'] ], handlers: { image: imageHandler } } } });
+                quillRef.current = editor;
+                if (content) {
+                    editor.root.innerHTML = content;
+                }
+                editor.on('text-change', () => { setContent(editor.root.innerHTML); });
+            }, [imageHandler, content]);
+
+            const handleSave = async () => {
+                setIsSaving(true);
+                const tagsArray = tags.split(',').map(tag => tag.trim()).filter(Boolean);
+                try {
+                    await onSave({ ...post, title, content, description, tags: tagsArray, metaImage });
+                } catch (error) {
+                    console.error("Failed to save post:", error);
+                } finally {
+                    setIsSaving(false);
+                }
+            };
+            
+            const handleApplySuggestion = (suggestion) => {
+                const { originalText, suggestedText } = suggestion;
+                const editor = quillRef.current;
+                const currentText = editor.getText();
+                const newText = currentText.replace(originalText, suggestedText);
+                editor.setText(newText);
+            };
+
+            const handleInsertImage = (imageUrl) => {
+                const editor = quillRef.current;
+                const range = editor.getSelection(true);
+                editor.insertEmbed(range.index, 'image', imageUrl);
+            };
+
+            return (
+                <form ref={formRef} onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+                    <div className="flex flex-col md:flex-row gap-6">
+                        <div className="flex-grow space-y-4">
+                            <input type="text" placeholder="Blog Title" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full p-3 text-2xl font-bold font-display border-b-2 focus:outline-none input-focus" required />
+                            <textarea placeholder="SEO Description (max 160 characters)" value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-3 text-sm border rounded-md focus:outline-none input-focus h-24 resize-none" maxLength="160"></textarea>
+                            <input type="text" placeholder="Tags (comma-separated, e.g., AI, Fintech, Markets)" value={tags} onChange={(e) => setTags(e.target.value)} className="w-full p-3 text-sm border rounded-md focus:outline-none input-focus" />
+                            <input type="url" placeholder="Featured Image URL (optional)" value={metaImage} onChange={(e) => setMetaImage(e.target.value)} className="w-full p-3 text-sm border rounded-md focus:outline-none input-focus" />
+                            <div id="editor"></div>
+                        </div>
+                        <AIAssistant quill={quillRef.current} onApplySuggestion={handleApplySuggestion} onInsertImage={handleInsertImage} />
+                    </div>
+                     <div className="w-full flex justify-end space-x-4 pt-4">
+                        <button type="button" onClick={() => window.location.hash = '#blog'} className="btn-secondary px-6 py-2 rounded-md font-semibold">Cancel</button>
+                        <button type="submit" disabled={isSaving || title.trim() === ''} className="btn-primary px-6 py-2 rounded-md font-semibold">
+                            {isSaving ? 'Saving...' : 'Submit for Review'}
+                        </button>
+                    </div>
+                </form>
+            );
+        }
+        
+        // --- Main Layout and Virtual Office Pages ---
+        const PlaceholderDepartment = ({ name }) => (
+            <div>
+                <h1 className="text-2xl font-display mb-4">{name}</h1>
+                <p>This department's content is not yet implemented.</p>
+            </div>
+        );
+        const SalesDepartment = () => <PlaceholderDepartment name="Sales Department" />;
+        const LegalDepartment = () => <PlaceholderDepartment name="Legal Department" />;
+        const SocialMediaDepartment = () => <PlaceholderDepartment name="Social Media Department" />;
+        const CustomerSupportDepartment = () => <PlaceholderDepartment name="Customer Support Department" />;
+        const ITDepartment = () => <PlaceholderDepartment name="IT Department" />;
+
+        function MainLayout({ user, onSignOut }) {
+            const [page, setPage] = useState('dashboard');
+            return (
+                <div className="flex min-h-screen">
+                    <Sidebar page={page} setPage={setPage} onSignOut={onSignOut} />
+                    <main className="flex-1 p-6 bg-gray-100">
+                        {page === 'dashboard' && <Dashboard user={user} />}
+                        {page === 'admin' && <AdminUserManagement />}
+                        {page === 'hr' && <HRManagement />}
+                        {page === 'payroll' && <PayrollFinance />}
+                        {page === 'pr' && <PRCommunications />}
+                        {page === 'sales' && <SalesDepartment />}
+                        {page === 'legal' && <LegalDepartment />}
+                        {page === 'social' && <SocialMediaDepartment />}
+                        {page === 'support' && <CustomerSupportDepartment />}
+                        {page === 'it' && <ITDepartment />}
+                        {page === 'training' && <TrainingDepartment />}
+                        {page === 'office' && <VirtualOffice />}
+                    </main>
+                </div>
+            );
+        }
+
+        function Sidebar({ page, setPage, onSignOut }) {
+            return (
+                <nav className="w-64 bg-white border-r p-4 flex flex-col justify-between min-h-screen">
+                    <div>
+                        <WordLogo className="mb-8 text-2xl" />
+                        <ul className="space-y-2">
+                            <li><button onClick={() => setPage('dashboard')} className={"w-full text-left py-2 px-3 rounded " + (page==='dashboard'?'text-accent font-bold bg-gray-100':'')}>Dashboard</button></li>
+                            <li><button onClick={() => setPage('admin')} className={"w-full text-left py-2 px-3 rounded " + (page==='admin'?'text-accent font-bold bg-gray-100':'')}>Admin User Management</button></li>
+                            <li><button onClick={() => setPage('hr')} className={"w-full text-left py-2 px-3 rounded " + (page==='hr'?'text-accent font-bold bg-gray-100':'')}>HR Management</button></li>
+                            <li><button onClick={() => setPage('payroll')} className={"w-full text-left py-2 px-3 rounded " + (page==='payroll'?'text-accent font-bold bg-gray-100':'')}>Payroll & Finance</button></li>
+                            <li><button onClick={() => setPage('pr')} className={"w-full text-left py-2 px-3 rounded " + (page==='pr'?'text-accent font-bold bg-gray-100':'')}>PR & Communications</button></li>
+                            <li><button onClick={() => setPage('sales')} className={"w-full text-left py-2 px-3 rounded " + (page==='sales'?'text-accent font-bold bg-gray-100':'')}>Sales Department</button></li>
+                            <li><button onClick={() => setPage('legal')} className={"w-full text-left py-2 px-3 rounded " + (page==='legal'?'text-accent font-bold bg-gray-100':'')}>Legal Department</button></li>
+                            <li><button onClick={() => setPage('social')} className={"w-full text-left py-2 px-3 rounded " + (page==='social'?'text-accent font-bold bg-gray-100':'')}>Social Media</button></li>
+                            <li><button onClick={() => setPage('support')} className={"w-full text-left py-2 px-3 rounded " + (page==='support'?'text-accent font-bold bg-gray-100':'')}>Customer Support</button></li>
+                            <li><button onClick={() => setPage('it')} className={"w-full text-left py-2 px-3 rounded " + (page==='it'?'text-accent font-bold bg-gray-100':'')}>IT Department</button></li>
+                            <li><button onClick={() => setPage('training')} className={"w-full text-left py-2 px-3 rounded " + (page==='training'?'text-accent font-bold bg-gray-100':'')}>Training Department</button></li>
+                            <li><button onClick={() => setPage('office')} className={"w-full text-left py-2 px-3 rounded " + (page==='office'?'text-accent font-bold bg-gray-100':'')}>Virtual Office</button></li>
+                        </ul>
+                    </div>
+                    <button onClick={onSignOut} className="mt-8 btn-secondary w-full py-2 px-3 rounded">Sign Out</button>
+                </nav>
+            );
+        }
+
+        function TrainingDepartment() {
+            const [modules, setModules] = React.useState([]);
+            const [search, setSearch] = React.useState('');
+            const [loading, setLoading] = React.useState(false);
+            const [assigned, setAssigned] = React.useState([]);
+            const [aiSuggestion, setAiSuggestion] = React.useState('');
+
+            // Fetch assigned trainings from Firestore
+            React.useEffect(() => {
+                const unsub = onSnapshot(
+                    collection(db, `artifacts/${window.appId}/public/data/training_assignments`),
+                    (snapshot) => setAssigned(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+                );
+                return () => unsub();
+            }, []);
+
+            // AI-powered fetch from external sources (mocked for now)
+            const fetchAIModules = async (query) => {
+                setLoading(true);
+                setAiSuggestion('');
+                setTimeout(() => {
+                    setModules([
+                        { title: 'AI for Everyone', provider: 'Coursera', url: 'https://www.coursera.org/learn/ai-for-everyone' },
+                        { title: 'Harvard CS50', provider: 'Harvard', url: 'https://cs50.harvard.edu/x/' },
+                        { title: 'Data Annotation Best Practices', provider: 'Appen', url: 'https://appen.com/resources/' },
+                        { title: 'Project Management', provider: 'Alison', url: 'https://alison.com/course/project-management' },
+                    ].filter(m => m.title.toLowerCase().includes(query.toLowerCase())));
+                    setAiSuggestion('Results powered by AI.');
+                    setLoading(false);
+                }, 1200);
+            };
+
+            // Assign training
+            const assignTraining = async (mod) => {
+                await addDoc(collection(db, `artifacts/${window.appId}/public/data/training_assignments`), {
+                    ...mod,
+                    assignedAt: serverTimestamp(),
+                    status: 'assigned'
+                });
+            };
+
+            return (
+                <div>
+                    <h1 className="text-2xl font-display mb-4">Training Department</h1>
+                    <p className="mb-2">Keep employees updated with the latest skills and best practices. Search and assign trainings below.</p>
+                    <div className="flex gap-2 mb-4">
+                        <input type="text" className="input-focus border rounded p-2 flex-1" placeholder="Search skills or topics (e.g. AI, compliance, leadership)" value={search} onChange={e=>setSearch(e.target.value)} />
+                        <button className="btn-primary px-4 py-2 rounded" onClick={()=>fetchAIModules(search)} disabled={loading}>{loading ? 'Searching...' : 'AI Lookup'}</button>
+                    </div>
+                    {aiSuggestion && <div className="text-xs text-accent mb-2">{aiSuggestion}</div>}
+                    <ul className="mb-4">
+                        {modules.map((m,i)=>(
+                            <li key={i} className="border-b py-2 flex justify-between items-center">
+                                <span><a href={m.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{m.title}</a> <span className="text-xs text-gray-500">({m.provider})</span></span>
+                                <button className="btn-secondary px-2 py-1 rounded" onClick={()=>assignTraining(m)}>Assign</button>
+                            </li>
+                        ))}
+                    </ul>
+                    <h2 className="font-bold mb-2">Assigned Trainings</h2>
+                    <ul className="mb-4">
+                        {assigned.map(a=>(
+                            <li key={a.id} className="border-b py-2 flex justify-between items-center">
+                                <span>{a.title} <span className="text-xs text-gray-500">({a.provider})</span> [{a.status}]</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            );
+        }
+
+        // --- Placeholder Pages for Each Department ---
+        function Dashboard({ user }) {
+            return (
+                <div>
+                    <h1 className="text-3xl font-display mb-4">Welcome, {user.email}</h1>
+                    <p className="mb-6">This is your personalized dashboard. Use the sidebar to access your department tools and resources.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <h2 className="font-bold text-lg mb-2">Payslips & Tax Reports</h2>
+                            <p>View your latest payslips and download tax documents.</p>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <h2 className="font-bold text-lg mb-2">Profile & Directory</h2>
+                            <p>Update your profile and browse the company directory.</p>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <h2 className="font-bold text-lg mb-2">Departmental Tools</h2>
+                            <p>Access your department's collaboration and communication tools.</p>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <h2 className="font-bold text-lg mb-2">Company News & Events</h2>
+                            <p>Stay up to date with announcements and upcoming events.</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function AdminUserManagement() {
+            const [users, setUsers] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState('');
+            const [showCreate, setShowCreate] = useState(false);
+            const [newUser, setNewUser] = useState({ email: '', fullName: '', role: 'editor' });
+            const [creating, setCreating] = useState(false);
+            const [success, setSuccess] = useState('');
+
+            // Fetch users from Firestore
+            useEffect(() => {
+                setLoading(true);
+                const unsub = onSnapshot(
+                    collection(db, `artifacts/${window.appId}/users`),
+                    (snapshot) => {
+                        setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                        setLoading(false);
+                    },
+                    (err) => {
+                        setError('Failed to load users.');
+                        setLoading(false);
+                    }
+                );
+                return () => unsub();
+            }, []);
+
+            // Create new user (invites by email)
+            const handleCreateUser = async (e) => {
+                e.preventDefault();
+                setCreating(true);
+                setError('');
+                setSuccess('');
+                try {
+                    // Add to employee_records for onboarding
+                    const recRef = collection(db, `artifacts/${window.appId}/public/data/employee_records`);
+                    await addDoc(recRef, {
+                        email: newUser.email,
+                        full_name: newUser.fullName,
+                        role: newUser.role,
+                        accountCreated: false,
+                        status: 'pending',
+                        invitedAt: serverTimestamp()
+                    });
+                    setSuccess('User invited for onboarding.');
+                    setShowCreate(false);
+                    setNewUser({ email: '', fullName: '', role: 'editor' });
+                } catch (err) {
+                    setError('Failed to invite user.');
+                } finally {
+                    setCreating(false);
+                }
+            };
+
+            // Update user role
+            const handleRoleChange = async (userId, newRole) => {
+                try {
+                    const userRef = doc(db, `artifacts/${window.appId}/users`, userId);
+                    await updateDoc(userRef, { role: newRole });
+                } catch (err) {
+                    setError('Failed to update role.');
+                }
+            };
+
+            // Approve onboarding (activate user)
+            const handleApprove = async (userId) => {
+                try {
+                    const userRef = doc(db, `artifacts/${window.appId}/users`, userId);
+                    await updateDoc(userRef, { status: 'active' });
+                } catch (err) {
+                    setError('Failed to approve user.');
+                }
+            };
+
+            return (
+                <div>
+                    <h1 className="text-2xl font-display mb-4">Admin User Management</h1>
+                    <p className="mb-4">Admins can create new users, assign roles, and approve onboarding here.</p>
+                    {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-2">{error}</div>}
+                    {success && <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-2 rounded mb-2">{success}</div>}
+                    <button className="btn-primary px-4 py-2 rounded mb-4" onClick={() => setShowCreate(!showCreate)}>{showCreate ? 'Cancel' : 'Invite New User'}</button>
+                    {showCreate && (
+                        <form className="bg-white rounded shadow p-4 mb-6" onSubmit={handleCreateUser}>
+                            <div className="mb-2">
+                                <label className="block mb-1 font-semibold">Full Name</label>
+                                <input type="text" className="input-focus w-full border rounded p-2" required value={newUser.fullName} onChange={e => setNewUser({ ...newUser, fullName: e.target.value })} />
+                            </div>
+                            <div className="mb-2">
+                                <label className="block mb-1 font-semibold">Email</label>
+                                <input type="email" className="input-focus w-full border rounded p-2" required value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} />
+                            </div>
+                            <div className="mb-2">
+                                <label className="block mb-1 font-semibold">Role</label>
+                                <select className="input-focus w-full border rounded p-2" value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })}>
+                                    <option value="admin">Admin</option>
+                                    <option value="editor">Editor</option>
+                                    <option value="viewer">Viewer</option>
+                                </select>
+                            </div>
+                            <button type="submit" className="btn-primary px-4 py-2 rounded mt-2" disabled={creating}>{creating ? 'Inviting...' : 'Invite User'}</button>
+                        </form>
+                    )}
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full bg-white rounded shadow">
+                            <thead>
+                                <tr>
+                                    <th className="px-4 py-2 text-left">Name</th>
+                                    <th className="px-4 py-2 text-left">Email</th>
+                                    <th className="px-4 py-2 text-left">Role</th>
+                                    <th className="px-4 py-2 text-left">Status</th>
+                                    <th className="px-4 py-2">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {loading ? (
+                                    <tr><td colSpan="5" className="text-center py-4">Loading users...</td></tr>
+                                ) : users.length === 0 ? (
+                                    <tr><td colSpan="5" className="text-center py-4">No users found.</td></tr>
+                                ) : users.map(user => (
+                                    <tr key={user.id} className="border-t">
+                                        <td className="px-4 py-2">{user.fullName || user.full_name || '-'}</td>
+                                        <td className="px-4 py-2">{user.email}</td>
+                                        <td className="px-4 py-2">
+                                            <select value={user.role || 'editor'} onChange={e => handleRoleChange(user.id, e.target.value)} className="input-focus border rounded p-1">
+                                                <option value="admin">Admin</option>
+                                                <option value="editor">Editor</option>
+                                                <option value="viewer">Viewer</option>
+                                            </select>
+                                        </td>
+                                        <td className="px-4 py-2">{user.status || 'pending'}</td>
+                                        <td className="px-4 py-2 text-center">
+                                            {user.status !== 'active' && (
+                                                <button className="btn-secondary px-3 py-1 rounded" onClick={() => handleApprove(user.id)}>Approve</button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- Enhanced HR Management: Applicants, Assessments, Anti-Cheating ---
+        function HRManagement() {
+            const [tab, setTab] = useState('applicants');
+            const [applicants, setApplicants] = useState([]);
+            const [newApplicant, setNewApplicant] = useState({ name: '', email: '', status: 'Applied' });
+            const [assessments, setAssessments] = useState([]);
+            const [selectedApplicant, setSelectedApplicant] = useState(null);
+            const [showAssessment, setShowAssessment] = useState(false);
+            const [assessmentData, setAssessmentData] = useState(null);
+            const [assessmentLog, setAssessmentLog] = useState([]);
+            const [assessmentStatus, setAssessmentStatus] = useState('not_started');
+            const [assessmentStart, setAssessmentStart] = useState(null);
+            const [assessmentAnswers, setAssessmentAnswers] = useState({});
+            const [assessmentTimeLeft, setAssessmentTimeLeft] = useState(0);
+            const [cheatDetected, setCheatDetected] = useState(false);
+            const [cheatReason, setCheatReason] = useState('');
+
+            // Fetch applicants
+            useEffect(() => {
+                const unsub = onSnapshot(
+                    collection(db, `artifacts/${window.appId}/public/data/applicants`),
+                    (snapshot) => setApplicants(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+                );
+                return () => unsub();
+            }, []);
+
+            // Fetch assessments
+            useEffect(() => {
+                const unsub = onSnapshot(
+                    collection(db, `artifacts/${window.appId}/public/data/assessments`),
+                    (snapshot) => setAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+                );
+                return () => unsub();
+            }, []);
+
+            // Add applicant
+            const handleAddApplicant = async (e) => {
+                e.preventDefault();
+                await addDoc(collection(db, `artifacts/${window.appId}/public/data/applicants`), {
+                    ...newApplicant,
+                    createdAt: serverTimestamp(),
+                });
+                setNewApplicant({ name: '', email: '', status: 'Applied' });
+            };
+
+            // Assign assessment
+            const handleAssignAssessment = async (applicant, assessment) => {
+                await addDoc(collection(db, `artifacts/${window.appId}/public/data/assessment_assignments`), {
+                    applicantId: applicant.id,
+                    assessmentId: assessment.id,
+                    assignedAt: serverTimestamp(),
+                    status: 'assigned',
+                });
+            };
+
+            // Start assessment: open robust anti-cheating test in new window
+            const handleStartAssessment = (assessment) => {
+                // Assume assessment.html is the filename for the test (e.g., cognitive-aptitude-test.html)
+                // You may want to map assessment.id or title to the correct file
+                let testFile = 'jobs/assessments/' + (assessment.file || 'cognitive-aptitude-test.html');
+                window.open('/' + testFile + '?applicant=' + encodeURIComponent(selectedApplicant?.email || ''), '_blank', 'noopener,width=1024,height=768');
+            };
+
+            // Timer for assessment
+            useEffect(() => {
+                if (assessmentStatus !== 'in_progress' || assessmentTimeLeft <= 0) return;
+                const timer = setInterval(() => {
+                    setAssessmentTimeLeft(t => {
+                        if (t <= 1) {
+                            setAssessmentStatus('finished');
+                            return 0;
+                        }
+                        return t - 1;
+                    });
+                }, 1000);
+                return () => clearInterval(timer);
+            }, [assessmentStatus, assessmentTimeLeft]);
+
+            // Anti-cheating: focus/tab change detection
+            useEffect(() => {
+                if (assessmentStatus !== 'in_progress') return;
+                const onBlur = () => {
+                    setCheatDetected(true);
+                    setCheatReason('Tab or window focus lost during assessment.');
+                    setAssessmentLog(log => [...log, { type: 'focus_lost', time: Date.now() }]);
+                };
+                window.addEventListener('blur', onBlur);
+                return () => window.removeEventListener('blur', onBlur);
+            }, [assessmentStatus]);
+
+            // Anti-cheating: copy/paste prevention
+            useEffect(() => {
+                if (assessmentStatus !== 'in_progress') return;
+                const prevent = (e) => {
+                    setCheatDetected(true);
+                    setCheatReason('Copy or paste detected during assessment.');
+                    setAssessmentLog(log => [...log, { type: 'copy_paste', time: Date.now() }]);
+                    e.preventDefault();
+                };
+                window.addEventListener('copy', prevent);
+                window.addEventListener('paste', prevent);
+                return () => {
+                    window.removeEventListener('copy', prevent);
+                    window.removeEventListener('paste', prevent);
+                };
+            }, [assessmentStatus]);
+
+            // Submit assessment
+            const handleSubmitAssessment = async () => {
+                setAssessmentStatus('finished');
+                await addDoc(collection(db, `artifacts/${window.appId}/public/data/assessment_results`), {
+                    applicantId: selectedApplicant?.id,
+                    assessmentId: assessmentData.id,
+                    answers: assessmentAnswers,
+                    submittedAt: serverTimestamp(),
+                    log: assessmentLog,
+                    cheatDetected,
+                    cheatReason,
+                });
+                setShowAssessment(false);
+            };
+
+            // Render assessment UI
+            const renderAssessment = () => {
+                if (!assessmentData) return null;
+                return (
+                    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-2xl relative">
+                            <h2 className="text-xl font-bold mb-2">Assessment: {assessmentData.title}</h2>
+                            <div className="mb-2">Time left: <span className="font-mono">{Math.floor(assessmentTimeLeft/60)}:{(assessmentTimeLeft%60).toString().padStart(2,'0')}</span></div>
+                            {cheatDetected && <div className="text-red-600 font-bold mb-2">Cheating detected: {cheatReason}</div>}
+                            <form onSubmit={e => { e.preventDefault(); handleSubmitAssessment(); }}>
+                                <ol className="space-y-4">
+                                    {assessmentData.questions.map((q, i) => (
+                                        <li key={i} className="border-b pb-2">
+                                            <div className="font-semibold mb-1">Q{i+1}: {q.question}</div>
+                                            {q.type === 'mcq' ? (
+                                                <div className="space-y-1">
+                                                    {q.options.map((opt, j) => (
+                                                        <label key={j} className="block">
+                                                            <input type="radio" name={`q${i}`} value={opt} checked={assessmentAnswers[i]===opt} onChange={() => setAssessmentAnswers(a => ({ ...a, [i]: opt }))} disabled={cheatDetected || assessmentStatus === 'finished'} /> {opt}
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <textarea className="border rounded p-2 w-full" rows="2" value={assessmentAnswers[i]||''} onChange={e=>setAssessmentAnswers(a=>({...a,[i]:e.target.value}))} disabled={cheatDetected || assessmentStatus==='finished'} />
+                                            )}
+                                        </li>
+                                    ))}
+                                </ol>
+                                <div className="flex justify-end mt-4 gap-2">
+                                    <button type="button" className="btn-secondary px-4 py-2 rounded" onClick={() => setShowAssessment(false)}>Cancel</button>
+                                    <button type="submit" className="btn-primary px-4 py-2 rounded" disabled={cheatDetected || assessmentStatus==='finished'}>Submit</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div>
+                    <h1 className="text-2xl font-display mb-4">HR Management</h1>
+                    <div className="flex gap-2 mb-4">
+                        <button className={tab === 'applicants' ? "btn-secondary px-4 py-2 rounded bg-accent text-white" : "btn-secondary px-4 py-2 rounded"} onClick={() => setTab('applicants')}>Applicants</button>
+                        <button className={tab === 'assessments' ? "btn-secondary px-4 py-2 rounded bg-accent text-white" : "btn-secondary px-4 py-2 rounded"} onClick={() => setTab('assessments')}>Assessments</button>
+                    </div>
+                    {tab==='applicants' && (
+                        <div>
+                            <h2 className="font-bold mb-2">Add Applicant</h2>
+                            <form className="flex gap-2 mb-4" onSubmit={handleAddApplicant}>
+                                <input type="text" className="input-focus border rounded p-2" placeholder="Name" value={newApplicant.name} onChange={e=>setNewApplicant({...newApplicant, name:e.target.value})} required />
+                                <input type="email" className="input-focus border rounded p-2" placeholder="Email" value={newApplicant.email} onChange={e=>setNewApplicant({...newApplicant, email:e.target.value})} required />
+                                <button type="submit" className="btn-primary px-4 py-2 rounded">Add</button>
+                            </form>
+                            <h2 className="font-bold mb-2">Applicants</h2>
+                            <ul className="mb-4">
+                                {applicants.map(a=>(
+                                    <li key={a.id} className="border-b py-2 flex justify-between items-center">
+                                        <span>{a.name} ({a.email}) - {a.status}</span>
+                                        <div className="flex gap-2">
+                                            <button className="btn-secondary px-2 py-1 rounded" onClick={() => setSelectedApplicant(a)}>Assign Assessment</button>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                            {selectedApplicant && (
+                                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                                    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md relative">
+                                        <h3 className="font-bold mb-2">Assign Assessment to {selectedApplicant.name}</h3>
+                                        <ul className="mb-4">
+                                            {assessments.map(asmt=>(
+                                                <li key={asmt.id} className="flex justify-between items-center border-b py-2">
+                                                    <span>{asmt.title}</span>
+                                                    <button className="btn-primary px-2 py-1 rounded" onClick={() => { handleAssignAssessment(selectedApplicant, asmt); setSelectedApplicant(null); }}>Assign</button>
+                                                    <button className="btn-secondary px-2 py-1 rounded" onClick={() => { handleStartAssessment(asmt); setSelectedApplicant(null); }}>Simulate Test</button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                        <button className="btn-secondary px-2 py-1 rounded absolute top-2 right-2" onClick={() => setSelectedApplicant(null)}>Close</button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    {tab==='assessments' && (
+                        <div>
+                            <h2 className="font-bold mb-2">Assessments</h2>
+                            <ul className="mb-4">
+                                {assessments.map(a=>(
+                                    <li key={a.id} className="border-b py-2 flex justify-between items-center">
+                                        <span>{a.title} ({a.questions.length} questions, {a.timeLimit||15} min)</span>
+                                        <button className="btn-secondary px-2 py-1 rounded" onClick={() => { setAssessmentData(a); setShowAssessment(true); setAssessmentStatus('not_started'); }}>Preview</button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                    {showAssessment && renderAssessment()}
+                </div>
+            );
+        }
+
+        function PayrollFinance() {
+            const [tab, setTab] = useState('payslips');
+            // Payslips
+            const [payslips, setPayslips] = useState([]);
+            const [uploadPayslip, setUploadPayslip] = useState({ user: '', file: null });
+            // Tax Reports
+            const [taxReports, setTaxReports] = useState([]);
+            const [uploadTax, setUploadTax] = useState({ user: '', file: null });
+            // Expense Claims
+            const [claims, setClaims] = useState([]);
+            const [newClaim, setNewClaim] = useState({ user: '', amount: '', description: '', status: 'pending' });
+            // Dashboard
+            const [totalClaims, setTotalClaims] = useState(0);
+            const [totalPaid, setTotalPaid] = useState(0);
+
+            // Fetch payslips
+            useEffect(() => {
+                const unsub = onSnapshot(
+                    collection(db, `artifacts/${window.appId}/public/data/payslips`),
+                    (snapshot) => setPayslips(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+                );
+                return () => unsub();
+            }, []);
+            // Fetch tax reports
+            useEffect(() => {
+                const unsub = onSnapshot(
+                    collection(db, `artifacts/${window.appId}/public/data/tax_reports`),
+                    (snapshot) => setTaxReports(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+                );
+                return () => unsub();
+            }, []);
+            // Fetch claims
+            useEffect(() => {
+                const unsub = onSnapshot(
+                    collection(db, `artifacts/${window.appId}/public/data/expense_claims`),
+                    (snapshot) => {
+                        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setClaims(data);
+                        setTotalClaims(data.length);
+                        setTotalPaid(data.filter(c=>c.status==='approved').reduce((sum,c)=>sum+parseFloat(c.amount||0),0));
+                    }
+                );
+                return () => unsub();
+            }, []);
+
+            // Upload payslip
+            const handlePayslipUpload = async (e) => {
+                e.preventDefault();
+                if (!uploadPayslip.user || !uploadPayslip.file) return;
+                const fileRef = ref(storage, `payslips/${Date.now()}_${uploadPayslip.file.name}`);
+                await uploadBytes(fileRef, uploadPayslip.file);
+                const url = await getDownloadURL(fileRef);
+                await addDoc(collection(db, `artifacts/${window.appId}/public/data/payslips`), {
+                    user: uploadPayslip.user,
+                    url,
+                    name: uploadPayslip.file.name,
+                    uploadedAt: serverTimestamp()
+                });
+                setUploadPayslip({ user: '', file: null });
+            };
+            // Upload tax report
+            const handleTaxUpload = async (e) => {
+                e.preventDefault();
+                if (!uploadTax.user || !uploadTax.file) return;
+                const fileRef = ref(storage, `tax_reports/${Date.now()}_${uploadTax.file.name}`);
+                await uploadBytes(fileRef, uploadTax.file);
+                const url = await getDownloadURL(fileRef);
+                await addDoc(collection(db, `artifacts/${window.appId}/public/data/tax_reports`), {
+                    user: uploadTax.user,
+                    url,
+                    name: uploadTax.file.name,
+                    uploadedAt: serverTimestamp()
+                });
+                setUploadTax({ user: '', file: null });
+            };
+            // Submit expense claim
+            const handleClaim = async (e) => {
+                e.preventDefault();
+                await addDoc(collection(db, `artifacts/${window.appId}/public/data/expense_claims`), {
+                    ...newClaim,
+                    amount: parseFloat(newClaim.amount),
+                    submittedAt: serverTimestamp()
+                });
+                setNewClaim({ user: '', amount: '', description: '', status: 'pending' });
+            };
+
+            return (
+                <div>
+                    <h1 className="text-2xl font-display mb-4">Payroll & Finance</h1>
+                    <div className="flex gap-2 mb-4">
+                        <button className={tab === 'payslips' ? "btn-secondary px-4 py-2 rounded bg-accent text-white" : "btn-secondary px-4 py-2 rounded"} onClick={() => setTab('payslips')}>Payslips</button>
+                        <button className={tab === 'tax' ? "btn-secondary px-4 py-2 rounded bg-accent text-white" : "btn-secondary px-4 py-2 rounded"} onClick={() => setTab('tax')}>Tax Reports</button>
+                        <button className={tab === 'claims' ? "btn-secondary px-4 py-2 rounded bg-accent text-white" : "btn-secondary px-4 py-2 rounded"} onClick={() => setTab('claims')}>Expense Claims</button>
+                        <button className={tab === 'dashboard' ? "btn-secondary px-4 py-2 rounded bg-accent text-white" : "btn-secondary px-4 py-2 rounded"} onClick={() => setTab('dashboard')}>Finance Dashboard</button>
+                    </div>
+                    {tab==='payslips' && (
+                        <div>
+                            <h2 className="font-bold mb-2">Upload Payslip</h2>
+                            <form className="flex gap-2 mb-4" onSubmit={handlePayslipUpload}>
+                                <input type="text" className="input-focus border rounded p-2" placeholder="User Email" value={uploadPayslip.user} onChange={e=>setUploadPayslip({...uploadPayslip, user:e.target.value})} required />
+                                <input type="file" className="input-focus border rounded p-2" onChange={e=>setUploadPayslip({...uploadPayslip, file:e.target.files[0]})} required />
+                                <button type="submit" className="btn-primary px-4 py-2 rounded">Upload</button>
+                            </form>
+                            <h2 className="font-bold mb-2">All Payslips</h2>
+                            <ul className="mb-4">
+                                {payslips.map(p=>(
+                                    <li key={p.id} className="border-b py-2 flex justify-between items-center">
+                                        <span>{p.user} - {p.name}</span>
+                                        <a href={p.url} target="_blank" rel="noopener noreferrer" className="btn-secondary px-2 py-1 rounded">Download</a>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                    {tab==='tax' && (
+                        <div>
+                            <h2 className="font-bold mb-2">Upload Tax Report</h2>
+                            <form className="flex gap-2 mb-4" onSubmit={handleTaxUpload}>
+                                <input type="text" className="input-focus border rounded p-2" placeholder="User Email" value={uploadTax.user} onChange={e=>setUploadTax({...uploadTax, user:e.target.value})} required />
+                                <input type="file" className="input-focus border rounded p-2" onChange={e=>setUploadTax({...uploadTax, file:e.target.files[0]})} required />
+                                <button type="submit" className="btn-primary px-4 py-2 rounded">Upload</button>
+                            </form>
+                            <h2 className="font-bold mb-2">All Tax Reports</h2>
+                            <ul className="mb-4">
+                                {taxReports.map(t=>(
+                                    <li key={t.id} className="border-b py-2 flex justify-between items-center">
+                                        <span>{t.user} - {t.name}</span>
+                                        <a href={t.url} target="_blank" rel="noopener noreferrer" className="btn-secondary px-2 py-1 rounded">Download</a>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                    {tab==='claims' && (
+                        <div>
+                            <h2 className="font-bold mb-2">Submit Expense Claim</h2>
+                            <form className="flex gap-2 mb-4" onSubmit={handleClaim}>
+                                <input type="text" className="input-focus border rounded p-2" placeholder="User Email" value={newClaim.user} onChange={e=>setNewClaim({...newClaim, user:e.target.value})} required />
+                                <input type="number" className="input-focus border rounded p-2" placeholder="Amount" value={newClaim.amount} onChange={e=>setNewClaim({...newClaim, amount:e.target.value})} required />
+                                <input type="text" className="input-focus border rounded p-2" placeholder="Description" value={newClaim.description} onChange={e=>setNewClaim({...newClaim, description:e.target.value})} required />
+                                <button type="submit" className="btn-primary px-4 py-2 rounded">Submit</button>
+                            </form>
+                            <h2 className="font-bold mb-2">All Expense Claims</h2>
+                            <ul className="mb-4">
+                                {claims.map(c=>(
+                                    <li key={c.id} className="border-b py-2 flex justify-between items-center">
+                                        <span>{c.user} - ${c.amount} - {c.description} [{c.status}]</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                    {tab==='dashboard' && (
+                        <div>
+                            <h2 className="font-bold mb-2">Finance Dashboard</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div className="bg-white rounded shadow p-4">
+                                    <h3 className="font-bold">Total Claims</h3>
+                                    <p className="text-2xl">{totalClaims}</p>
+                                </div>
+                                <div className="bg-white rounded shadow p-4">
+                                    <h3 className="font-bold">Total Paid</h3>
+                                    <p className="text-2xl">${totalPaid.toFixed(2)}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function PRCommunications() {
+            const [tab, setTab] = useState('news');
+            // News Feed
+            const [news, setNews] = useState([]);
+            const [newNews, setNewNews] = useState({ title: '', content: '' });
+            // Announcements
+            const [announcements, setAnnouncements] = useState([]);
+            const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '' });
+            // Departmental Chat
+            const [chat, setChat] = useState([]);
+            const [message, setMessage] = useState('');
+            // Calendar/Events
+            const [events, setEvents] = useState([]);
+            const [newEvent, setNewEvent] = useState({ title: '', date: '', description: '' });
+
+            // Fetch news
+            useEffect(() => {
+                const unsub = onSnapshot(
+                    collection(db, `artifacts/${window.appId}/public/data/news_feed`),
+                    (snapshot) => setNews(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+                );
+                return () => unsub();
+            }, []);
+            // Fetch announcements
+            useEffect(() => {
+                const unsub = onSnapshot(
+                    collection(db, `artifacts/${window.appId}/public/data/announcements`),
+                    (snapshot) => setAnnouncements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+                );
+                return () => unsub();
+            }, []);
+            // Fetch chat
+            useEffect(() => {
+                const unsub = onSnapshot(
+                    collection(db, `artifacts/${window.appId}/public/data/departmental_chat`),
+                    (snapshot) => setChat(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+                );
+                return () => unsub();
+            }, []);
+            // Fetch events
+            useEffect(() => {
+                const unsub = onSnapshot(
+                    collection(db, `artifacts/${window.appId}/public/data/events`),
+                    (snapshot) => setEvents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+                );
+                return () => unsub();
+            }, []);
+
+            // Post news
+            const handleNews = async (e) => {
+                e.preventDefault();
+                await addDoc(collection(db, `artifacts/${window.appId}/public/data/news_feed`), {
+                    ...newNews,
+                    createdAt: serverTimestamp()
+                });
+                setNewNews({ title: '', content: '' });
+            };
+            // Post announcement
+            const handleAnnouncement = async (e) => {
+                e.preventDefault();
+                await addDoc(collection(db, `artifacts/${window.appId}/public/data/announcements`), {
+                    ...newAnnouncement,
+                    createdAt: serverTimestamp()
+                });
+                setNewAnnouncement({ title: '', content: '' });
+            };
+            // Send chat message
+            const handleChat = async (e) => {
+                e.preventDefault();
+                if (!message.trim()) return;
+                await addDoc(collection(db, `artifacts/${window.appId}/public/data/departmental_chat`), {
+                    text: message,
+                    createdAt: serverTimestamp()
+                });
+                setMessage('');
+            };
+            // Add event
+            const handleEvent = async (e) => {
+                e.preventDefault();
+                await addDoc(collection(db, `artifacts/${window.appId}/public/data/events`), {
+                    ...newEvent,
+                    createdAt: serverTimestamp()
+                });
+                setNewEvent({ title: '', date: '', description: '' });
+            };
+
+            return (
+                <div>
+                    <h1 className="text-2xl font-display mb-4">PR & Communications</h1>
+                    <div className="flex gap-2 mb-4">
+                        <button className={tab === 'news' ? "btn-secondary px-4 py-2 rounded bg-accent text-white" : "btn-secondary px-4 py-2 rounded"} onClick={() => setTab('news')}>News Feed</button>
+                        <button className={tab === 'announcements' ? "btn-secondary px-4 py-2 rounded bg-accent text-white" : "btn-secondary px-4 py-2 rounded"} onClick={() => setTab('announcements')}>Announcements</button>
+                        <button className={tab === 'chat' ? "btn-secondary px-4 py-2 rounded bg-accent text-white" : "btn-secondary px-4 py-2 rounded"} onClick={() => setTab('chat')}>Departmental Chat</button>
+                        <button className={tab === 'events' ? "btn-secondary px-4 py-2 rounded bg-accent text-white" : "btn-secondary px-4 py-2 rounded"} onClick={() => setTab('events')}>Calendar/Events</button>
+                    </div>
+                    {tab==='news' && (
+                        <div>
+                            <h2 className="font-bold mb-2">Post News</h2>
+                            <form className="flex gap-2 mb-4" onSubmit={handleNews}>
+                                <input type="text" className="input-focus border rounded p-2" placeholder="Title" value={newNews.title} onChange={e=>setNewNews({...newNews, title:e.target.value})} required />
+                                <input type="text" className="input-focus border rounded p-2" placeholder="Content" value={newNews.content} onChange={e=>setNewNews({...newNews, content:e.target.value})} required />
+                                <button type="submit" className="btn-primary px-4 py-2 rounded">Post</button>
+                            </form>
+                            <h2 className="font-bold mb-2">Company News Feed</h2>
+                            <ul className="mb-4">
+                                {news.map(n=>(
+                                    <li key={n.id} className="border-b py-2">
+                                        <span className="font-bold">{n.title}</span>: {n.content}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                    {tab==='announcements' && (
+                        <div>
+                            <h2 className="font-bold mb-2">Post Announcement</h2>
+                            <form className="flex gap-2 mb-4" onSubmit={handleAnnouncement}>
+                                <input type="text" className="input-focus border rounded p-2" placeholder="Title" value={newAnnouncement.title} onChange={e=>setNewAnnouncement({...newAnnouncement, title:e.target.value})} required />
+                                <input type="text" className="input-focus border rounded p-2" placeholder="Content" value={newAnnouncement.content} onChange={e=>setNewAnnouncement({...newAnnouncement, content:e.target.value})} required />
+                                <button type="submit" className="btn-primary px-4 py-2 rounded">Announce</button>
+                            </form>
+                            <h2 className="font-bold mb-2">Announcements</h2>
+                            <ul className="mb-4">
+                                {announcements.map(a=>(
+                                    <li key={a.id} className="border-b py-2">
+                                        <span className="font-bold">{a.title}</span>: {a.content}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                    {tab==='chat' && (
+                        <div>
+                            <h2 className="font-bold mb-2">Departmental Chat</h2>
+                            <div className="mb-4 max-h-64 overflow-y-auto">
+                                {chat.map(msg=>(
+                                    <div key={msg.id} className="mb-2">
+                                        <span>{msg.text}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <form className="flex gap-2" onSubmit={handleChat}>
+                                <input type="text" className="input-focus flex-1 border rounded p-2" placeholder="Type a message..." value={message} onChange={e=>setMessage(e.target.value)} />
+                                <button type="submit" className="btn-primary px-4 py-2 rounded">Send</button>
+                            </form>
+                        </div>
+                    )}
+                    {tab==='events' && (
+                        <div>
+                            <h2 className="font-bold mb-2">Add Event</h2>
+                            <form className="flex gap-2 mb-4" onSubmit={handleEvent}>
+                                <input type="text" className="input-focus border rounded p-2" placeholder="Title" value={newEvent.title} onChange={e=>setNewEvent({...newEvent, title:e.target.value})} required />
+                                <input type="date" className="input-focus border rounded p-2" value={newEvent.date} onChange={e=>setNewEvent({...newEvent, date:e.target.value})} required />
+                                <input type="text" className="input-focus border rounded p-2" placeholder="Description" value={newEvent.description} onChange={e=>setNewEvent({...newEvent, description:e.target.value})} required />
+                                <button type="submit" className="btn-primary px-4 py-2 rounded">Add</button>
+                            </form>
+                            <h2 className="font-bold mb-2">Upcoming Events</h2>
+                            <ul className="mb-4">
+                                {events.map(ev=>(
+                                    <li key={ev.id} className="border-b py-2">
+                                        <span className="font-bold">{ev.title}</span> ({ev.date}): {ev.description}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function VirtualOffice() {
+            const [users, setUsers] = useState([]);
+            const [currentUser, setCurrentUser] = useState(null);
+            const [chat, setChat] = useState([]);
+            const [message, setMessage] = useState('');
+            const [groups, setGroups] = useState([]);
+            const [selectedGroup, setSelectedGroup] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [presenceUnsub, setPresenceUnsub] = useState(null);
+            const [chatUnsub, setChatUnsub] = useState(null);
+
+            // Fetch all users (including AI agents)
+            useEffect(() => {
+                setLoading(true);
+                const unsub = onSnapshot(
+                    collection(db, `artifacts/${window.appId}/users`),
+                    (snapshot) => {
+                        setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                        setLoading(false);
+                    }
+                );
+                return () => unsub();
+            }, []);
+
+            // Set current user presence (simulate online)
+            useEffect(() => {
+                // For demo, use a random user as current (in real app, use auth user)
+                if (users.length > 0) {
+                    setCurrentUser(users[0]);
+                    const userRef = doc(db, `artifacts/${window.appId}/users`, users[0].id);
+                    updateDoc(userRef, { online: true, lastActive: serverTimestamp() });
+                    // On unload, set offline
+                    const handleUnload = () => updateDoc(userRef, { online: false });
+                    window.addEventListener('beforeunload', handleUnload);
+                    return () => window.removeEventListener('beforeunload', handleUnload);
+                }
+            }, [users]);
+
+            // Fetch groups
+            useEffect(() => {
+                const unsub = onSnapshot(
+                    collection(db, `artifacts/${window.appId}/public/data/groups`),
+                    (snapshot) => setGroups(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+                );
+                return () => unsub();
+            }, []);
+
+            // Fetch chat for selected group
+            useEffect(() => {
+                if (!selectedGroup) return;
+                if (chatUnsub) chatUnsub();
+                const unsub = onSnapshot(
+                    query(collection(db, `artifacts/${window.appId}/public/data/groups/${selectedGroup.id}/chat`)),
+                    (snapshot) => setChat(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+                );
+                setChatUnsub(() => unsub);
+                return () => unsub();
+            }, [selectedGroup]);
+
+            // Send chat message
+            const sendMessage = async (e) => {
+                e.preventDefault();
+                if (!message.trim() || !selectedGroup || !currentUser) return;
+                const chatRef = collection(db, `artifacts/${window.appId}/public/data/groups/${selectedGroup.id}/chat`);
+                await addDoc(chatRef, {
+                    text: message,
+                    sender: currentUser.fullName || currentUser.email,
+                    senderId: currentUser.id,
+                    createdAt: serverTimestamp()
+                });
+                setMessage('');
+            };
+
+            return (
+                <div className="flex flex-col md:flex-row gap-6">
+                    <div className="w-full md:w-1/4 bg-white rounded shadow p-4">
+                        <h2 className="font-bold text-lg mb-2">Online Users</h2>
+                        <ul className="space-y-2">
+                            {users.filter(u => u.online).map(u => (
+                                <li key={u.id} className="flex items-center gap-2">
+                                    <span className="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
+                                    <span>{u.fullName || u.email}</span>
+                                    {u.isAI && <span className="ml-2 text-xs text-blue-500">AI Agent</span>}
+                                </li>
+                            ))}
+                        </ul>
+                        <h2 className="font-bold text-lg mt-6 mb-2">Groups</h2>
+                        <ul className="space-y-2">
+                            {groups.map(g => (
+                                <li key={g.id}>
+                                    <button className={selectedGroup && selectedGroup.id === g.id ? "w-full text-left px-2 py-1 rounded bg-accent text-white" : "w-full text-left px-2 py-1 rounded bg-gray-100"} onClick={() => setSelectedGroup(g)}>{g.name}</button>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                    <div className="flex-1 bg-white rounded shadow p-4 flex flex-col">
+                        <h2 className="font-bold text-lg mb-2">{selectedGroup ? selectedGroup.name : 'Select a Group'}</h2>
+                        {selectedGroup ? (
+                            <div className="flex flex-col h-full">
+                                <div className="flex-1 overflow-y-auto mb-4" style={{ maxHeight: 400 }}>
+                                    {chat.map(msg => (
+                                        <div key={msg.id} className="mb-2">
+                                            <span className="font-semibold">{msg.sender}:</span> <span>{msg.text}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <form onSubmit={sendMessage} className="flex gap-2">
+                                    <input type="text" className="input-focus flex-1 border rounded p-2" placeholder="Type a message..." value={message} onChange={e => setMessage(e.target.value)} />
+                                    <button type="submit" className="btn-primary px-4 py-2 rounded">Send</button>
+                                </form>
+                            </div>
+                        ) : (
+                            <div className="text-gray-500">Select a group to start chatting and collaborating.</div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+        
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(<App />);
+
+    </script>
+</body>
+</html>

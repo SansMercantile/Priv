@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/png" href="../img/logo.png" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sans Mercantile | Financial Acumen Test</title>
+  <link rel="stylesheet" href="style-test.css" />
+  <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet" />
+  <meta name="description" content="Financial Acumen Test for Sans Mercantile Executive Partner Evaluation." />
+</head>
+<body>
+  <div id="header-placeholder"></div>
+
+  <main class="main-wrap legal-page">
+    <section class="legal-hero" data-aos="fade-up">
+      <h2>Financial Acumen Test</h2>
+      <p>Focus: Capital structuring, pricing logic, investor alignment.</p>
+      <p>Duration: 60 minutes | 15 Questions</p>
+      <div id="timer">Time Left: 60:00</div>
+    </section>
+
+    <section data-aos="fade-up" data-aos-delay="100">
+      <h3>Questions</h3>
+      <form id="quiz-form" class="quiz-container">
+        <div class="quiz-question">
+          <h4>A startup requires $10 million in funding. They are considering two options: 1) 70% equity, 30% debt with an 8% interest rate, or 2) 50% equity, 50% debt with a 10% interest rate. Assuming both have the same valuation considerations for equity, which option likely has a lower Weighted Average Cost of Capital (WACC) if the cost of equity is 15% and the tax rate is 25%?</h4>
+          <div class="options">
+            <label>
+              <input type="radio" name="question0" value="A"> Option 1 (70% equity, 30% debt)
+            </label>
+            <label>
+              <input type="radio" name="question0" value="B"> Option 2 (50% equity, 50% debt)
+            </label>
+            <label>
+              <input type="radio" name="question0" value="C"> They would have the same WACC.
+            </label>
+            <label>
+              <input type="radio" name="question0" value="D"> More information is needed to determine WACC.
+            </label>
+          </div>
+        </div>
+
+        <div class="quiz-question">
+            <h4>Your new AI-trading platform service costs $50,000 per year to develop and maintain for each client. You want to achieve a 20% profit margin. What should be the minimum annual subscription fee per client?</h4>
+            <div class="options">
+              <label>
+                <input type="radio" name="question1" value="A"> $55,000
+              </label>
+              <label>
+                <input type="radio" name="question1" value="B"> $60,000
+              </label>
+              <label>
+                <input type="radio" name="question1" value="C"> $62,500
+              </label>
+              <label>
+                <input type="radio" name="question1" value="D"> $75,000
+              </label>
+            </div>
+        </div>
+
+        <div class="submit-btn">
+          <button type="submit" class="cta" id="submit-quiz">Submit Test</button>
+        </div>
+      </form>
+      <div id="result"></div>
+      <div id="completion-message"></div>
+    </section>
+  </main>
+
+  <div id="footer-placeholder"></div>
+
+  <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+  <script src="test-script.js"></script>
+  <script>
+    // Define the questions and correct answers for this specific test
+    document.addEventListener("DOMContentLoaded", function() {
+        window.setQuestions([
+            { id: 0, type: 'multiple-choice', question: "A startup requires $10 million in funding...", correctAnswer: "B" }, // WACC calculation: WACC = (E/V)*Re + (D/V)*Rd*(1-T). Option 1: (0.7*0.15) + (0.3*0.08*(1-0.25)) = 0.105 + 0.018 = 0.123 (12.3%). Option 2: (0.5*0.15) + (0.5*0.10*(1-0.25)) = 0.075 + 0.0375 = 0.1125 (11.25%). Option 2 has lower WACC.
+            { id: 1, type: 'multiple-choice', question: "Your new AI-trading platform service costs $50,000 per year...", correctAnswer: "C" }, // Cost is $50,000. If cost is 80% of selling price (100%-20% profit), then 50,000 / 0.8 = 62,500.
+            // Add 13 more questions here with their correct answers
+        ]);
+    });
+  </script>
+</body>
+</html>

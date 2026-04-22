@@ -1,0 +1,77 @@
+{
+  "meta": {
+    "title": "Sans Mercantile™ | Home",
+    "description": "Sans Mercantile™ is an AI-native fintech platform transforming CFD trading and township economies with predictive, transparent, and institution-grade intelligence."
+  },
+  "nav": {
+    "home": "Home",
+    "about": "About",
+    "services": "Services",
+    "platform": "Platform",
+    "blog": "Blog",
+    "investors": "Investors",
+    "contact": "Contact",
+    "careers": "Careers"
+  },
+  "hero": {
+    "title": "AI-Native Financial Infrastructure for Tomorrow’s Economies",
+    "subtitle": "Empowering underbanked and high-growth markets with predictive, transparent, and institution-grade CFD trading intelligence.",
+    "cta": "Explore the AI Platform"
+  },
+  "vision": {
+    "heading": "Our Vision",
+    "body": "To redefine financial markets through AI-driven strategy, expert advisory, and automated precision, creating unmatched profitability and sustainable financial growth."
+  },
+  "values": {
+    "heading": "Our Edge",
+    "aiRegulated": {
+      "title": "AI Regulated",
+      "desc": "Real-time predictive governance built into every transaction."
+    },
+    "inclusive": {
+      "title": "Inclusive Access",
+      "desc": "Serving underbanked markets through tokenized mobile finance."
+    },
+    "expert": {
+      "title": "Expert-Driven",
+      "desc": "Institutional intelligence. Grassroots strategy."
+    }
+  },
+  "platform": {
+    "heading": "Meet the Platform",
+    "cta": "See All Platform Features"
+  },
+  "metrics": {
+      "confidence": "Predictive Signal Confidence",
+      "minutes": "min",
+      "kyc": "Tokenized KYC Onboarding"
+      "surveillance": "ESG-Sensitive Surveillance"
+  },
+  "insights": {
+    "heading": "Latest Insights",
+    "0": {
+        "title": "Redefining Risk: Why Township Markets Deserve Better Infrastructure",
+        "body": "A deep dive into how our AI engine mitigates structural volatility while unlocking scalable growth for communities long overlooked by traditional finance.",
+        "link": "Read More"
+    },
+    "1": {
+        "title": "Compliance Isn’t a Checkbox. It’s a Framework.",
+        "body": "Why built-in governance matters—and how Sans Mercantile™ approaches compliance as a trust-building opportunity, not a hurdle.",
+        "link": "Read More"
+    },
+    "viewAll": "View All Insights"
+  },
+  "subscribe": {
+    "heading": "Join Our Insider Briefing",
+    "placeholder": "Your Email",
+    "button": "Subscribe"
+  },
+  "footer": {
+    "information": { "title": "Information", "sitemap": "Sitemap", "terms": "Terms & Conditions", "privacy": "Privacy Notice", "cookie": "Cookie Notice" },
+    "connect": { "title": "Connect", "careers": "Work With Us", "partners": "Content Partners", "advertise": "Advertise", "press": "Press" },
+    "support": { "title": "Support and Help", "contact": "Contact Support", "faq": "FAQ", "trust": "Trust and Safety" },
+    "legal": { "title": "Legal", "eula": "EULA", "compliance": "Compliance Framework", "liability": "Liability Provisions" },
+    "discover": { "title": "Discover", "blog": "Insights Blog" },
+    "copyright": "All Rights Reserved."
+  }
+}

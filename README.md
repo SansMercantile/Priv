@@ -1,2 +1,1 @@
-# Priv
-Fintech
+# ftg

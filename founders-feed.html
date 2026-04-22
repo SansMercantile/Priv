@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="robots" content="index,follow" />
+  <title>Founder’s Feed — Hidden</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="header-placeholder"></div>
+  <main class="main-wrap">
+    <section style="padding:2.5rem 1.25rem; max-width:1000px; margin:1.5rem auto; text-align:left;">
+      <h1 class="font-display">Founder’s Feed (Hidden)</h1>
+      <p class="lead">Phase 3 preview: curated archive of short reflections and posts. This will become a live LinkedIn integration later.</p>
+
+      <div id="feed" style="margin-top:1rem;">
+        <!-- feed items will be injected here -->
+      </div>
+
+      <h3 style="margin-top:1rem;">Subscribe (hidden)</h3>
+  <form style="display:flex;gap:0.5rem;max-width:420px;" onsubmit="event.preventDefault();alert('Subscribed (demo)');">
+        <input type="email" placeholder="you@company.com" style="flex:1;padding:0.75rem;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);color:var(--color-white)" />
+        <button class="cta" type="submit">Subscribe</button>
+      </form>
+
+    </section>
+  </main>
+  <div id="footer-placeholder"></div>
+  <script src="js/main.js"></script>
+  <script>
+    (async function(){
+      const feedEl = document.getElementById('feed');
+      function render(posts){
+        feedEl.innerHTML = posts.map(p => `
+          <article class="feature-card">
+            <h4>${p.title}</h4>
+            <p>${p.text}</p>
+            ${p.link ? `<a href="${p.link}">Read</a>` : ''}
+          </article>
+        `).join('');
+      }
+
+      // Try local proxy first
+      try{
+        const res = await fetch('/tools/linkedin-proxy/feed');
+        if(res.ok){
+          const json = await res.json();
+          // Transform placeholder response to posts
+          const posts = [{ title: 'LinkedIn: profile', text: JSON.stringify(json.data) }];
+          render(posts);
+          return;
+        }
+      }catch(e){
+        // ignore
+      }
+
+      // fallback local posts
+      render([
+        { title: 'Reflection — Empathy in Systems', text: 'We design instruments to lower friction, not to extract identity.' },
+        { title: 'Reflection — On Local Markets', text: 'If markets are a language, we must teach everyone to read and write it.' }
+      ]);
+    })();
+  </script>
+</body>
+</html>

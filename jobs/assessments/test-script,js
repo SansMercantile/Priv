@@ -1,0 +1,238 @@
+document.addEventListener("DOMContentLoaded", function() {
+  const TOTAL_TIME_SECONDS = 60 * 60; // 60 minutes
+  let timeLeft = TOTAL_TIME_SECONDS;
+  let timerInterval;
+  let questions = []; // This will be populated by each test page
+  let score = 0;
+  let hasSubmitted = false;
+
+  // Function to fetch and insert HTML content
+  const loadComponent = (url, placeholderId) => {
+    fetch(url)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Failed to load ${url}: ${response.statusText}`);
+        }
+        return response.text();
+      })
+      .then(data => {
+        const placeholder = document.getElementById(placeholderId);
+        if (placeholder) {
+          placeholder.innerHTML = data;
+          // After header and footer are loaded, initialize AOS and language selector
+          if (placeholderId === 'footer-placeholder') {
+            AOS.init();
+            initializeLanguageSelector();
+          }
+        } else {
+          console.error(`Placeholder element with id "${placeholderId}" not found.`);
+        }
+      })
+      .catch(error => console.error(error));
+  };
+
+  // Load header and footer (note the ../ for test pages)
+  loadComponent('../header-test.html', 'header-placeholder');
+  loadComponent('../footer-test.html', 'footer-placeholder');
+
+  const timerDisplay = document.getElementById('timer');
+  const quizForm = document.getElementById('quiz-form');
+  const submitButton = document.getElementById('submit-quiz');
+  const resultDisplay = document.getElementById('result');
+  const completionMessage = document.getElementById('completion-message');
+
+  function updateTimer() {
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    timerDisplay.textContent = `Time Left: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+    if (timeLeft <= 0) {
+      clearInterval(timerInterval);
+      submitQuiz(true); // Submit if time runs out
+    }
+    timeLeft--;
+  }
+
+  function startTimer() {
+    timerInterval = setInterval(updateTimer, 1000);
+  }
+
+  // Define questions array based on the specific test page
+  // Each test page HTML will need to set its 'questions' array
+  // Example: `questions = [...]`
+  window.setQuestions = function(q) {
+    questions = q;
+  };
+
+  function calculateScore() {
+    score = 0;
+    questions.forEach((q, index) => {
+      const questionName = `question${index}`;
+      const selectedOption = quizForm.elements[questionName].value;
+
+      // Handle different question types
+      if (q.type === 'multiple-choice') {
+        if (selectedOption === q.correctAnswer) {
+          score++;
+        }
+      } else if (q.type === 'scenario-ranking') {
+        // For ranking, assume correct if the top-ranked choice matches the expected first choice
+        // Or implement more complex logic if partial credit for ranking is desired
+        if (selectedOption === q.correctOrder[0]) { // Check if the first ranked option is correct
+            score++;
+        }
+        // More sophisticated ranking scoring would compare the submitted order
+        // with the correctOrder array. For simplicity, we'll just check the first.
+      } else if (q.type === 'calculation' || q.type === 'short-form') {
+        // For calculation or short-form, these are typically manually reviewed.
+        // For immediate scoring, you might have a hidden 'expected answer' for calculations.
+        // For short-form, they just need to submit something. We won't auto-score rationale here.
+        // If there's an exact match expected for a calculation, you could add:
+        // if (parseFloat(selectedOption) === q.correctAnswer) { score++; }
+      }
+    });
+    return score;
+  }
+
+  function submitQuiz(timedOut = false) {
+    if (hasSubmitted) return; // Prevent multiple submissions
+    hasSubmitted = true;
+    clearInterval(timerInterval);
+
+    calculateScore();
+    const totalQuestions = questions.length;
+    resultDisplay.innerHTML = `Your Score: <span class="score">${score} / ${totalQuestions}</span>`;
+
+    let message = `Thank you for completing the test. Your score is ${score} out of ${totalQuestions}.`;
+
+    if (timedOut) {
+      message += " The time limit was reached.";
+    }
+
+    // THIS IS A PLACEHOLDER FOR SECURE EMAIL SUBMISSION
+    // In a real application, you would send this data to your backend API.
+    // The backend would then handle sending the email and logging the result.
+    const applicantEmail = "hello@sansmercantile.com"; // Replace with actual applicant email if collected
+    const testName = document.title.replace('Sans Mercantile | ', '');
+    const submissionData = {
+        test: testName,
+        score: score,
+        totalQuestions: totalQuestions,
+        timedOut: timedOut,
+        // Include answers if you need them for review
+        answers: Array.from(quizForm.elements).filter(el => el.type !== 'submit').map(el => ({
+            name: el.name,
+            value: el.value
+        }))
+    };
+
+    console.log("Submitting quiz data (client-side simulation):", submissionData);
+
+    // Simulate sending data to a backend. In a real scenario, this would be an API call.
+    // Example using fetch (requires a backend endpoint):
+    /*
+    fetch('/api/submit-test', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(submissionData),
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Success:', data);
+        if (data.success) { // Assuming your backend sends a success flag
+            completionMessage.innerHTML = `
+                ${message}<br><br>
+                Congratulations! We are setting up an interview to proceed with your application.
+                You will receive an email shortly with details.
+            `;
+        } else {
+            completionMessage.innerHTML = `${message}<br><br>There was an issue processing your submission. Please contact support.`;
+        }
+    })
+    .catch((error) => {
+        console.error('Error:', error);
+        completionMessage.innerHTML = `${message}<br><br>There was an error submitting your test. Please contact support.`;
+    });
+    */
+
+    // For this client-side example, we'll just display a message
+    completionMessage.innerHTML = `
+        ${message}<br><br>
+        Congratulations! We are setting up an interview to proceed with your application.
+        You will receive an email shortly with details at ${applicantEmail}.
+        <br><br>
+        <small><em>Note: For a real test, this data would be securely sent to a backend server.</em></small>
+    `;
+
+    submitButton.disabled = true; // Disable button after submission
+    Array.from(quizForm.elements).forEach(element => {
+        element.disabled = true; // Disable all form elements
+    });
+  }
+
+  // Attach event listener to the submit button
+  if (submitButton) {
+    submitButton.addEventListener('click', (event) => {
+      event.preventDefault(); // Prevent default form submission
+      submitQuiz();
+    });
+  }
+
+  // Start the timer when the page loads
+  if (timerDisplay) {
+    startTimer();
+  }
+
+  function initializeLanguageSelector() {
+    const languageSelect = document.getElementById('language-select');
+    if (languageSelect) {
+      const englishRegions = ['en', 'en-US', 'en-GB', 'en-CA', 'en-AU', 'en-NZ', 'en-ZA'];
+      const userLang = navigator.language || navigator.userLanguage;
+
+      if (englishRegions.some(region => userLang.startsWith(region))) {
+          languageSelect.value = 'en';
+      } else {
+          const langPrefix = userLang.split('-')[0];
+          const optionExists = languageSelect.querySelector(`option[value="${langPrefix}"]`);
+          if (optionExists) {
+              languageSelect.value = langPrefix;
+          } else {
+              languageSelect.value = 'en';
+          }
+      }
+
+      languageSelect.addEventListener('change', (event) => {
+          const selectedLanguage = event.target.value;
+          console.log(`Language changed to: ${selectedLanguage}`);
+          alert(`Page would now translate to ${selectedLanguage}. You need to implement the translation logic.`);
+      });
+    }
+  }
+
+  // IMPORTANT SECURITY NOTES FOR DEVELOPER IMPLEMENTATION:
+  // 1. FULLSCREEN LOCK: Use Fullscreen API (document.documentElement.requestFullscreen()) on page load
+  //    and monitor for 'fullscreenchange' events. If user exits, log a violation.
+  //    Browsers may have limitations on preventing exit.
+  // 2. KEYBOARD RESTRICTIONS (NO COPY/PASTE):
+  //    document.addEventListener('copy', preventCopy);
+  //    document.addEventListener('paste', preventPaste);
+  //    document.addEventListener('cut', preventCut);
+  //    function preventCopy(e) { e.preventDefault(); alert("Copying is not allowed."); } (and similar for paste/cut)
+  //    This can be circumvented via browser dev tools or external tools.
+  // 3. MOUSE TRACKING:
+  //    document.addEventListener('mouseleave', (e) => { if (e.clientY <= 0 || e.clientX <= 0 || (e.clientX >= window.innerWidth || e.clientY >= window.innerHeight)) { console.log('Mouse left viewport - VIOLATION'); /* Log to backend */ }});
+  //    This is basic and can be false-positive prone.
+  // 4. WEBCAM ACCESS: Requires getUserMedia API. Display video feed to user to confirm it's working.
+  //    Continuous monitoring and AI analysis require a backend service (e.g., TensorFlow.js for client-side detection,
+  //    but reliable proctoring is server-side).
+  //    Example:
+  //    navigator.mediaDevices.getUserMedia({ video: true })
+  //      .then(stream => { const video = document.createElement('video'); video.srcObject = stream; video.play(); /* Add video to DOM */ })
+  //      .catch(err => { console.error("Webcam access denied:", err); alert("Webcam access is mandatory for this test."); });
+  // 5. AI PROCTORING: This is a complex server-side or specialized software feature. Client-side JS can only do very basic detection.
+  // 6. 2 VIOLATIONS RULE: Implement a client-side counter, but this *must* be synchronized with and validated by a backend.
+  //    Any client-side counter can be easily manipulated.
+  // 7. SECURE SUBMISSION: ALL answers and scores MUST be validated on the server. Client-side scoring is for immediate feedback only.
+});
