@@ -22,7 +22,6 @@ import Connections from "./components/Connections";
 import UnifiedAssistant from "./ui/UnifiedAssistant";
 import GuidedWalkthrough from "./components/GuidedWalkthrough";
 
-import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import CreateProfilePage from "./pages/CreateProfilePage";
 import VerificationPage from "./pages/VerificationPage";
@@ -153,7 +152,6 @@ function App({ initialDevice = "desktop" }: AppProps) {
 
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/oauth/callback" element={<BrokerOAuthCallbackPage />} />
       <Route
