@@ -100,6 +100,14 @@ export default function LandingPage() {
                 allow="clipboard-write; fullscreen"
               />
             </div>
+            <div className="mt-3 flex justify-end">
+              <Link
+                to="/dashboard"
+                className="text-sm font-semibold text-zinc-200 underline-offset-4 transition hover:text-white hover:underline"
+              >
+                Open full dashboard
+              </Link>
+            </div>
           </div>
         </section>
 
