@@ -10,12 +10,20 @@ interface EnvironmentContextValue {
 
 const EnvironmentContext = createContext<EnvironmentContextValue | null>(null);
 
+function shouldForceDemoPreview(): boolean {
+  if (typeof window === 'undefined') return false;
+  return new URLSearchParams(window.location.search).get('preview') === 'broker';
+}
+
 export function EnvironmentProvider({ children }: { children: React.ReactNode }) {
-  const [demoMode, setDemoModeState] = useState<boolean>(() => readDemoMode());
+  const [demoMode, setDemoModeState] = useState<boolean>(() => shouldForceDemoPreview() || readDemoMode());
+  const previewMode = shouldForceDemoPreview();
 
   const setDemoMode = useCallback((enabled: boolean) => {
     setDemoModeState(enabled);
-    writeDemoMode(enabled);
+    if (!previewMode) {
+      writeDemoMode(enabled);
+    }
     toast({
       title: enabled ? 'Demo environment activated' : 'Live environment activated',
       description: enabled
@@ -23,15 +31,17 @@ export function EnvironmentProvider({ children }: { children: React.ReactNode })
         : 'Connect your Priv account, complete KYC, customize your profile, and link a broker to unlock analysis.',
       duration: 8000,
     });
-  }, []);
+  }, [previewMode]);
 
   const toggleDemoMode = useCallback(() => {
     setDemoMode(!demoMode);
   }, [demoMode, setDemoMode]);
 
   useEffect(() => {
-    writeDemoMode(demoMode);
-  }, [demoMode]);
+    if (!previewMode) {
+      writeDemoMode(demoMode);
+    }
+  }, [demoMode, previewMode]);
 
   const value = useMemo(
     () => ({ demoMode, setDemoMode, toggleDemoMode }),
