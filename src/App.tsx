@@ -22,6 +22,7 @@ import Connections from "./components/Connections";
 import UnifiedAssistant from "./ui/UnifiedAssistant";
 import GuidedWalkthrough from "./components/GuidedWalkthrough";
 
+import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import CreateProfilePage from "./pages/CreateProfilePage";
 import VerificationPage from "./pages/VerificationPage";
@@ -102,7 +103,7 @@ function DashboardShell({ demoMode }: { demoMode: boolean }) {
               className="p-6"
             >
               <Routes>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/" element={<LandingPage />} />
                 <Route path="/dashboard" element={<Dashboard demoMode={demoMode} />} />
                 <Route path="/dashboard/terminal" element={<TradingTerminal demoMode={demoMode} />} />
                 <Route path="/dashboard/agi-core" element={<AGICore demoMode={demoMode} />} />
