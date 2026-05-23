@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "cheerio": "^1.1.2",
     "escape-html": "^1.0.3"
   }
