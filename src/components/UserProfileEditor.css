@@ -1,0 +1,455 @@
+/* src/components/UserProfileEditor.css */
+
+/* Main container for the entire component */
+.user-profile-editor {
+    max-width: 800px;
+    margin: 2rem auto;
+    background-color: var(--color-card-bg);
+    border-radius: 12px;
+    box-shadow: var(--custom-medium);
+    overflow: hidden;
+    font-family: var(--font-body);
+}
+
+/* Header section with the main title */
+.profile-header {
+    padding: 1.5rem 2rem;
+    background-color: var(--color-main-bg);
+    border-bottom: 1px solid var(--color-border-color);
+}
+
+.profile-header h1 {
+    font-family: 'Playfair Display', serif;
+    color: var(--color-text-primary);
+    font-size: 1.75rem;
+    margin: 0;
+}
+
+.profile-header p {
+    color: var(--color-text-secondary);
+    margin: 0.25rem 0 0;
+}
+
+/* Form and Tab Layout */
+.profile-form {
+    display: flex;
+    flex-direction: column;
+}
+
+.profile-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--color-border-color);
+    padding: 0 2rem;
+}
+
+.tab-button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+    background-color: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    transition: color 0.2s ease, border-color 0.2s ease;
+    margin-bottom: -1px; /* Align with the container's border */
+}
+
+.tab-button:hover {
+    color: var(--color-text-primary);
+}
+
+.tab-button.active {
+    color: var(--color-accent-primary);
+    border-bottom-color: var(--color-accent-primary);
+}
+
+.tab-content {
+    padding: 2rem;
+}
+
+.tab-pane {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Form Elements Styling */
+.section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.25rem;
+    color: var(--color-text-primary);
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--color-border-color);
+    padding-bottom: 0.5rem;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.input-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.input-group label {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--color-text-primary);
+}
+
+.input-group input[type="text"],
+.input-group input[type="email"],
+.input-group input[type="tel"],
+.input-group input[type="number"],
+.input-group select {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background-color: var(--color-input-bg);
+    border: 1px solid var(--color-border-color);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    color: var(--color-text-primary);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input-group input:focus,
+.input-group select:focus {
+    outline: none;
+    border-color: var(--color-accent-primary);
+    box-shadow: 0 0 0 3px rgba(252, 118, 66, 0.2); /* --color-accent-primary with opacity */
+}
+
+.input-group input.error {
+    border-color: var(--color-accent-bad);
+}
+
+.error-message {
+    color: var(--color-accent-bad);
+    font-size: 0.8rem;
+}
+
+/* Checkbox and Toggle Switch Styling */
+.checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.5rem;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.switch input { 
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: var(--color-accent-primary);
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+.slider.round {
+  border-radius: 24px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+.toggle-group {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.privacy-grid .toggle-group {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+    padding: 1rem;
+    border: 1px solid var(--color-border-color);
+    border-radius: 8px;
+}
+.privacy-grid .toggle-group label:first-child {
+    font-weight: bold;
+}
+.privacy-grid .toggle-group p {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    flex-grow: 1;
+    margin: 0;
+    padding-right: 1rem;
+}
+
+
+/* Profile Picture Section */
+.profile-picture-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.profile-picture {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--color-card-bg);
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.upload-button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background-color: var(--color-input-bg);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border-color);
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.upload-button:hover {
+    background-color: var(--color-border-color);
+}
+
+
+/* Kill Switch Banner */
+.kill-switch-banner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background-color: rgba(252, 118, 66, 0.1); /* accent-primary with opacity */
+    border: 1px solid var(--color-accent-primary);
+    border-radius: 8px;
+    margin-bottom: 2rem;
+}
+.kill-switch-banner.active {
+    background-color: rgba(220, 53, 69, 0.1); /* accent-bad with opacity */
+    border-color: var(--color-accent-bad);
+}
+.kill-switch-banner p {
+    flex-grow: 1;
+    margin: 0;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+.kill-switch-banner .kill-switch-button {
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: var(--color-accent-primary);
+    color: white;
+}
+.kill-switch-banner .kill-switch-button.reactivate {
+    background-color: var(--color-accent-good);
+}
+.kill-switch-banner.active .kill-switch-button {
+    background-color: var(--color-accent-bad);
+}
+
+
+/* Footer and Buttons */
+.profile-footer {
+    padding: 1.5rem 2rem;
+    background-color: var(--color-main-bg);
+    border-top: 1px solid var(--color-border-color);
+}
+
+.footer-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+.button-primary, .button-secondary, .button-danger {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.button-primary {
+    background-color: var(--color-accent-primary);
+    color: white;
+}
+.button-primary:hover {
+    opacity: 0.9;
+}
+.button-primary:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.button-secondary {
+    background-color: var(--color-card-bg);
+    border-color: var(--color-border-color);
+    color: var(--color-text-primary);
+}
+.button-secondary:hover {
+    background-color: var(--color-input-bg);
+}
+.button-secondary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.button-danger {
+    background-color: var(--color-accent-bad);
+    color: white;
+}
+
+/* Banners for success/error messages */
+.error-banner, .success-banner {
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    text-align: center;
+    font-weight: 600;
+}
+.error-banner {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: var(--color-accent-bad);
+}
+.success-banner {
+    background-color: rgba(40, 167, 69, 0.1);
+    color: var(--color-accent-good);
+}
+
+
+/* Modal for Kill Switch Confirmation */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    -webkit-backdrop-filter: blur(5px); /* Safari compatibility */
+    backdrop-filter: blur(5px);
+}
+
+.modal-content {
+    background-color: var(--color-card-bg);
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: var(--custom-heavy);
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+    position: relative;
+    animation: zoomIn 0.3s ease-in-out;
+}
+
+@keyframes zoomIn {
+    from { transform: scale(0.8); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.modal-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text-secondary);
+}
+
+.modal-icon {
+    color: var(--color-accent-bad);
+    margin-bottom: 1rem;
+}
+
+.modal-content h2 {
+    font-family: 'Playfair Display', serif;
+    color: var(--color-text-primary);
+    margin-top: 0;
+}
+
+.modal-content p {
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+}
+
+.modal-actions {
+    margin-top: 2rem;
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+}
