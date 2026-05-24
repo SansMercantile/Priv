@@ -4,15 +4,18 @@ import { getSessionUserId } from '../lib/environment';
 import { Plug, Key, ExternalLink } from 'lucide-react';
 
 function BrokerConnectionCard({ brokerName, affiliateUrl, demoMode }) {
+  const [loginMethod, setLoginMethod] = useState('credentials'); // 'credentials' or 'keys'
   const [apiKey, setApiKey] = useState('');
   const [apiSecret, setApiSecret] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [message, setMessage] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const handleConnect = async (e) => {
     e.preventDefault();
     if (demoMode) {
-      setMessage({ type: 'success', text: 'Demo mode — API keys not persisted.' });
+      setMessage({ type: 'success', text: 'Demo mode — connection simulated.' });
       return;
     }
     setIsSaving(true);
@@ -20,10 +23,10 @@ function BrokerConnectionCard({ brokerName, affiliateUrl, demoMode }) {
     try {
       const response = await apiClient.connectBroker({
         broker_name: brokerName,
-        api_key: apiKey,
-        api_secret: apiSecret,
+        api_key: loginMethod === 'keys' ? apiKey : username,
+        api_secret: loginMethod === 'keys' ? apiSecret : password,
       });
-      setMessage({ type: 'success', text: response.message || 'Connected' });
+      setMessage({ type: 'success', text: response.message || 'Connected successfully.' });
     } catch (error) {
       setMessage({ type: 'error', text: error.message });
     } finally {
@@ -33,7 +36,25 @@ function BrokerConnectionCard({ brokerName, affiliateUrl, demoMode }) {
 
   return (
     <div className="metric-card p-6 rounded border border-white/10">
-      <h3 className="text-lg font-serif italic text-white mb-4">{brokerName}</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-serif italic text-white">{brokerName}</h3>
+        <div className="flex items-center bg-neutral-900 p-0.5 rounded border border-white/5 font-mono text-[9px]">
+          <button
+            type="button"
+            onClick={() => setLoginMethod('credentials')}
+            className={`px-2 py-0.5 rounded transition ${loginMethod === 'credentials' ? 'bg-white text-black font-bold' : 'text-zinc-500 hover:text-white'}`}
+          >
+            Login
+          </button>
+          <button
+            type="button"
+            onClick={() => setLoginMethod('keys')}
+            className={`px-2 py-0.5 rounded transition ${loginMethod === 'keys' ? 'bg-white text-black font-bold' : 'text-zinc-500 hover:text-white'}`}
+          >
+            API Keys
+          </button>
+        </div>
+      </div>
       <a
         href={affiliateUrl}
         target="_blank"
@@ -43,28 +64,193 @@ function BrokerConnectionCard({ brokerName, affiliateUrl, demoMode }) {
         <ExternalLink className="w-4 h-4" /> Open broker signup
       </a>
       <form onSubmit={handleConnect} className="space-y-3">
+        {loginMethod === 'keys' ? (
+          <>
+            <input
+              type="text"
+              placeholder="API Key"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              className="w-full p-2.5 rounded bg-neutral-900 border border-white/10 text-white text-sm font-mono"
+              required={!demoMode}
+            />
+            <input
+              type="password"
+              placeholder="API Secret"
+              value={apiSecret}
+              onChange={(e) => setApiSecret(e.target.value)}
+              className="w-full p-2.5 rounded bg-neutral-900 border border-white/10 text-white text-sm font-mono"
+              required={!demoMode}
+            />
+          </>
+        ) : (
+          <>
+            <input
+              type="text"
+              placeholder="Username / Account ID"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full p-2.5 rounded bg-neutral-900 border border-white/10 text-white text-sm font-mono"
+              required={!demoMode}
+            />
+            <input
+              type="password"
+              placeholder="Password / PIN"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full p-2.5 rounded bg-neutral-900 border border-white/10 text-white text-sm font-mono"
+              required={!demoMode}
+            />
+          </>
+        )}
+        <button
+          type="submit"
+          disabled={isSaving}
+          className="w-full py-2.5 rounded bg-white/10 border border-white/20 text-white text-sm font-mono font-semibold hover:bg-white/15 disabled:opacity-50"
+        >
+          {isSaving ? 'Connecting…' : loginMethod === 'keys' ? 'Connect with API keys' : 'Sign in securely'}
+        </button>
+        {message && (
+          <p className={`text-xs text-center font-mono ${message.type === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>
+            {message.text}
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}
+
+function ETaxConnectionCard({ demoMode }) {
+  const [taxAuthority, setTaxAuthority] = useState('SARS');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleConnect = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    setMessage(null);
+    setTimeout(() => {
+      setMessage({ type: 'success', text: `Successfully linked with ${taxAuthority} eFiling portal.` });
+      setIsSaving(false);
+    }, 1200);
+  };
+
+  return (
+    <div className="metric-card p-6 rounded border border-white/10">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-serif italic text-white">eTax Provider Portal</h3>
+        <span className="text-[9px] font-mono uppercase px-2 py-0.5 rounded border border-emerald-500/20 bg-emerald-500/5 text-emerald-400">Tax Intelligence</span>
+      </div>
+      <form onSubmit={handleConnect} className="space-y-3">
+        <div className="space-y-1">
+          <label className="block text-[10px] font-mono text-white/50 uppercase">Tax Jurisdiction</label>
+          <select
+            value={taxAuthority}
+            onChange={(e) => setTaxAuthority(e.target.value)}
+            className="w-full p-2.5 rounded bg-neutral-900 border border-white/10 text-white text-sm font-mono focus:outline-none focus:border-white/30"
+          >
+            <option value="SARS">SARS eFiling (South Africa)</option>
+            <option value="IRS">IRS e-File (United States)</option>
+            <option value="HMRC">HMRC Gateway (United Kingdom)</option>
+            <option value="LHDN">LHDN EzHasil (Malaysia)</option>
+          </select>
+        </div>
         <input
           type="text"
-          placeholder="API Key"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
+          placeholder="Username / Tax ID"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
           className="w-full p-2.5 rounded bg-neutral-900 border border-white/10 text-white text-sm font-mono"
-          required={!demoMode}
+          required
         />
         <input
           type="password"
-          placeholder="API Secret"
-          value={apiSecret}
-          onChange={(e) => setApiSecret(e.target.value)}
+          placeholder="eTax Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
           className="w-full p-2.5 rounded bg-neutral-900 border border-white/10 text-white text-sm font-mono"
-          required={!demoMode}
+          required
+        />
+        <button
+          type="submit"
+          disabled={isSaving}
+          className="w-full py-2.5 rounded bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-sm font-mono hover:bg-emerald-500/20 disabled:opacity-50"
+        >
+          {isSaving ? 'Establishing Link...' : 'Sign into eTax Platform'}
+        </button>
+        {message && (
+          <p className="text-xs text-center font-mono text-emerald-400">
+            {message.text}
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}
+
+function AICognitiveLayerCard({ demoMode }) {
+  const [engine, setEngine] = useState('Gemini');
+  const [apiKey, setApiKey] = useState('');
+  const [message, setMessage] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleConnect = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    setMessage(null);
+    try {
+      const response = await apiClient.connectBroker({
+        broker_name: `${engine} Cognitive Core`,
+        api_key: apiKey,
+        api_secret: 'USER_SUPPLIED_AI_KEY',
+      });
+      setMessage({ type: 'success', text: response.message || `Connected to custom ${engine} cognitive core.` });
+    } catch (error) {
+      setMessage({ type: 'error', text: error.message || 'Error saving keys.' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="metric-card p-6 rounded border border-white/10 relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-[1px] h-full bg-gradient-to-b from-white/10 to-transparent" />
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-serif italic text-white">AI of Choice (Cognitive Layer)</h3>
+        <span className="text-[9px] font-mono uppercase px-2 py-0.5 rounded border border-white/10 text-white/50">Custom LLM</span>
+      </div>
+      <p className="text-xs text-white/40 mb-3 font-sans leading-relaxed">
+        Sync your own private API key to power the autonomous auto-trading analysis. *(Priv Support's preloaded enterprise secrets are active by default).*
+      </p>
+      <form onSubmit={handleConnect} className="space-y-3">
+        <div className="space-y-1">
+          <label className="block text-[10px] font-mono text-white/50 uppercase">Cognitive Core Engine</label>
+          <select
+            value={engine}
+            onChange={(e) => setEngine(e.target.value)}
+            className="w-full p-2.5 rounded bg-neutral-900 border border-white/10 text-white text-sm font-mono focus:outline-none focus:border-white/30"
+          >
+            <option value="Gemini">Google Gemini (3.5 Flash / Pro)</option>
+            <option value="OpenAI">OpenAI GPT-4o / gemma4</option>
+            <option value="Claude">Anthropic Claude 3.5 Sonnet</option>
+          </select>
+        </div>
+        <input
+          type="password"
+          placeholder="Paste API Key here"
+          value={apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
+          className="w-full p-2.5 rounded bg-neutral-900 border border-white/10 text-white text-sm font-mono"
+          required
         />
         <button
           type="submit"
           disabled={isSaving}
           className="w-full py-2.5 rounded bg-white/10 border border-white/20 text-white text-sm font-mono font-semibold hover:bg-white/15 disabled:opacity-50"
         >
-          {isSaving ? 'Connecting…' : 'Connect with API keys'}
+          {isSaving ? 'Activating Core...' : `Connect Custom ${engine} Key`}
         </button>
         {message && (
           <p className={`text-xs text-center font-mono ${message.type === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>

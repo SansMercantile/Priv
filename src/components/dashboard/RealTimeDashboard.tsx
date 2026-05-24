@@ -6,5 +6,6 @@ interface DashboardProps {
 }
 
 export default function RealTimeDashboard({ demoMode }: DashboardProps) {
-  return <DashboardOverview setActiveSection={() => {}} demoMode={demoMode} />;
+  // Pass matching function placeholders since DashboardOverview needs setActiveSection
+  return <DashboardOverview demoMode={demoMode} setActiveSection={() => {}} />;
 }

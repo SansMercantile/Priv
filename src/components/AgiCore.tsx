@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Brain, Sparkles, Heart, RefreshCw, Cpu, Gauge, Play } from "lucide-react";
-import apiClient from "../api/apiClient";
+import React, { useState, useEffect, useRef } from "react";
+import { Brain, Sparkles, Heart, RefreshCw, Cpu, Gauge } from "lucide-react";
 
-export const AgiCore: React.FC<{ demoMode?: boolean }> = ({ demoMode = false }) => {
+export const AgiCore: React.FC<{ demoMode?: boolean }> = () => {
   const [altruism, setAltruism] = useState(84);
   const [caution, setCaution] = useState(72);
   const [intuition, setIntuition] = useState(91);
@@ -10,83 +9,17 @@ export const AgiCore: React.FC<{ demoMode?: boolean }> = ({ demoMode = false }) 
 
   const [empathyScore, setEmpathyScore] = useState(88.4);
   const [coherence, setCoherence] = useState(94.2);
-  const [consciousnessState, setConsciousnessState] = useState("meta-stable");
-  const [taskLog, setTaskLog] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const applyMetrics = useCallback((metrics: { empathy_score?: number; coherence?: number; strategic_coherence?: number }) => {
-    if (metrics.empathy_score != null) setEmpathyScore(metrics.empathy_score);
-    if (metrics.coherence != null) setCoherence(metrics.coherence);
-  }, []);
-
+  // Recalculate empathy score dynamically when user drags controls
   useEffect(() => {
-    if (demoMode) {
-      const rawEmpathy = altruism * 0.4 + intuition * 0.3 + (100 - caution) * 0.2 + stability * 0.1;
-      setEmpathyScore(parseFloat(rawEmpathy.toFixed(1)));
-      const rawCoherence = stability * 0.5 + caution * 0.2 + altruism * 0.3;
-      setCoherence(parseFloat(rawCoherence.toFixed(1)));
-      return;
-    }
-    (async () => {
-      try {
-        const resp = await apiClient.getAgiStatus();
-        const data = resp?.data || resp;
-        const params = data?.emotional_params;
-        if (params) {
-          setAltruism(params.altruism ?? 84);
-          setCaution(params.caution ?? 72);
-          setIntuition(params.intuition ?? 91);
-          setStability(params.stability ?? 95);
-        }
-        if (data?.metrics) applyMetrics(data.metrics);
-        if (data?.consciousness_state) setConsciousnessState(data.consciousness_state);
-      } catch (e) {
-        console.warn("AGI status load failed", e);
-      }
-    })();
-  }, [demoMode, applyMetrics]);
-
-  useEffect(() => {
-    if (demoMode) return;
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(async () => {
-      setSyncing(true);
-      try {
-        const resp = await apiClient.updateAgiEmotionalParams({
-          altruism,
-          caution,
-          intuition,
-          stability,
-        });
-        const data = resp?.data || resp;
-        if (data?.metrics) applyMetrics(data.metrics);
-      } catch (e) {
-        console.warn("AGI params sync failed", e);
-      } finally {
-        setSyncing(false);
-      }
-    }, 600);
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
-  }, [altruism, caution, intuition, stability, demoMode, applyMetrics]);
-
-  const runAgiTask = async (taskType: string) => {
-    if (demoMode) {
-      setTaskLog(`Demo: ${taskType} simulated locally.`);
-      return;
-    }
-    setTaskLog("Running…");
-    try {
-      const resp = await apiClient.runAgiTask(taskType, { generations: 3, years: 1 });
-      setTaskLog(JSON.stringify(resp?.data || resp, null, 2).slice(0, 500));
-    } catch (e: unknown) {
-      setTaskLog(e instanceof Error ? e.message : "Task failed");
-    }
-  };
+    const rawEmpathy = (altruism * 0.4 + intuition * 0.3 + (100 - caution) * 0.2 + stability * 0.1);
+    setEmpathyScore(parseFloat(rawEmpathy.toFixed(1)));
+    
+    const rawCoherence = (stability * 0.5 + caution * 0.2 + altruism * 0.3);
+    setCoherence(parseFloat(rawCoherence.toFixed(1)));
+  }, [altruism, caution, intuition, stability]);
 
   // Consciousness Cortex Brainwave Canvas Simulator
   useEffect(() => {
@@ -170,35 +103,13 @@ export const AgiCore: React.FC<{ demoMode?: boolean }> = ({ demoMode = false }) 
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-serif italic text-white">AGI Core Intelligence</h1>
-          <p className="text-white/40 text-xs font-light mt-1">
-            {demoMode ? "Demo emotional matrix (local only)" : "Synced with /api/v1/agi — emotional tuning & orchestration"}
-            {syncing && " · saving…"}
-          </p>
+          <p className="text-white/40 text-xs font-light mt-1">Unified consciousness, emotional tuning and decision alignment nodes</p>
         </div>
         <div className="flex items-center space-x-2 px-3 py-1.5 bg-white/5 rounded border border-white/10">
           <Heart className="w-3.5 h-3.5 text-white/60 animate-pulse" />
-          <span className="text-white/60 text-[9px] font-mono tracking-widest uppercase mb-0">{consciousnessState}</span>
+          <span className="text-white/60 text-[9px] font-mono tracking-widest uppercase mb-0">Empathy Deployed</span>
         </div>
       </div>
-
-      {!demoMode && (
-        <div className="metric-card rounded p-4 border border-white/10 flex flex-wrap gap-2 items-center">
-          <span className="text-[10px] font-mono text-white/40 mr-2">AGI tasks:</span>
-          {["evolve_cppn", "terraforming_step", "biological_step"].map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => runAgiTask(t)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded border border-white/15 text-[10px] font-mono text-white/70 hover:bg-white/10"
-            >
-              <Play className="w-3 h-3" /> {t}
-            </button>
-          ))}
-          {taskLog && (
-            <pre className="w-full mt-2 text-[9px] font-mono text-white/50 max-h-24 overflow-auto">{taskLog}</pre>
-          )}
-        </div>
-      )}
 
       {/* Primary Analytics cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

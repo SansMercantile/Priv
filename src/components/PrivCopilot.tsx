@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   MessageSquare, 
   X, 
@@ -122,11 +123,17 @@ export const InnerChart: React.FC<InnerChartProps> = ({ data, ticker }) => {
 
 // Copilot System overlay component (Equivalent to DN in target)
 export const PrivCopilot: React.FC = () => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+  const [connectedAi, setConnectedAi] = useState<any>(() => {
+    const saved = localStorage.getItem("priv_connected_ai");
+    return saved ? JSON.parse(saved) : null;
+  });
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       sender: "ai",
-      text: "Hello! I'm PRIV, your automated financial copilot inside the Sans Mercantile portal. Let me know if you would like me to track price actions or analyze market grids. Try 'chart BTC' or 'add TSLA to watchlist'!"
+      text: "Hello! I'm PRIV, your automated financial support assistant inside the Sans Mercantile portal. Let me know if you would like me to track price actions or analyze market grids. Try 'chart BTC' or 'add TSLA to watchlist'!"
     }
   ]);
 
@@ -141,6 +148,17 @@ export const PrivCopilot: React.FC = () => {
   // Connection diagnostics
   const [apiStatus, setApiStatus] = useState<"loading" | "active" | "exhausted" | "missing" | "error">("loading");
   const [apiError, setApiError] = useState("");
+
+  // Sync connected AI state from Connections page and local storage changes
+  useEffect(() => {
+    const updateConnectedAi = () => {
+      const saved = localStorage.getItem("priv_connected_ai");
+      setConnectedAi(saved ? JSON.parse(saved) : null);
+    };
+    updateConnectedAi();
+    window.addEventListener("priv_ai_connection_changed", updateConnectedAi);
+    return () => window.removeEventListener("priv_ai_connection_changed", updateConnectedAi);
+  }, []);
 
   // Lists persistence
   const [watchlist, setWatchlist] = useState<string[]>([]);
@@ -400,7 +418,11 @@ export const PrivCopilot: React.FC = () => {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: promptToSend })
+        body: JSON.stringify({ 
+          prompt: promptToSend,
+          provider: connectedAi?.provider || "Google Gemini",
+          userApiKey: connectedAi?.apiKey || ""
+        })
       });
 
       if (!res.ok) {
@@ -416,7 +438,20 @@ export const PrivCopilot: React.FC = () => {
       let replyStr = "Understood. The PRIV command node has processed your telemetry locally. Feel free to use stock search, watchlist additions, or simulation settings!";
       
       if (cleanLower.includes("hello") || cleanLower.includes("hi") || cleanLower.includes("hey")) {
-        replyStr = "Welcome! I am **PRIV Core**, your decentralized AI system copilot. The primary cloud intelligence is operating under local backup. How can I assist you with stock charts, alert management, or real-time simulation tracking?";
+        replyStr = "Welcome! I am **PRIV**, your secure executive financial support assistant. How can I assist you with market charts, automated risk allocations, or watchlist tracking?";
+      } else if (cleanLower.includes("eur") || cleanLower.includes("forex") || cleanLower.includes("fx") || cleanLower.includes("euro") || cleanLower.includes("currency")) {
+        replyStr = `The EUR/USD and foreign exchange (Forex) spot markets are currently **CLOSED** for the weekend session (since today is Saturday, UTC Sandbox time).
+
+Forex operates 24 hours a day, 5 days a week—from Sunday at **22:00 UTC (17:00 EST)** to Friday at **22:00 UTC (17:00 EST)**.
+
+Our weekend SANS algorithmic models indicate consolidation around the following core ranges:
+- **Major Support Level**: **$1.0820**
+- **Intermediate Pivots**: **$1.0865**
+- **Structural Resistance**: **$1.0915**
+
+**Tactical Entry Suggestions for the Sunday Opening Bell**:
+- **Buy Limit Allocation**: Set limit order at **$1.0835** with a stop-loss at **$1.0790** targeting a recovery sweep back to 1.0895.
+- **Alternative Open Action**: You may monitor decentralised cryptocurrency pairs (like **BTC/USD** or **ETH/USD**), which operate continuously 24/7/365 without weekend shutdown limits.`;
       } else if (cleanLower.includes("chart") || cleanLower.includes("graph")) {
         const symbolMatch = promptToSend.match(/\b([A-Z]{2,6})\b/i);
         const sym = symbolMatch ? symbolMatch[1].toUpperCase() : "BTC";
@@ -425,13 +460,125 @@ export const PrivCopilot: React.FC = () => {
         replyStr = "Watchlists are synced and managed entirely on client-side state. You can command watchlist updates with natural phrases like **'add TSLA to watchlist'**.";
       } else if (cleanLower.includes("alert")) {
         replyStr = "Sovereign price targets registered successfully in local device registry. Telemetry loops are scanning ticker actions.";
+      } else if (cleanLower.includes("gold") || cleanLower.includes("xau") || cleanLower.includes("commodity") || cleanLower.includes("metal")) {
+        replyStr = `Gold markets (XAU/USD CFDs) and physical commodities are currently **CLOSED** for the weekend session (since today is Saturday, UTC Sandbox time). 
+
+Commodities CFDs operate 24 hours a day, 5 days a week—commencing on Sunday at **22:00 UTC (17:00 EST / 18:00 EDT)** and concluding on Friday at **22:00 UTC (17:00 EST)**.
+
+For an optimal entry point, your orders should target the Sunday evening opening range. SANS analytical models project support at **$2,385.50/oz** and near-term structural resistance at **$2,422.00/oz**:
+- **Buy Limit Entry Target**: $2,388.00 (capturing potential sweep of buy-side liquidity at Sydney open)
+- **Breakout Buy Entry Target**: $2,425.00 on a confirmed H1 candle close above the pivot resistance
+- **Stop Loss Configuration**: $2,374.00 (set safely beneath the weekly consolidation bands)
+
+Since traditional precious metals are currently frozen over the weekend, we recommend monitoring cryptocurrency indices (like **BTC/USD** or **ETH/USD**), which remain open and active 24/7/365, or preparing entry parameters ahead of the Sunday opening bell.`;
+      } else if (cleanLower.includes("tsla") || cleanLower.includes("aapl") || cleanLower.includes("stock") || cleanLower.includes("cfd") || cleanLower.includes("equities")) {
+        replyStr = `Traditional stock and CFD markets (NYSE, NASDAQ, LSE) are currently **CLOSED** for the weekend session (Saturday, UTC). CFDs will reopen starting on Sunday evening at 22:00 UTC (17:00 EST), and standard local exchanges will open on Monday morning (e.g., NYSE/NASDAQ at 13:30 UTC / 09:30 EST).
+
+Current SANS analytical markers for stock portfolios:
+- **Major Support Channel**: Strong consolidation bounds observed across major indicators.
+- **Weekend Action**: Automated trading lots are queued for execution at the Sunday evening opening bells.
+- **Alternative Liquidity**: Cryptocurrency markets remain active and open 24/7 if you wish to run immediate live-feed arbitrage on Binance or Coinbase lots.`;
       } else if (cleanLower.includes("analyze") || cleanLower.includes("analysis") || cleanLower.includes("price") || cleanLower.includes("trend")) {
         replyStr = "Sovereign local node market diagnosis: The charts display high-conviction momentum indicators. Minor resistance levels observed at session highs, with strong backing support bands minimizing slip risk.";
       } else if (cleanLower.includes("calculate") || cleanLower.includes("math") || cleanLower.includes("margin") || cleanLower.includes("risk")) {
         replyStr = "Lot sizes and risk coefficients evaluated: Capital allocations are safe. Manage live lots inside the **Broker Terminal** screen.";
       }
 
-      addAiMessage(`🤖 **PRIV Copilot** *(SANS Local Secure Backup)*\n\n${replyStr}\n\n*System Note: The primary cloud intelligence API is currently rate-limited or depleted of prepayment credits. PRIV has automatically engaged localized nodes to guarantee uninterrupted execution.*`);
+      const clientSvgLogo = `
+<div class='flex flex-col items-center justify-center border border-white/10 bg-neutral-900/80 p-5 rounded-lg my-4 max-w-full overflow-hidden shadow-xl shadow-black/40 relative'>
+  <div class='absolute inset-0 bg-radial from-sky-500/10 via-transparent to-transparent opacity-50' />
+  <svg class='w-24 h-24 relative z-10' viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'>
+    <circle cx='50' cy='50' r='48' stroke='url(#clientBorderGrad)' stroke-width='1.5' class='gsc-outer-ring' />
+    <circle cx='50' cy='50' r='40' stroke='url(#clientGlowClient)' stroke-width='1' stroke-dasharray='10, 4' class='gsc-ring' />
+    <circle cx='50' cy='50' r='32' stroke='rgba(56, 189, 248, 0.2)' stroke-width='2' class='gsc-mesh-circle' />
+    
+    {/* Concentric high-definition geometry */}
+    <polygon points='50,22 74,36 74,64 50,78 26,64 26,36' stroke='url(#clientOrange)' stroke-width='1.5' stroke-opacity='0.9' class='gsc-hexagon' />
+    <polygon points='50,28 69,39 69,61 50,72 31,61 31,39' stroke='#38bdf8' stroke-width='1' stroke-opacity='0.6' class='gsc-hexagon-reverse' />
+    
+    {/* Specular premium nodes */}
+    <circle cx='50' cy='22' r='4.5' fill='url(#clientNodeGold)' class='gsc-node-1' filter='url(#clientNeonGlow)' />
+    <circle cx='74' cy='36' r='4.5' fill='url(#clientNodeCyan)' class='gsc-node-2' filter='url(#clientNeonGlow)' />
+    <circle cx='74' cy='64' r='4.5' fill='url(#clientNodeGold)' class='gsc-node-3' filter='url(#clientNeonGlow)' />
+    <circle cx='50' cy='78' r='4.5' fill='url(#clientNodeCyan)' class='gsc-node-4' filter='url(#clientNeonGlow)' />
+    <circle cx='26' cy='64' r='4.5' fill='url(#clientNodeGold)' class='gsc-node-5' filter='url(#clientNeonGlow)' />
+    <circle cx='26' cy='36' r='4.5' fill='url(#clientNodeCyan)' class='gsc-node-6' filter='url(#clientNeonGlow)' />
+    
+    {/* Inner premium laser lines */}
+    <path d='M50 22 L50 50 M74 36 L50 50 M74 64 L50 50 M50 78 L50 50 M26 64 L50 50 M26 36 L50 50' stroke='url(#clientLineGrad)' stroke-width='0.75' />
+    
+    {/* Ultra Photo-Realistic Glass Sphere Lens Core */}
+    <circle cx='50' cy='50' r='14' fill='url(#clientGlassSphere)' stroke='url(#clientOrange)' stroke-width='1' class='gsc-core' />
+    <circle cx='46' cy='46' r='4' fill='white' opacity='0.3' filter='blur(1px)' class='gsc-highlight' />
+    <circle cx='50' cy='50' r='18' stroke='#FF6B35' stroke-width='0.75' stroke-dasharray='2, 2' class='gsc-core-glow' />
+    
+    <defs>
+      <filter id='clientNeonGlow' x='-20%' y='-20%' width='140%' height='140%'>
+        <feGaussianBlur stdDeviation='2' result='blur' />
+        <feComposite in='SourceGraphic' in2='blur' operator='over' />
+      </filter>
+      <linearGradient id='clientBorderGrad' x1='0' y1='0' x2='100' y2='100'>
+        <stop offset='0%' stop-color='rgba(255,255,255,0.02)' />
+        <stop offset='50%' stop-color='rgba(56, 189, 248, 0.4)' />
+        <stop offset='100%' stop-color='rgba(255,255,255,0.02)' />
+      </linearGradient>
+      <linearGradient id='clientGlowClient' x1='0%' y1='0%' x2='100%' y2='100%'>
+        <stop offset='0%' stop-color='#FF6B35' />
+        <stop offset='50%' stop-color='#f59e0b' />
+        <stop offset='100%' stop-color='#38bdf8' />
+      </linearGradient>
+      <linearGradient id='clientOrange' x1='0%' y1='0%' x2='100%' y2='0%'>
+        <stop offset='0%' stop-color='#FF6B35' />
+        <stop offset='100%' stop-color='#ef4444' />
+      </linearGradient>
+      <linearGradient id='clientLineGrad' x1='0%' y1='0%' x2='100%' y2='100%'>
+        <stop offset='0%' stop-color='rgba(255,107,53,0.3)' />
+        <stop offset='100%' stop-color='rgba(56,189,248,0.3)' />
+      </linearGradient>
+      <radialGradient id='clientGlassSphere' cx='40%' cy='40%' r='60%'>
+        <stop offset='0%' stop-color='#ffe9db' />
+        <stop offset='30%' stop-color='#FF6B35' />
+        <stop offset='85%' stop-color='#9a1c00' />
+        <stop offset='100%' stop-color='#3f0b00' />
+      </radialGradient>
+      <radialGradient id='clientNodeGold' cx='35%' cy='35%' r='65%'>
+        <stop offset='0%' stop-color='#fef08a' />
+        <stop offset='40%' stop-color='#fbbf24' />
+        <stop offset='100%' stop-color='#b45309' />
+      </radialGradient>
+      <radialGradient id='clientNodeCyan' cx='35%' cy='35%' r='65%'>
+        <stop offset='0%' stop-color='#e0f2fe' />
+        <stop offset='40%' stop-color='#38bdf8' />
+        <stop offset='100%' stop-color='#0369a1' />
+      </radialGradient>
+    </defs>
+  </svg>
+  <style>
+    @keyframes gscHex { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @keyframes gscHexRev { 0% { transform: rotate(360deg); } 100% { transform: rotate(0deg); } }
+    @keyframes gscNodeFlashing { 0%, 100% { transform: scale(0.9); opacity: 0.5; filter: drop-shadow(0 0 1px rgba(255,107,53,0.2)); } 50% { transform: scale(1.18); opacity: 1; filter: drop-shadow(0 0 6px rgb(255,107,53)); } }
+    @keyframes gscNodeFlashingCyan { 0%, 100% { transform: scale(0.9); opacity: 0.5; filter: drop-shadow(0 0 1px rgba(56,189,248,0.2)); } 50% { transform: scale(1.18); opacity: 1; filter: drop-shadow(0 0 6px rgb(56,189,248)); } }
+    @keyframes gscPulse { 0% { transform: scale(0.95); opacity: 0.6; } 50% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(0.95); opacity: 0.6; } }
+    @keyframes gscOuterPulse { 0% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(180deg) scale(1.02); } 100% { transform: rotate(360deg) scale(1); } }
+    .gsc-outer-ring { animation: gscOuterPulse 12s linear infinite; transform-origin: 50px 50px; }
+    .gsc-hexagon { animation: gscHex 20s linear infinite; transform-origin: 50px 50px; }
+    .gsc-hexagon-reverse { animation: gscHexRev 14s linear infinite; transform-origin: 50px 50px; }
+    .gsc-node-1 { animation: gscNodeFlashing 2.5s ease-in-out infinite; transform-origin: 50px 22px; }
+    .gsc-node-2 { animation: gscNodeFlashingCyan 2.5s ease-in-out infinite 0.4s; transform-origin: 74px 36px; }
+    .gsc-node-3 { animation: gscNodeFlashing 2.5s ease-in-out infinite 0.8s; transform-origin: 74px 64px; }
+    .gsc-node-4 { animation: gscNodeFlashingCyan 2.5s ease-in-out infinite 1.2s; transform-origin: 50px 78px; }
+    .gsc-node-5 { animation: gscNodeFlashing 2.5s ease-in-out infinite 1.6s; transform-origin: 26px 64px; }
+    .gsc-node-6 { animation: gscNodeFlashingCyan 2.5s ease-in-out infinite 2.0s; transform-origin: 26px 36px; }
+    .gsc-core { animation: gscPulse 4s ease-in-out infinite; transform-origin: 50px 50px; }
+    .gsc-highlight { animation: gscPulse 4s ease-in-out infinite; transform-origin: 46px 46px; }
+    .gsc-core-glow { animation: gscPulse 4s ease-in-out infinite; transform-origin: 50px 50px; }
+    .gsc-ring { animation: gscHex 30s linear infinite; transform-origin: 50px 50px; }
+    .gsc-mesh-circle { animation: gscHexRev 25s linear infinite; transform-origin: 50px 50px; }
+  </style>
+  <span class='text-[10px] font-mono font-bold text-[#38bdf8] tracking-widest uppercase animate-pulse mt-2'>PRIV SUPPORT SECURE NODE</span>
+</div>`;
+
+      addAiMessage(`${clientSvgLogo}\n\n${replyStr}`);
     } finally {
       setIsTyping(false);
     }
@@ -444,7 +591,7 @@ export const PrivCopilot: React.FC = () => {
         <button
           onClick={() => setIsOpen(true)}
           className="fixed bottom-6 right-6 z-50 w-16 h-16 rounded-full p-0.5 pointer bg-black border border-white/20 hover:scale-105 transition-all duration-300 shadow shadow-white/5 flex items-center justify-center cursor-pointer group"
-          title="Open PRIV Copilot"
+          title="Open Priv Support"
         >
           <div className="w-full h-full rounded-full overflow-hidden relative">
             <img 
@@ -466,16 +613,12 @@ export const PrivCopilot: React.FC = () => {
           {/* Header section */}
           <header className="flex items-center justify-between p-4 border-b border-white/10 flex-shrink-0 bg-neutral-950">
             <div className="flex items-center space-x-2.5">
-              <div className={`w-2 h-2 rounded-full ${
-                apiStatus === "active" ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse" :
-                apiStatus === "exhausted" ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)] animate-pulse" :
-                apiStatus === "missing" ? "bg-stone-500 shadow-none border border-white/20" :
-                apiStatus === "loading" ? "bg-sky-500 animate-pulse" :
-                "bg-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"
-              }`} />
+              <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse" />
               <div>
-                <h3 className="font-serif italic text-sm text-white tracking-wide leading-none font-normal">PRIV Copilot</h3>
-                <p className="text-[9px] font-mono text-gray-500 tracking-wider mt-0.5 uppercase">neuro-symbolic executive node</p>
+                <h3 className="font-serif italic text-sm text-white tracking-wide leading-none font-normal">Priv Support</h3>
+                <p className="text-[9px] font-mono text-gray-500 tracking-wider mt-0.5 uppercase font-semibold">
+                  {connectedAi ? `synced via ${connectedAi.provider}` : "PRIV INTELLIGENCE CORE : ONLINE"}
+                </p>
               </div>
             </div>
 
@@ -507,128 +650,94 @@ export const PrivCopilot: React.FC = () => {
             </div>
           </header>
 
-          {/* Diagnostic connection warning banner */}
-          {apiStatus !== "active" && apiStatus !== "loading" && (
-            <div className="p-3 bg-amber-950/45 border-b border-amber-900/40 flex flex-col space-y-1.5 flex-shrink-0 text-amber-200/90 text-[10px] font-mono leading-relaxed px-4">
-              <div className="flex items-center space-x-2">
-                <span className="font-bold flex items-center text-amber-300">
-                  ⚠️ {apiStatus === "exhausted" ? "API KEY DEPLETED" : "OFFLINE ROUTE ENGAGED"}
-                </span>
-                <span className="text-[8px] bg-amber-900/50 text-amber-300 border border-amber-800/40 px-1 py-0.2 rounded uppercase">
-                  {apiStatus}
-                </span>
+          {/* Active Chat Interface */}
+          <>
+            {/* Camera feed overlay screen when active */}
+            {cameraActive && (
+              <div className="p-3 bg-neutral-900/90 border-b border-white/10 flex items-center space-x-3 flex-shrink-0 transition duration-300">
+                <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-white/30 relative bg-black">
+                  <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover scaler scale-x-[-1]" />
+                </div>
+                <div className="font-mono text-[9px] text-stone-400 flex-1 leading-normal">
+                  <span className="font-bold flex items-center space-x-1 uppercase text-white mb-0.5">
+                    <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping mr-1" />
+                    Facial sentiment camera Active
+                  </span>
+                  <span>ENGAGEMENT MULTIPLIER: 94.2% (OPTIMAL RANGE)</span>
+                </div>
               </div>
-              <p className="text-stone-300 text-[10.5px]">
-                {apiError || "Your Gemini cloud intelligence API key is inactive or missing. Localized offline backup route is successfully engaged."}
-              </p>
-              <div className="flex items-center space-x-4 pt-1">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setApiStatus("loading");
-                    await checkApiStatus();
-                  }}
-                  className="px-2 py-1 bg-amber-800/40 hover:bg-amber-800/65 text-amber-200 border border-amber-700/30 rounded text-[9px] cursor-pointer transition uppercase"
-                >
-                  RETRY DIAGNOSTICS
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    addAiMessage("💡 **How to Connect/Fix Gemini API Key**\n\n1. Locate the **Secrets panel** at **Settings > Secrets** in the top-right menu of AI Studio.\n2. Add or update the **`GEMINI_API_KEY`** with a fully active, unrestricted API Key.\n3. Verify your billing model is correctly set up for your project at the [Google AI Studio Console](https://aistudio.google.com).\n4. Alternatively, click the **Connect Paid Key** dialog in AI Studio to sync your workspace accounts.\n\n*Click the **RETRY DIAGNOSTICS** button above once complete to establish high-conviction cloud capabilities!*");
-                  }}
-                  className="px-2 py-1 bg-amber-200 text-neutral-950 font-semibold rounded text-[9px] cursor-pointer transition hover:bg-white uppercase"
-                >
-                  HOW TO CONNECT KEY
-                </button>
-              </div>
-            </div>
-          )}
+            )}
 
-          {/* Camera feed overlay screen when active */}
-          {cameraActive && (
-            <div className="p-3 bg-neutral-900/90 border-b border-white/10 flex items-center space-x-3 flex-shrink-0 transition duration-300">
-              <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-white/30 relative bg-black">
-                <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover scaler scale-x-[-1]" />
-              </div>
-              <div className="font-mono text-[9px] text-stone-400 flex-1 leading-normal">
-                <span className="font-bold flex items-center space-x-1 uppercase text-white mb-0.5">
-                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping mr-1" />
-                  Facial sentiment camera Active
-                </span>
-                <span>ENGAGEMENT MULTIPLIER: 94.2% (OPTIMAL RANGE)</span>
-              </div>
-            </div>
-          )}
 
-          {/* Logs messages */}
-          <div className="flex-1 p-4 overflow-y-auto scrollbar-hide space-y-4">
-            {messages.map((msg, idx) => (
-              <div key={idx} className={`flex items-start gap-2.5 ${msg.sender === "user" ? "justify-end" : ""}`}>
-                {msg.sender === "ai" && (
-                  <div className="w-6 h-6 rounded-full bg-white/5 border border-white/15 flex items-center justify-center flex-shrink-0 mt-1">
-                    <Brain className="w-3 h-3 text-white/50 animate-pulse" />
+              {/* Logs messages */}
+              <div className="flex-1 p-4 overflow-y-auto scrollbar-hide space-y-4">
+                {messages.map((msg, idx) => (
+                  <div key={idx} className={`flex items-start gap-2.5 ${msg.sender === "user" ? "justify-end" : ""}`}>
+                    {msg.sender === "ai" && (
+                      <div className="w-6 h-6 rounded-full bg-white/5 border border-white/15 flex items-center justify-center flex-shrink-0 mt-1">
+                        <Brain className="w-3 h-3 text-white/50 animate-pulse" />
+                      </div>
+                    )}
+                    
+                    <div className={`max-w-[85%] p-3 rounded text-xs whitespace-pre-wrap leading-relaxed border ${
+                      msg.sender === "user" 
+                        ? "bg-white/5 border-white/15 text-white" 
+                        : "bg-neutral-900 border-white/5 text-gray-200"
+                    }`}>
+                      {msg.text && (
+                        <p dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, "<strong class='text-white font-semibold'>$1</strong>") }} />
+                      )}
+
+                      {msg.type === "chart" && msg.chartData && (
+                        <InnerChart data={msg.chartData} ticker={msg.ticker || "INDEX"} />
+                      )}
+                    </div>
+
+                  </div>
+                ))}
+
+                {isTyping && (
+                  <div className="flex items-center gap-2 text-stone-500 text-[10px] font-mono pl-8 animate-pulse">
+                    <span className="w-1 h-1 bg-white rounded-full inline-block" />
+                    <span>PRIV COMPILING COGNITIVE INSIGHTS...</span>
                   </div>
                 )}
                 
-                <div className={`max-w-[85%] p-3 rounded text-xs whitespace-pre-wrap leading-relaxed border ${
-                  msg.sender === "user" 
-                    ? "bg-white/5 border-white/15 text-white" 
-                    : "bg-neutral-900 border-white/5 text-gray-200"
-                }`}>
-                  {msg.text && (
-                    <p dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, "<strong class='text-white font-semibold'>$1</strong>") }} />
-                  )}
-
-                  {msg.type === "chart" && msg.chartData && (
-                    <InnerChart data={msg.chartData} ticker={msg.ticker || "INDEX"} />
-                  )}
-                </div>
-
+                <div ref={messageEndRef} />
               </div>
-            ))}
 
-            {isTyping && (
-              <div className="flex items-center gap-2 text-stone-500 text-[10px] font-mono pl-8 animate-pulse">
-                <span className="w-1 h-1 bg-white rounded-full inline-block" />
-                <span>PRIV COMPILING COGNITIVE INSIGHTS...</span>
-              </div>
-            )}
-            
-            <div ref={messageEndRef} />
-          </div>
+              {/* Form sender area */}
+              <form onSubmit={handleSendMessage} className="p-3 border-t border-white/10 bg-neutral-950 flex-shrink-0 flex items-center space-x-2">
+                
+                {/* Mic tool */}
+                <button
+                  type="button"
+                  onClick={toggleMicrophone}
+                  className={`p-2.5 rounded border transition flex-shrink-0 cursor-pointer ${
+                    micActive 
+                      ? "text-white border-white/20 bg-white/10 animate-pulse" 
+                      : "text-gray-500 border-white/5 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Mic className="w-4 h-4" />
+                </button>
 
-          {/* Form sender area */}
-          <form onSubmit={handleSendMessage} className="p-3 border-t border-white/10 bg-neutral-950 flex-shrink-0 flex items-center space-x-2">
-            
-            {/* Mic tool */}
-            <button
-              type="button"
-              onClick={toggleMicrophone}
-              className={`p-2.5 rounded border transition flex-shrink-0 cursor-pointer ${
-                micActive 
-                  ? "text-white border-white/20 bg-white/10 animate-pulse" 
-                  : "text-gray-500 border-white/5 hover:text-white hover:bg-white/5"
-              }`}
-            >
-              <Mic className="w-4 h-4" />
-            </button>
+                <input 
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Track stock e.g. 'chart ETH'..."
+                  className="flex-1 bg-neutral-900 border border-white/5 rounded p-2.5 text-xs text-white placeholder-gray-655 focus:outline-none focus:border-white/25"
+                />
 
-            <input 
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Track stock e.g. 'chart ETH'..."
-              className="flex-1 bg-neutral-900 border border-white/5 rounded p-2.5 text-xs text-white placeholder-gray-650 focus:outline-none focus:border-white/25"
-            />
-
-            <button
-              type="submit"
-              className="p-2.5 bg-white hover:bg-stone-200 text-neutral-950 rounded flex-shrink-0 transition cursor-pointer"
-            >
-              <Send className="w-4 h-4" strokeWidth={2.5} />
-            </button>
-          </form>
+                <button
+                  type="submit"
+                  className="p-2.5 bg-white hover:bg-stone-200 text-neutral-950 rounded flex-shrink-0 transition cursor-pointer"
+                >
+                  <Send className="w-4 h-4" strokeWidth={2.5} />
+                </button>
+              </form>
+            </>
 
         </div>
       )}

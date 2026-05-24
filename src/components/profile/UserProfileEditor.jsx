@@ -14,8 +14,8 @@ import {
   Unlock,
   X
 } from 'lucide-react';
-import apiClient from '../../api/apiClient';
-import '../UserProfileEditor.css';
+import apiClient from '../../api/apiClient'; 
+import './UserProfileEditor.css'; // Make sure to create this CSS file
 
 const UserProfileEditor = ({ demoMode = false }) => {
   // Profile state

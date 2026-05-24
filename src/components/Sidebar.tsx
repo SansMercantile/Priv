@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { 
   LayoutDashboard, 
@@ -12,29 +12,130 @@ import {
   BarChart2,
   History,
   Link2,
+  Menu,
   ChevronLeft,
   ChevronRight,
   Sparkles,
   Smartphone,
   Laptop,
-  Coins,
-  UserCircle,
-  FileCheck,
-  Plug,
-  Bell,
-  Gauge,
-  Lightbulb,
-  Eye,
-  Mic,
-  Wallet,
-  Banknote,
-  Briefcase,
-  Scale,
-  Send,
-  Vault,
-  Shield
+  Coins
 } from "lucide-react";
 import logo from "../assets/images/logo_1779280505672.png";
+
+// Adaptive glowing logo component that falls back to vector art if the image is empty or fails to load
+const LogoIcon: React.FC<{ className?: string }> = ({ className = "w-9 h-9" }) => {
+  const [imgFailed, setImgFailed] = useState(false);
+
+  if (!imgFailed && logo) {
+    return (
+      <img
+        alt="Sans Mercantile Logo"
+        src={logo}
+        referrerPolicy="no-referrer"
+        onError={() => setImgFailed(true)}
+        className={`${className} object-contain select-none max-w-full border-0 p-0 outline-none bg-transparent`}
+        style={{
+          filter: "drop-shadow(0 0 12px rgba(225, 29, 72, 0.95)) drop-shadow(0 0 3px rgba(159, 18, 57, 0.6))",
+          border: "none"
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className={`${className} flex items-center justify-center select-none bg-transparent`} style={{ border: "none" }}>
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-full h-full"
+        style={{
+          filter: "drop-shadow(0 0 10px #e11d48) drop-shadow(0 0 3px #9f1239)"
+        }}
+      >
+        <path
+          d="M50 15 L85 50 L50 85 L15 50 Z"
+          stroke="url(#ruby-core-gradient)"
+          strokeWidth="4"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M50 28 L72 50 L50 72 L28 50 Z"
+          fill="url(#ruby-core-gradient)"
+          opacity="0.25"
+        />
+        <circle cx="50" cy="50" r="6" fill="#ffffff" />
+        <defs>
+          <linearGradient id="ruby-core-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#ff4b72" />
+            <stop offset="50%" stopColor="#e11d48" />
+            <stop offset="100%" stopColor="#9f1239" />
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+  );
+};
+
+// Reusable elegant system name typing component
+const TypingPriv: React.FC = () => {
+  const [text, setText] = useState("");
+  
+  useEffect(() => {
+    let typeTimer: any = null;
+    const fullText = "Priv";
+    
+    const triggerEffect = () => {
+      if (typeTimer) clearInterval(typeTimer);
+      
+      let index = 0;
+      setText("");
+      
+      typeTimer = setInterval(() => {
+        index++;
+        if (index <= fullText.length) {
+          setText(fullText.slice(0, index));
+        } else {
+          clearInterval(typeTimer);
+          typeTimer = null;
+        }
+      }, 200);
+    };
+
+    // Begin typing effect on mount
+    triggerEffect();
+
+    // Loop typing every 10 minutes exactly (600,000 milliseconds)
+    const systemInterval = setInterval(() => {
+      triggerEffect();
+    }, 10 * 60 * 1000);
+
+    return () => {
+      if (typeTimer) clearInterval(typeTimer);
+      clearInterval(systemInterval);
+    };
+  }, []);
+
+  return (
+    <span className="relative inline-flex items-center select-none font-serif italic">
+      <style>{`
+        @keyframes priv-cursor-blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
+        }
+      `}</style>
+      <span>{text}</span>
+      <span 
+        className="inline-block w-[2px] h-[0.85em] ml-1 shadow-[0_0_8px_#e11d48]"
+        style={{ 
+          backgroundColor: "#e11d48", // solid vibrant ruby/rose
+          animation: "priv-cursor-blink 1.0s infinite",
+          verticalAlign: "middle"
+        }}
+      />
+    </span>
+  );
+};
 
 interface SidebarProps {
   device: string;
@@ -53,7 +154,7 @@ export interface SectionItem {
 }
 
 export const navigationItems: SectionItem[] = [
-  { name: "Live Dashboard", icon: LayoutDashboard, path: "/dashboard" },
+  { name: "Priv Dashboard", icon: LayoutDashboard, path: "/dashboard" },
   { name: "Broker Terminal", icon: Coins, path: "/dashboard/terminal" },
   { name: "AGI Core", icon: Brain, path: "/dashboard/agi-core" },
   { name: "Multi-Agent Hub", icon: Users, path: "/dashboard/multi-agent" },
@@ -64,25 +165,7 @@ export const navigationItems: SectionItem[] = [
   { name: "Tactical News", icon: Newspaper, path: "/dashboard/news" },
   { name: "Diagnostics Log", icon: BarChart2, path: "/dashboard/analytics" },
   { name: "History & Audit", icon: History, path: "/dashboard/history" },
-  { name: "SANS Network Link", icon: Link2, path: "/dashboard/connections" },
-];
-
-export const accountNavigationItems: SectionItem[] = [
-  { name: "Profile & Preferences", icon: UserCircle, path: "/dashboard/profile" },
-  { name: "KYC Verification", icon: FileCheck, path: "/dashboard/kyc" },
-  { name: "Broker Accounts", icon: Plug, path: "/dashboard/broker-connect" },
-  { name: "Trade Alerts", icon: Bell, path: "/dashboard/alerts" },
-  { name: "Risk Analysis", icon: Gauge, path: "/dashboard/risk" },
-  { name: "Market Insights", icon: Lightbulb, path: "/dashboard/insights" },
-  { name: "Vision Analysis", icon: Eye, path: "/dashboard/vision" },
-  { name: "Audio Intel", icon: Mic, path: "/dashboard/audio" },
-  { name: "Wallet", icon: Wallet, path: "/dashboard/wallet" },
-  { name: "Funding", icon: Banknote, path: "/dashboard/funding" },
-  { name: "Ventures", icon: Briefcase, path: "/dashboard/ventures" },
-  { name: "Legal", icon: Scale, path: "/dashboard/legal" },
-  { name: "Trade Executor", icon: Send, path: "/dashboard/trade-executor" },
-  { name: "Treasury", icon: Vault, path: "/dashboard/treasury" },
-  { name: "System Integrity", icon: Shield, path: "/dashboard/integrity" },
+  { name: "SANS Network Link", icon: Link2, path: "/dashboard/connections" }
 ];
 
 export default function Sidebar({
@@ -101,13 +184,10 @@ export default function Sidebar({
     return (
       <header className="fixed top-0 left-0 right-0 h-16 px-4 flex items-center justify-between bg-black/95 border-b border-white/10 z-50 backdrop-blur-md">
         <div className="flex items-center space-x-2">
-          <img 
-            alt="Sans Mercantile Logo" 
-            className="w-7 h-7 object-cover rounded border border-white/25" 
-            src={logo} 
-            referrerPolicy="no-referrer"
-          />
-          <span className="font-serif italic text-white font-medium text-sm tracking-wide">Priv Core</span>
+          <LogoIcon className="w-7 h-7" />
+          <span className="font-serif italic text-white font-medium text-sm tracking-wide flex items-center">
+            <TypingPriv />
+          </span>
         </div>
         
         {/* Horizontal Navigation List */}
@@ -153,25 +233,21 @@ export default function Sidebar({
     >
       {/* Brand Header */}
       <div className={`flex items-center space-x-3 mb-8 mt-2 pb-4 border-b border-white/5 ${isMinimized ? "justify-center" : ""}`}>
-        <img 
-          alt="Sans Mercantile Logo" 
-          className="w-9 h-9 object-cover rounded border border-white/30" 
-          src={logo} 
-          referrerPolicy="no-referrer"
-        />
+        <LogoIcon className="w-9 h-9" />
         {!isMinimized && (
           <div>
-            <h2 className="font-serif italic text-[#ffffff] tracking-wide text-lg leading-none font-medium">Priv Core</h2>
-            <span className="text-[9px] text-zinc-500 font-mono tracking-widest mt-1 block uppercase">SANS MERCANTILE</span>
+            <h2 className="font-serif italic text-[#ffffff] tracking-wide text-lg leading-none font-medium flex items-center">
+              <TypingPriv />
+            </h2>
+            <span className="text-[#FF6B35]">Sans</span>
+            <span className="text-white" style={{textShadow: '0 0 10px rgba(255, 255, 255, 0.8)'}}>Mercantile</span>
+            <sup className="text-white text-xs">™</sup>
           </div>
         )}
       </div>
 
       {/* Navigation list */}
       <nav className="flex-1 space-y-1 overflow-y-auto scrollbar-hide">
-        {!isMinimized && (
-          <div className="px-3 py-1 text-[8px] font-mono text-zinc-600 tracking-widest uppercase">Core</div>
-        )}
         {navigationItems.map((item) => {
           const Icon = item.icon;
           return (
@@ -193,27 +269,6 @@ export default function Sidebar({
                   EXEC
                 </div>
               )}
-            </NavLink>
-          );
-        })}
-        {!isMinimized && (
-          <div className="px-3 pt-4 pb-1 text-[8px] font-mono text-zinc-600 tracking-widest uppercase">Account & Platform</div>
-        )}
-        {accountNavigationItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) => `flex items-center rounded-lg py-2 px-3 font-mono text-xs transition duration-200 border ${
-                isActive
-                  ? "text-white bg-white/10 border-white/25 font-bold"
-                  : "text-zinc-500 border-transparent hover:text-white hover:bg-white/5"
-              } ${isMinimized ? "justify-center" : "space-x-3"}`}
-              title={isMinimized ? item.name : undefined}
-            >
-              <Icon className="w-4 h-4 flex-shrink-0" />
-              {!isMinimized && <span>{item.name}</span>}
             </NavLink>
           );
         })}
