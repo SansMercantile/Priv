@@ -1,0 +1,15 @@
+{
+  "profit_surge": [
+    "profit_rocket.gif",
+    "chill_cocktail.json"
+  ],
+  "margin_warning": [
+    "panic_sweat.gif"
+  ],
+  "drawdown": [
+    "drawdown_tears.gif"
+  ],
+  "consolidation": [
+    "ice_block_trader.gif"
+  ]
+}

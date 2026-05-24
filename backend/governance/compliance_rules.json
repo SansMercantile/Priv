@@ -1,0 +1,12 @@
+[
+  {
+    "rule_id": "EXAMPLE_RULE_ID",
+    "name": "Example Rule Name",
+    "description": "Description of this compliance rule.",
+    "category": "trading_limits",
+    "severity": "critical",
+    "jurisdictions": ["EXAMPLE_JURISDICTION"],
+    "parameters": {},
+    "check_function_name": "ExampleCheckFunction"
+  }
+]

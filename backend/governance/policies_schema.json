@@ -1,0 +1,56 @@
+[
+  {
+    "name": "policy_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Unique identifier for the policy."
+  },
+  {
+    "name": "name",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Name of the policy."
+  },
+  {
+    "name": "description",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Detailed description of the policy directive."
+  },
+  {
+    "name": "policy_type",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Type of policy (e.g., risk_adjustment, operational_guidance)."
+  },
+  {
+    "name": "severity",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Severity or impact level of the policy (e.g., guidance, warning, critical)."
+  },
+  {
+    "name": "target_agents",
+    "type": "STRING",
+    "mode": "REPEATED",
+    "description": "Array of agent IDs or roles that this policy targets."
+  },
+  {
+    "name": "parameters",
+    "type": "JSON",
+    "mode": "NULLABLE",
+    "description": "JSON object for any specific parameters related to the policy."
+  },
+  {
+    "name": "created_at",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE",
+    "description": "Timestamp when the policy was created."
+  },
+  {
+    "name": "expires_at",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE",
+    "description": "Timestamp when the policy expires, if applicable."
+  }
+]

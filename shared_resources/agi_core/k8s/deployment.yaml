@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agi-core-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agi-core
+  template:
+    metadata:
+      labels:
+        app: agi-core
+    spec:
+      containers:
+      - name: agi-core
+        image: agi-core:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: ENVIRONMENT
+          value: "production"

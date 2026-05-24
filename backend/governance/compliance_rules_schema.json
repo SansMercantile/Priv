@@ -1,0 +1,50 @@
+[
+  {
+    "name": "rule_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Unique identifier for the compliance rule."
+  },
+  {
+    "name": "name",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Name of the compliance rule."
+  },
+  {
+    "name": "description",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Detailed description of the rule."
+  },
+  {
+    "name": "category",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Category the rule belongs to (e.g., trading_limits, data_privacy)."
+  },
+  {
+    "name": "severity",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Severity level of the rule (e.g., low, medium, high, critical)."
+  },
+  {
+    "name": "jurisdictions",
+    "type": "STRING",
+    "mode": "REPEATED",
+    "description": "Array of jurisdictions this rule applies to."
+  },
+  {
+    "name": "parameters",
+    "type": "JSON",
+    "mode": "NULLABLE",
+    "description": "JSON object for any specific parameters related to the rule."
+  },
+  {
+    "name": "check_function_name",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Name of the function used to check this rule."
+  }
+]

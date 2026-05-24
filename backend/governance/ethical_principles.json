@@ -1,0 +1,11 @@
+[
+  {
+    "principle_id": "EXAMPLE_PRINCIPLE_ID",
+    "name": "Example Principle Name",
+    "description": "Description of this ethical principle.",
+    "category": "risk_management",
+    "severity": "medium",
+    "parameters": {},
+    "check_function_name": "ExampleCheckFunction"
+  }
+]

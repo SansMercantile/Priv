@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avatar System Frontend</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://sites.super.myninja.ai/_assets/ninja-daytona-script.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Avatar System Dashboard</h1>
+            <p>Advanced photorealistic avatar creation and person cloning</p>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-button active" onclick="showTab('create')">Create Avatar</button>
+            <button class="tab-button" onclick="showTab('clone')">Create Clone</button>
+            <button class="tab-button" onclick="showTab('manage')">Manage Avatars</button>
+            <button class="tab-button" onclick="showTab('animate')">Animate</button>
+        </nav>
+
+        <main>
+            <!-- Create Avatar Tab -->
+            <div id="create-tab" class="tab-content active">
+                <h2>Create New Avatar</h2>
+                <form id="avatar-form">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="avatar-name">Avatar Name</label>
+                            <input type="text" id="avatar-name" placeholder="My Avatar">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="gender">Gender</label>
+                            <select id="gender">
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="neutral">Neutral</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="ethnicity">Ethnicity</label>
+                            <select id="ethnicity">
+                                <option value="caucasian">Caucasian</option>
+                                <option value="african">African</option>
+                                <option value="asian">Asian</option>
+                                <option value="hispanic">Hispanic</option>
+                                <option value="middle_eastern">Middle Eastern</option>
+                                <option value="mixed">Mixed</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="body-type">Body Type</label>
+                            <select id="body-type">
+                                <option value="slim">Slim</option>
+                                <option value="athletic">Athletic</option>
+                                <option value="average">Average</option>
+                                <option value="muscular">Muscular</option>
+                                <option value="plus_size">Plus Size</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="age">Age</label>
+                            <input type="number" id="age" min="18" max="100" value="30">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="height">Height (m)</label>
+                            <input type="number" id="height" min="1.0" max="2.5" step="0.01" value="1.75">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="face-shape">Face Shape</label>
+                            <select id="face-shape">
+                                <option value="oval">Oval</option>
+                                <option value="round">Round</option>
+                                <option value="square">Square</option>
+                                <option value="heart">Heart</option>
+                                <option value="diamond">Diamond</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="eye-color">Eye Color</label>
+                            <select id="eye-color">
+                                <option value="brown">Brown</option>
+                                <option value="blue">Blue</option>
+                                <option value="green">Green</option>
+                                <option value="hazel">Hazel</option>
+                                <option value="gray">Gray</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="hair-color">Hair Color</label>
+                            <select id="hair-color">
+                                <option value="black">Black</option>
+                                <option value="brown">Brown</option>
+                                <option value="blonde">Blonde</option>
+                                <option value="red">Red</option>
+                                <option value="gray">Gray</option>
+                                <option value="white">White</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="hair-style">Hair Style</label>
+                            <select id="hair-style">
+                                <option value="short">Short</option>
+                                <option value="long">Long</option>
+                                <option value="curly">Curly</option>
+                                <option value="straight">Straight</option>
+                                <option value="wavy">Wavy</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="skin-tone">Skin Tone</label>
+                            <select id="skin-tone">
+                                <option value="light">Light</option>
+                                <option value="medium">Medium</option>
+                                <option value="dark">Dark</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="outfit">Outfit</label>
+                            <select id="outfit">
+                                <option value="casual">Casual</option>
+                                <option value="business">Business</option>
+                                <option value="formal">Formal</option>
+                                <option value="athletic">Athletic</option>
+                                <option value="ethnic">Ethnic</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group full-width">
+                            <label for="accessories">Accessories (comma-separated)</label>
+                            <input type="text" id="accessories" placeholder="glasses, watch, necklace">
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary">Create Avatar</button>
+                </form>
+                
+                <div id="avatar-result" class="result-section" style="display: none;">
+                    <h3>Created Avatar</h3>
+                    <div id="avatar-details"></div>
+                </div>
+            </div>
+
+            <!-- Create Clone Tab -->
+            <div id="clone-tab" class="tab-content">
+                <h2>Create Person Clone</h2>
+                <form id="clone-form">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="clone-name">Person Name</label>
+                            <input type="text" id="clone-name" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="clone-email">Email (optional)</label>
+                            <input type="email" id="clone-email">
+                        </div>
+                    </div>
+                    
+                    <div class="file-upload-section">
+                        <h3>Upload Files</h3>
+                        
+                        <div class="upload-group">
+                            <label>Images</label>
+                            <input type="file" id="clone-images" multiple accept="image/*">
+                            <div id="images-preview" class="file-preview"></div>
+                        </div>
+                        
+                        <div class="upload-group">
+                            <label>Videos</label>
+                            <input type="file" id="clone-videos" multiple accept="video/*">
+                            <div id="videos-preview" class="file-preview"></div>
+                        </div>
+                        
+                        <div class="upload-group">
+                            <label>Voice Notes</label>
+                            <input type="file" id="clone-voice" multiple accept="audio/*">
+                            <div id="voice-preview" class="file-preview"></div>
+                        </div>
+                        
+                        <div class="upload-group">
+                            <label>Documents</label>
+                            <input type="file" id="clone-docs" multiple>
+                            <div id="docs-preview" class="file-preview"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="social-media-section">
+                        <h3>Social Media Posts</h3>
+                        <div id="social-posts">
+                            <div class="social-post">
+                                <input type="text" placeholder="Platform" class="platform-input">
+                                <textarea placeholder="Post content"></textarea>
+                                <input type="datetime-local">
+                            </div>
+                        </div>
+                        <button type="button" onclick="addSocialPost()">Add Post</button>
+                    </div>
+                    
+                    <div class="email-section">
+                        <h3>Emails</h3>
+                        <div id="emails">
+                            <div class="email-entry">
+                                <input type="text" placeholder="Subject">
+                                <textarea placeholder="Email body"></textarea>
+                                <input type="datetime-local">
+                            </div>
+                        </div>
+                        <button type="button" onclick="addEmail()">Add Email</button>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary">Create Clone</button>
+                </form>
+                
+                <div id="clone-result" class="result-section" style="display: none;">
+                    <h3>Created Clone</h3>
+                    <div id="clone-details"></div>
+                </div>
+            </div>
+
+            <!-- Manage Avatars Tab -->
+            <div id="manage-tab" class="tab-content">
+                <h2>Manage Avatars</h2>
+                <div class="controls">
+                    <button onclick="loadAvatars()">Load All Avatars</button>
+                    <button onclick="loadClones()">Load All Clones</button>
+                </div>
+                
+                <div id="avatars-list" class="items-grid"></div>
+                <div id="clones-list" class="items-grid"></div>
+            </div>
+
+            <!-- Animate Tab -->
+            <div id="animate-tab" class="tab-content">
+                <h2>Animate Avatar</h2>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="animate-avatar-id">Avatar ID</label>
+                        <select id="animate-avatar-id"></select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="animation-type">Animation Type</label>
+                        <select id="animation-type">
+                            <option value="greeting">Greeting</option>
+                            <option value="talking">Talking</option>
+                            <option value="walking">Walking</option>
+                            <option value="thinking">Thinking</option>
+                            <option value="celebrating">Celebrating</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="expression">Facial Expression</label>
+                        <select id="expression">
+                            <option value="happy">Happy</option>
+                            <option value="sad">Sad</option>
+                            <option value="surprised">Surprised</option>
+                            <option value="angry">Angry</option>
+                            <option value="neutral">Neutral</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="expression-intensity">Expression Intensity</label>
+                        <input type="range" id="expression-intensity" min="0" max="1" step="0.1" value="0.8">
+                        <span id="intensity-value">0.8</span>
+                    </div>
+                </div>
+                
+                <button onclick="animateAvatar()" class="btn-primary">Animate</button>
+                
+                <div id="animation-result" class="result-section" style="display: none;">
+                    <h3>Animation Result</h3>
+                    <div id="animation-details"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

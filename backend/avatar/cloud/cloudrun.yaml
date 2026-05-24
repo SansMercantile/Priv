@@ -1,0 +1,14 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: avatar-cloudrun
+spec:
+  template:
+    spec:
+      containers:
+      - image: avatar:latest
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        ports:
+        - containerPort: 8000

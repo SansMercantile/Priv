@@ -1,0 +1,4 @@
+# AI Core requirements
+numpy
+scikit-learn
+networkx

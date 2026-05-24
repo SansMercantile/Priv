@@ -1,0 +1,11 @@
+{
+  "name": "Sovereign AI Execution Server Node",
+  "description": "Next-generation secure multi-agent consensus system covering sovereign compliance, analytics, tax forecasting models, and interactive AI copilots.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
