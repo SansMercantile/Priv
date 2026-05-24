@@ -17,11 +17,11 @@ export function EnvironmentProvider({ children }: { children: React.ReactNode })
     setDemoModeState(enabled);
     writeDemoMode(enabled);
     toast({
-      title: enabled ? 'Demo environment activated' : 'Live environment activated',
+      title: enabled ? '🚀 Demo Environment Activated' : '🛡️ Live Environment Activated',
       description: enabled
-        ? 'Sample portfolios, news, and broker data are shown. No real account or KYC is required.'
-        : 'Connect your Priv account, complete KYC, customize your profile, and link a broker to unlock analysis.',
-      duration: 8000,
+        ? 'You are now in a simulated environment. Sample portfolios, news, and broker data are shown. No real account or KYC is required to explore.'
+        : 'Welcome to the real Priv environment. To unlock full analysis and trading, please create your account, complete the KYC verification, and link your broker.',
+      duration: 10000,
     });
   }, []);
 
