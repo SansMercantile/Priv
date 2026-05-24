@@ -2,27 +2,75 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { toast } from '../components/ui/use-toast';
 import { readDemoMode, writeDemoMode } from '../lib/environment';
 
+export type EnvironmentType = 'demo' | 'live';
+
+export interface EnvironmentRequirements {
+  requiresKYC: boolean;
+  requiresProfileCompletion: boolean;
+  requiresBrokerConnection: boolean;
+  mockDataAvailable: boolean;
+  realTimeDataAvailable: boolean;
+}
+
 interface EnvironmentContextValue {
   demoMode: boolean;
+  environmentType: EnvironmentType;
   setDemoMode: (enabled: boolean) => void;
   toggleDemoMode: () => void;
+  getEnvironmentRequirements: () => EnvironmentRequirements;
+  isReady: boolean;
+  lastToggleTime: number;
 }
 
 const EnvironmentContext = createContext<EnvironmentContextValue | null>(null);
 
 export function EnvironmentProvider({ children }: { children: React.ReactNode }) {
   const [demoMode, setDemoModeState] = useState<boolean>(() => readDemoMode());
+  const [isReady, setIsReady] = useState(false);
+  const [lastToggleTime, setLastToggleTime] = useState(Date.now());
+
+  const environmentType: EnvironmentType = demoMode ? 'demo' : 'live';
+
+  const getEnvironmentRequirements = useCallback((): EnvironmentRequirements => {
+    if (demoMode) {
+      return {
+        requiresKYC: false,
+        requiresProfileCompletion: false,
+        requiresBrokerConnection: false,
+        mockDataAvailable: true,
+        realTimeDataAvailable: false,
+      };
+    }
+    // Live environment requirements
+    return {
+      requiresKYC: true,
+      requiresProfileCompletion: true,
+      requiresBrokerConnection: true,
+      mockDataAvailable: false,
+      realTimeDataAvailable: true,
+    };
+  }, [demoMode]);
 
   const setDemoMode = useCallback((enabled: boolean) => {
     setDemoModeState(enabled);
+    setLastToggleTime(Date.now());
     writeDemoMode(enabled);
-    toast({
-      title: enabled ? 'Demo environment activated' : 'Live environment activated',
-      description: enabled
-        ? 'Sample portfolios, news, and broker data are shown. No real account or KYC is required.'
-        : 'Connect your Priv account, complete KYC, customize your profile, and link a broker to unlock analysis.',
-      duration: 8000,
-    });
+    
+    const toastConfig = enabled
+      ? {
+          title: '🎭 DEMO MODE ACTIVATED',
+          description:
+            'You are now in Demo Mode. Sample portfolios, simulated data, and free public market data (delayed ~15 min) are available. No KYC or account setup required.',
+          duration: 8000,
+        }
+      : {
+          title: '🔒 LIVE MODE ACTIVATED',
+          description:
+            'You have switched to Live Mode. Complete KYC verification, customize your profile, and connect a real trading broker to enable live market analysis and trading.',
+          duration: 8000,
+        };
+    
+    toast(toastConfig);
   }, []);
 
   const toggleDemoMode = useCallback(() => {
@@ -31,16 +79,25 @@ export function EnvironmentProvider({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     writeDemoMode(demoMode);
+    // Simulate ready state after a brief delay
+    const timer = setTimeout(() => setIsReady(true), 300);
+    return () => clearTimeout(timer);
   }, [demoMode]);
 
   const value = useMemo(
-    () => ({ demoMode, setDemoMode, toggleDemoMode }),
-    [demoMode, setDemoMode, toggleDemoMode]
+    () => ({
+      demoMode,
+      environmentType,
+      setDemoMode,
+      toggleDemoMode,
+      getEnvironmentRequirements,
+      isReady,
+      lastToggleTime,
+    }),
+    [demoMode, environmentType, setDemoMode, toggleDemoMode, getEnvironmentRequirements, isReady, lastToggleTime]
   );
 
-  return (
-    <EnvironmentContext.Provider value={value}>{children}</EnvironmentContext.Provider>
-  );
+  return <EnvironmentContext.Provider value={value}>{children}</EnvironmentContext.Provider>;
 }
 
 export function useEnvironment(): EnvironmentContextValue {
