@@ -18,7 +18,8 @@ import {
   Sparkles,
   Smartphone,
   Laptop,
-  Coins
+  Coins,
+  User
 } from "lucide-react";
 import logo from "../assets/images/logo_1779280505672.png";
 
@@ -155,6 +156,7 @@ export interface SectionItem {
 
 export const navigationItems: SectionItem[] = [
   { name: "Priv Dashboard", icon: LayoutDashboard, path: "/dashboard" },
+  { name: "Identity & Profile", icon: User, path: "/dashboard/profile" },
   { name: "Broker Terminal", icon: Coins, path: "/dashboard/terminal" },
   { name: "AGI Core", icon: Brain, path: "/dashboard/agi-core" },
   { name: "Multi-Agent Hub", icon: Users, path: "/dashboard/multi-agent" },
@@ -336,7 +338,15 @@ export default function Sidebar({
         {!isMinimized && (
           <div className="border-t border-white/5 pt-3 text-[9px] text-zinc-600 font-semibold space-y-0.5 text-center">
             <div>SANS MERCANTILE CO.</div>
-            <div className="tracking-wider">REIMAGINE &bull; REBUILD &bull; TRANSCEND</div>
+            <div className="tracking-wider text-zinc-700">REIMAGINE &bull; REBUILD &bull; TRANSCEND</div>
+            <div className="pt-1 select-none opacity-25 hover:opacity-100 transition-opacity duration-300">
+              <NavLink 
+                to="/dashboard/admin/kyc" 
+                className="text-[7.5px] font-mono tracking-widest text-zinc-500 hover:text-rose-500 uppercase"
+              >
+                [Compliance Gate]
+              </NavLink>
+            </div>
           </div>
         )}
       </div>
