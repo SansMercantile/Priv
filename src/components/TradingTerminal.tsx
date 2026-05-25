@@ -25,7 +25,8 @@ import {
   Sparkles, 
   ChevronRight,
   X,
-  BookOpen
+  BookOpen,
+  Calendar
 } from "lucide-react";
 
 // Types for broker account state
@@ -56,7 +57,8 @@ interface HistoricalTrade {
 // Predefined hot financial RSS feeds
 const PREDEFINED_FEEDS = [
   { name: "ForexLive FX News", url: "https://www.forexlive.com/feed" },
-  { name: "Yahoo Finance", url: "https://finance.yahoo.com/news/rssindex" },
+  { name: "Yahoo Finance Headlines", url: "https://finance.yahoo.com/news/rss" },
+  { name: "MarketWatch MarketPulse", url: "https://www.marketwatch.com/rss/marketpulse" },
   { name: "SANS Intelligence Feed", url: "" } // Custom or local simulation falling back
 ];
 
@@ -115,7 +117,9 @@ const MOCK_ARTICLES_BY_SYMBOL: Record<string, typeof LOCAL_MOCK_ARTICLES> = {
 };
 
 const cleanSymbol = (sym: string): string => {
-  return sym.replace("XM:", "").replace("FX:", "").replace("BINANCE:", "").replace("FOREXCOM:", "").replace("FX_IDC:", "").toUpperCase();
+  if (!sym) return "";
+  const parts = sym.split(":");
+  return parts[parts.length - 1].toUpperCase();
 };
 
 const getDynamicMockArticles = (sym: string) => {
@@ -326,7 +330,7 @@ export default function TradingTerminal({
 }) {
   // --- STATE DECLARATIONS ---
   // Active TradingView Ticker Selection
-  const [selectedSymbol, setSelectedSymbol] = useState<string>("XM:EURUSD");
+  const [selectedSymbol, setSelectedSymbol] = useState<string>("FX_IDC:EURUSD");
   const [customSymbolInput, setCustomSymbolInput] = useState<string>("");
 
   // Dynamic instrument intelligence state mapping
@@ -370,35 +374,50 @@ export default function TradingTerminal({
   };
 
   const getSimulatedTwitterFeeds = (sym: string) => {
-    if (sym === "EURUSD") {
+    const rawSym = cleanSymbol(sym);
+    if (rawSym === "EURUSD") {
       return [
         { username: "ZeroHedge", content: "Macro liquidity channels flashing standard EURUSD interest rate divergence thresholds. Support at 1.0820 holding steady.", time: "4m ago", sentiment: "Bullish" },
         { username: "XM_Markets", content: "Euro inflation print sets the stage for a critical ECB session. High-speed carry traders looking at 1.0915 dynamic ceiling.", time: "18m ago", sentiment: "Neutral" },
         { username: "SANS_Mercantile", content: "PRIV Secure Node: Algorithmic EURUSD exposure recommendation is aligned. Limit buy order targeted around 1.0835.", time: "1h ago", sentiment: "Bullish" }
       ];
-    } else if (sym === "GBPUSD") {
+    } else if (rawSym === "GBPUSD") {
       return [
         { username: "SterlingInsight", content: "BOE rate decision minutes leak suggests growing hawkish division. Target ranges for GBPUSD revised to 1.2580 - 1.2690.", time: "2m ago", sentiment: "Bullish" },
         { username: "ZeroHedge", content: "UK housing data outperformer keeps BoE on high inflation alert. Cable longs build support above 1.2595 base.", time: "14m ago", sentiment: "Neutral" },
         { username: "SANS_Mercantile", content: "Dynamic GBPUSD sweep parameters adjusted. Sovereign ledger ready to absorb liquidity below 1.2580.", time: "1h ago", sentiment: "Bullish" }
       ];
-    } else if (sym === "USDJPY") {
+    } else if (rawSym === "USDJPY") {
       return [
         { username: "YenWatcher", content: "🚨 MOF visual warning levels: 'Extreme FX swings are undesirable.' Direct intervention risks spike if JPY slides past 156.", time: "3m ago", sentiment: "Bearish" },
         { username: "ZeroHedge", content: "carry traders printing record arbitrage sizes on USDJPY. If BOJ doesn't hike soon, 156.0 might see heavy squeeze.", time: "30m ago", sentiment: "Neutral" },
         { username: "NikkeiMacro", content: "Japanese retail option books show heavy protective USDJPY put options placed at 154.20 zone.", time: "2h ago", sentiment: "Bearish" }
       ];
-    } else if (sym === "XAUUSD") {
+    } else if (rawSym === "XAUUSD") {
       return [
         { username: "GoldBullion", content: "Commodity desks reporting massive physical bullion drawdowns from Western vaults. Safe-haven asset bias remains exceptionally strong.", time: "5m ago", sentiment: "Bullish" },
         { username: "ZeroHedge", content: "XAUUSD targets 2,422. Central bank reserves increase gold ratio by 8.4% YoY. Cash alternatives continue to lose premium.", time: "12m ago", sentiment: "Bullish" },
         { username: "SANS_Mercantile", content: "Secured spot metals router designates Gold limit setups as active. Strong bias on retest of 2,390 support corridor.", time: "1h ago", sentiment: "Bullish" }
       ];
-    } else {
+    } else if (rawSym === "USDCAD") {
       return [
-        { username: "WhaleAlert", content: "🚨 12,500 #BTC ($1.1B) moved from long-term cold custody to Coinbase liquidity pool. Base support stable at 88K.", time: "4m ago", sentiment: "Neutral" },
-        { username: "PlanB_Fractal", content: "Bitcoin Bollinger bands tightening on the hourly slot. Technical breakout setup targeting 91.5K is ready.", time: "22m ago", sentiment: "Bullish" },
-        { username: "CryptoWhale", content: "Leveraged longs completely wiped out. Bitcoin price recovery signals very robust bid density above 88,200.", time: "1h ago", sentiment: "Bullish" }
+        { username: "CADForexHub", content: "USDCAD is testing major supply near 1.3710. Retail short ratios are up 12% as Bank of Canada sentiment aligns more dovish.", time: "6m ago", sentiment: "Bearish" },
+        { username: "ZeroHedge", content: "WTI Crude fluctuations hold Canadian Dollar bulls back. Dynamic retest of 1.3620 loonie support zone is critical.", time: "22m ago", sentiment: "Neutral" },
+        { username: "SANS_Mercantile", content: "PRIV Copilot node reports heavy USDCAD buying action from systemic execution desks. Hard stop loss settings recommended at 1.3580.", time: "1h ago", sentiment: "Bullish" }
+      ];
+    } else if (rawSym === "XAGUSD") {
+      return [
+        { username: "SilverSqueeze", content: "XAGUSD Spot Silver is surging past the $30.25 hurdle with heavy technical momentum. Next primary objective at $31.50.", time: "5m ago", sentiment: "Bullish" },
+        { username: "ZeroHedge", content: "Industrial demand for silver continues to drain COMEX warehouse allocations. Price ratios support gold-to-silver trend contraction.", time: "14m ago", sentiment: "Bullish" },
+        { username: "MetalsInsight", content: "Silver options show major whale volume buying deep out of the money calls at $32 strike levels.", time: "2h ago", sentiment: "Bullish" }
+      ];
+    } else {
+      const base = rawSym.substring(0, 3).toUpperCase();
+      const quote = rawSym.substring(3).toUpperCase() || "USD";
+      return [
+        { username: "GlobalTradeFeed", content: `Technical charts for ${rawSym} show typical trading bands after structural trend changes. Support found near dynamic lows.`, time: "8m ago", sentiment: "Neutral" },
+        { username: "QuantSkins", content: `Leveraged setups on ${base}/${quote} demonstrate stable bid liquidity profiles. Scalping traders targeting overhead levels.`, time: "25m ago", sentiment: "Bullish" },
+        { username: "SANS_Algos", content: `PRIV Node has completed a volume study for ${rawSym}. Risk parameters are synced across standard trade slots.`, time: "1h ago", sentiment: "Bullish" }
       ];
     }
   };
@@ -458,18 +477,61 @@ export default function TradingTerminal({
 
   // Balance parameters
   const [balance, setBalance] = useState<number>(() => {
-    if (demoMode) return 10000.0;
+    const saved = localStorage.getItem("xm_balance");
+    if (demoMode) return saved ? parseFloat(saved) : 10000.0;
     return localStorage.getItem("xm_is_logged") === "true" 
-      ? parseFloat(localStorage.getItem("xm_balance") || "5218.42")
+      ? parseFloat(saved || "5218.42")
       : 0;
   });
   const [initialBalance, setInitialBalance] = useState<number>(() => {
-    if (demoMode) return 10000.0;
+    const saved = localStorage.getItem("xm_initial_balance");
+    if (demoMode) return saved ? parseFloat(saved) : 10000.0;
     return localStorage.getItem("xm_is_logged") === "true" 
-      ? parseFloat(localStorage.getItem("xm_initial_balance") || "5000.00")
+      ? parseFloat(saved || "5000.00")
       : 0;
   });
-  const [positions, setPositions] = useState<OpenPosition[]>([]);
+  const [positions, setPositions] = useState<OpenPosition[]>(() => {
+    try {
+      const saved = localStorage.getItem("xm_positions");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Sync positions to localStorage whenever they update
+  useEffect(() => {
+    localStorage.setItem("xm_positions", JSON.stringify(positions));
+  }, [positions]);
+
+  // Sync balances to localStorage whenever they update
+  useEffect(() => {
+    localStorage.setItem("xm_balance", balance.toString());
+  }, [balance]);
+
+  useEffect(() => {
+    localStorage.setItem("xm_initial_balance", initialBalance.toString());
+  }, [initialBalance]);
+
+  // Autonomous Trading states
+  const [isAutoTrading, setIsAutoTrading] = useState<boolean>(() => {
+    return localStorage.getItem("xm_auto_trading") === "true";
+  });
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [autoAnalysis, setAutoAnalysis] = useState<any | null>(null);
+  const [autoLogs, setAutoLogs] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("xm_auto_logs");
+      return saved ? JSON.parse(saved) : [`[${new Date().toLocaleTimeString()}] SANS Autonomous Trading Core in Standby mode.`];
+    } catch {
+      return [`[${new Date().toLocaleTimeString()}] SANS Autonomous Trading Core in Standby mode.`];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("xm_auto_logs", JSON.stringify(autoLogs));
+  }, [autoLogs]);
+
   const [history, setHistory] = useState<HistoricalTrade[]>([]);
   const [executionLogs, setExecutionLogs] = useState<string[]>([]);
 
@@ -503,6 +565,7 @@ export default function TradingTerminal({
   const tickerTapeRef = useRef<HTMLDivElement>(null);
   const forexCrossRatesRef = useRef<HTMLDivElement>(null);
   const screenerRef = useRef<HTMLDivElement>(null);
+  const economicCalendarRef = useRef<HTMLDivElement>(null);
 
   // --- COMPUTE KEY METRICS ---
   const currentFloatingPnl = positions.reduce((acc, pos) => acc + pos.pnl, 0);
@@ -534,9 +597,9 @@ export default function TradingTerminal({
           { "proName": "FOREXCOM:SPXUSD", "title": "S&P 500" },
           { "proName": "FX_IDC:EURUSD", "title": "EUR/USD" },
           { "proName": "FX_IDC:GBPUSD", "title": "GBP/USD" },
-          { "proName": "XM:XAUUSD", "title": "Gold Spot" },
+          { "proName": "OANDA:XAUUSD", "title": "Gold Spot" },
           { "proName": "BINANCE:BTCUSDT", "title": "Bitcoin" },
-          { "proName": "FX:USDJPY", "title": "USD/JPY" }
+          { "proName": "FX_IDC:USDJPY", "title": "USD/JPY" }
         ],
         "showSymbolLogo": false,
         "colorTheme": "dark",
@@ -584,6 +647,24 @@ export default function TradingTerminal({
         "isTransparent": true
       });
       screenerRef.current.appendChild(scriptScreener);
+    }
+
+    // 1d. Render Live Economic Calendar
+    if (economicCalendarRef.current) {
+      economicCalendarRef.current.innerHTML = "";
+      const scriptEvents = document.createElement("script");
+      scriptEvents.src = "https://s3.tradingview.com/external-embedding/embed-widget-events.js";
+      scriptEvents.type = "text/javascript";
+      scriptEvents.async = true;
+      scriptEvents.innerHTML = JSON.stringify({
+        "colorTheme": "dark",
+        "isTransparent": true,
+        "width": "100%",
+        "height": "100%",
+        "locale": "en",
+        "importanceFilter": "-1,0,1 font-semibold"
+      });
+      economicCalendarRef.current.appendChild(scriptEvents);
     }
   }, []);
 
@@ -766,13 +847,189 @@ export default function TradingTerminal({
 
   // Helper pricing list for custom execution trades
   const getAssetRefPrice = (sym: string): number => {
-    if (sym.includes("EURUSD")) return 1.06525;
-    if (sym.includes("GBPUSD")) return 1.25430;
-    if (sym.includes("USDJPY")) return 156.425;
-    if (sym.includes("XAUUSD") || sym.includes("Gold")) return 2420.50;
-    if (sym.includes("BTC")) return 91245.00;
-    return 1.15;
+    const s = cleanSymbol(sym);
+    if (s.includes("EURUSD")) return 1.08250;
+    if (s.includes("GBPUSD")) return 1.26430;
+    if (s.includes("USDJPY")) return 156.425;
+    if (s.includes("XAUUSD") || s.includes("GOLD")) return 2420.50;
+    if (s.includes("XAGUSD") || s.includes("SILVER")) return 30.25;
+    if (s.includes("USDCAD") || s.includes("CAD")) return 1.3665;
+    if (s.includes("BTC")) return 91245.00;
+    if (s.includes("ETH")) return 3150.00;
+    if (s.includes("AUD")) return 0.6620;
+    return 1.1520;
   };
+
+  // --- SANS AUTONOMOUS COGNITIVE CO-PILOT PIPELINES ---
+  const isRunningTradeCycleRef = useRef(false);
+
+  const runAutonomousTradeCycle = async () => {
+    if (isRunningTradeCycleRef.current) return;
+    if (!isLogged) {
+      setAutoLogs(prev => [
+        `[${new Date().toLocaleTimeString()}] 🛑 AUTH GATEWAY SHUT: Handshake into XM Account first to authorize trade executions.`,
+        ...prev.slice(0, 99)
+      ]);
+      return;
+    }
+
+    isRunningTradeCycleRef.current = true;
+    setAutoLogs(prev => [
+      `[${new Date().toLocaleTimeString()}] 🧠 Initiating SANS autonomous market verification sweep...`,
+      ...prev.slice(0, 99)
+    ]);
+
+    try {
+      const activePrice = getAssetRefPrice(selectedSymbol);
+      const cleanSym = selectedSymbol.replace("XM:", "").replace("BINANCE:", "").replace("FX:", "");
+      
+      const reqBody = {
+        symbol: selectedSymbol,
+        price: activePrice,
+        balance,
+        news: rssArticles.slice(0, 5).map(art => ({ title: art.title })),
+        existingPositions: positions
+      };
+
+      const response = await fetch("/api/autonomous/trade", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reqBody)
+      });
+
+      if (!response.ok) throw new Error("Synchronisation failure on telemetry endpoints.");
+      const result = await response.json();
+
+      if (result.logs && Array.isArray(result.logs)) {
+        const freshLogs = [...result.logs].reverse();
+        setAutoLogs(prev => [...freshLogs, ...prev].slice(0, 100));
+        setExecutionLogs(prev => [...result.logs, ...prev]);
+      }
+
+      if (result.execute && result.trade) {
+        const entryP = activePrice || result.trade.sl;
+        const id = `XM-AI-${Math.floor(100000 + Math.random() * 900000)}`;
+        const time = new Date().toLocaleTimeString();
+
+        // Prevent immediate duplicates
+        const hasDouble = positions.some(p => p.symbol === cleanSym);
+        if (hasDouble) {
+          setAutoLogs(prev => [
+            `[${time}] ⚠️ Risk ceiling reached. Exposure limit of 1 position for ${cleanSym} already fulfilled.`,
+            ...prev.slice(0, 99)
+          ]);
+          return;
+        }
+
+        const newPos: OpenPosition = {
+          id,
+          symbol: cleanSym,
+          side: result.trade.side,
+          lots: parseFloat(result.trade.lots || "0.2"),
+          entryPrice: entryP,
+          currentPrice: entryP,
+          pnl: 0,
+          timestamp: time,
+          sl: result.trade.sl,
+          tp: result.trade.tp
+        };
+
+        let contractSize = 100000;
+        if (newPos.symbol.includes("XAU") || newPos.symbol.includes("Gold")) contractSize = 100;
+        if (newPos.symbol.includes("BTC")) contractSize = 1;
+        const levVal = parseInt(leverage.split(":")[1]) || 500;
+        const marginReq = (newPos.lots * contractSize * entryP) / levVal;
+
+        if (marginReq > freeMargin) {
+          setAutoLogs(prev => [
+            `[${time}] 🛑 POSITION SHIELDED: SANS Risk Sentinel blocked dispatch. Capital constraint violation (Required: ${marginReq.toFixed(2)} USD).`,
+            ...prev.slice(0, 99)
+          ]);
+          return;
+        }
+
+        setPositions(prev => [newPos, ...prev]);
+        setAutoLogs(prev => [
+          `[${time}] ✅ AUTONOMOUS PLACEMENT COMPLETE: Ticket ${id} submitted to Broker Core.`,
+          ...prev.slice(0, 99)
+        ]);
+      } else {
+        setAutoLogs(prev => [
+          `[${new Date().toLocaleTimeString()}] SANS Core assessment: HOLD. Current valuation indicates equilibrium (${result.reasoning || "ranges locked"}).`,
+          ...prev.slice(0, 99)
+        ]);
+      }
+    } catch (err: any) {
+      setAutoLogs(prev => [
+        `[${new Date().toLocaleTimeString()}] ⚠️ Handshake interrupted: ${err.message || err}`,
+        ...prev.slice(0, 99)
+      ]);
+    } finally {
+      isRunningTradeCycleRef.current = false;
+    }
+  };
+
+  const runAutonomousAnalysis = async () => {
+    setIsAnalyzing(true);
+    setAutoAnalysis(null);
+    try {
+      const activePrice = getAssetRefPrice(selectedSymbol);
+      const reqBody = {
+        symbol: selectedSymbol,
+        price: activePrice,
+        balance,
+        news: rssArticles.slice(0, 5).map(art => ({ title: art.title })),
+        technicalIndicators: {
+          screener: "Live Oscillators",
+          rsi: Math.floor(45 + Math.random() * 25),
+          sentiment: "Positive Delta Integration"
+        }
+      };
+
+      const response = await fetch("/api/autonomous/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reqBody)
+      });
+
+      if (!response.ok) throw new Error("Sovereign analyst node offline.");
+      const result = await response.json();
+      setAutoAnalysis(result);
+    } catch (err: any) {
+      setAutoAnalysis({
+        reasoning: `Sovereign analytical scan for ${selectedSymbol} failed. Primary cause: ${err.message || err}. Falling back to emergency local risk projections. Sell volume is solid at previous heights, expect consolidation bounds near spot price.`,
+        action: "HOLD",
+        confidence: 65,
+        stopLoss: 0,
+        takeProfit: 0,
+        lotSize: 1.0,
+        rationale: "Emergency offline diagnostic completed."
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  // Autonomous scheduling control trigger
+  useEffect(() => {
+    localStorage.setItem("xm_auto_trading", isAutoTrading ? "true" : "false");
+    if (!isAutoTrading) return;
+
+    // First cycle run in 2 seconds
+    const bootTimer = setTimeout(() => {
+      runAutonomousTradeCycle();
+    }, 2000);
+
+    // Run trade cycle periodically every 28 seconds
+    const intervalTimer = setInterval(() => {
+      runAutonomousTradeCycle();
+    }, 28000);
+
+    return () => {
+      clearTimeout(bootTimer);
+      clearInterval(intervalTimer);
+    };
+  }, [isAutoTrading, selectedSymbol, balance]);
 
   // --- BROKER ACTION HANDLERS ---
   const handleBrokerConnect = (e: React.FormEvent) => {
@@ -1000,10 +1257,12 @@ export default function TradingTerminal({
 
   // Quick preset symbols for TradingView Selector
   const SYMBOLS = [
-    { title: "EUR/USD", symbol: "XM:EURUSD" },
-    { title: "GBP/USD", symbol: "XM:GBPUSD" },
-    { title: "USD/JPY", symbol: "FX:USDJPY" },
-    { title: "Gold Spot", symbol: "XM:XAUUSD" },
+    { title: "EUR/USD", symbol: "FX_IDC:EURUSD" },
+    { title: "GBP/USD", symbol: "FX_IDC:GBPUSD" },
+    { title: "USD/JPY", symbol: "FX_IDC:USDJPY" },
+    { title: "USD/CAD", symbol: "FX_IDC:USDCAD" },
+    { title: "Gold Spot", symbol: "OANDA:XAUUSD" },
+    { title: "Silver Spot", symbol: "OANDA:XAGUSD" },
     { title: "Bitcoin", symbol: "BINANCE:BTCUSDT" }
   ];
 
@@ -1122,15 +1381,7 @@ export default function TradingTerminal({
   };
 
   const renderWorkspace = () => {
-    const activeSymbolCode = selectedSymbol.includes("EURUSD") 
-      ? "EURUSD" 
-      : selectedSymbol.includes("GBPUSD") 
-      ? "GBPUSD" 
-      : selectedSymbol.includes("USDJPY") 
-      ? "USDJPY" 
-      : selectedSymbol.includes("XAUUSD") 
-      ? "XAUUSD" 
-      : "BTCUSDT";
+    const activeSymbolCode = cleanSymbol(selectedSymbol);
 
     return (
       <>
@@ -1583,6 +1834,113 @@ export default function TradingTerminal({
               </div>
             </div>
           </div>
+
+          {/* SANS Autonomous Cognitive & Audit Desk */}
+          <div className="metric-card p-5 rounded border border-white/10 bg-neutral-950/5 relative overflow-hidden flex flex-col justify-between animate-fadeIn space-y-4">
+            <div className="absolute top-0 right-0 w-[1px] h-full bg-gradient-to-b from-white/10 to-transparent" />
+            
+            <div className="space-y-3.5">
+              <div className="flex items-center justify-between pb-3 border-b border-white/5">
+                <span className="font-serif italic text-white flex items-center font-normal">
+                  <Sparkles className="w-4 h-4 mr-2 text-[#FF2E93] animate-pulse" />
+                  SANS Autonomous Neural Desk
+                </span>
+                <span className={`font-mono text-[9px] border px-2 py-0.5 rounded leading-none ${
+                  isAutoTrading 
+                    ? "bg-[#FF2E93]/10 text-[#FF2E93] border-[#FF2E93]/30 animate-pulse" 
+                    : "bg-neutral-950 text-stone-500 border-white/5"
+                }`}>
+                  {isAutoTrading ? "AUTONOMOUS LIVE" : "MANUAL STANDBY"}
+                </span>
+              </div>
+
+              <p className="text-[11px] font-mono text-zinc-400 leading-relaxed font-light">
+                Authorise PRIV multi-agent algorithms to continuously ingest frontend RSS news, indicators & charts to allocate exposure balance autonomously.
+              </p>
+
+              {/* Action Buttons Grid */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAutoTrading(prev => !prev)}
+                  className={`py-2.5 px-3 rounded text-[10px] font-mono font-bold transition select-none cursor-pointer flex items-center justify-center gap-1.5 border uppercase ${
+                    isAutoTrading 
+                      ? "bg-[#FF2E93]/15 text-[#FF2E93] border-[#FF2E93]/30" 
+                      : "bg-white hover:bg-neutral-200 text-neutral-950 border-white"
+                  }`}
+                >
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>{isAutoTrading ? "DISABLE AGENT" : "AUTONOMOUS TRADE"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={runAutonomousAnalysis}
+                  disabled={isAnalyzing}
+                  className="py-2.5 px-3 rounded text-[10px] bg-neutral-950 border border-white/10 text-white hover:bg-stone-900 transition font-mono font-bold select-none cursor-pointer flex items-center justify-center gap-1.5 uppercase"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? "animate-spin" : ""}`} />
+                  <span>{isAnalyzing ? "ANALYSING..." : "DEEP ANALYZE"}</span>
+                </button>
+              </div>
+
+              {/* Deep Analysis Expandable Result panel */}
+              {autoAnalysis && (
+                <div className="p-3 border border-sky-500/15 bg-sky-500/5 rounded space-y-2.5 animate-fadeIn">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-mono text-sky-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> Cognitive Scan Result
+                    </span>
+                    <span className={`text-[9.5px] font-mono font-bold px-1.5 py-0.5 rounded border uppercase ${
+                      autoAnalysis.action === "BUY" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                      autoAnalysis.action === "SELL" ? "bg-red-500/10 text-red-500 border-red-500/20" : "bg-zinc-800 text-zinc-400 border-zinc-700"
+                    }`}>
+                      {autoAnalysis.action} {autoAnalysis.confidence ? `(${autoAnalysis.confidence}% Conf)` : ""}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-zinc-300 leading-relaxed font-sans font-light">
+                    {autoAnalysis.reasoning}
+                  </p>
+
+                  <div className="grid grid-cols-3 gap-1.5 font-mono text-[9px] border-t border-white/5 pt-2">
+                    <div>
+                      <span className="text-zinc-500 block">RECO LOTS</span>
+                      <strong className="text-white font-semibold">{autoAnalysis.lotSize || "0.50"}</strong>
+                    </div>
+                    <div>
+                      <span className="text-zinc-500 block">RECO SL</span>
+                      <strong className="text-rose-400 font-semibold">{autoAnalysis.stopLoss || "N/A"}</strong>
+                    </div>
+                    <div>
+                      <span className="text-zinc-500 block">RECO TP</span>
+                      <strong className="text-emerald-400 font-semibold">{autoAnalysis.takeProfit || "N/A"}</strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Cognitive Stdout Terminal Log Output */}
+              <div className="space-y-1.5">
+                <span className="block text-[8.5px] font-mono text-zinc-500 uppercase tracking-widest">SANS Cognitive Agent Stdout Lines</span>
+                <div className="p-3 bg-black border border-white/5 rounded h-32 overflow-y-auto font-mono text-[9.5px] text-stone-400 space-y-1.5 scrollbar-thin scrollbar-thumb-white/10">
+                  {autoLogs.map((log, i) => {
+                    let textClass = "text-[#FF2E93]/80"; // standard auto
+                    if (log.includes("🛑") || log.includes("FAILED")) textClass = "text-red-400";
+                    if (log.includes("✅") || log.includes("COMPLETE")) textClass = "text-emerald-400 font-bold";
+                    if (log.includes("🧠") || log.includes("verifying")) textClass = "text-sky-300";
+                    if (log.includes("⚠️")) textClass = "text-amber-400";
+                    
+                    return (
+                      <div key={i} className={`leading-relaxed border-b border-white/5 pb-1 break-words last:border-b-0 ${textClass}`}>
+                        {log}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* ========================================================== */}
@@ -1594,27 +1952,71 @@ export default function TradingTerminal({
           <div className="metric-card p-5 rounded border border-white/10 bg-neutral-950/5 relative overflow-hidden flex flex-col justify-between">
             <div className="absolute top-0 right-0 w-[1px] h-full bg-gradient-to-b from-white/10 to-transparent" />
             <div>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b border-white/5 mb-4 gap-2">
-                <span className="font-serif italic text-white flex items-center font-normal">
+              <div className="flex flex-col xl:flex-row xl:items-center justify-between pb-3 border-b border-white/5 mb-4 gap-3">
+                <span className="font-serif italic text-white flex items-center font-normal text-sm">
                   <Database className="w-4 h-4 mr-2" />
                   TradingView Technical Core
                 </span>
                 
-                {/* Micro-Selector */}
-                <div className="flex flex-wrap items-center gap-1 bg-neutral-950 border border-white/5 p-0.5 rounded">
-                  {SYMBOLS.map((preset) => (
+                {/* Search & Selector Area */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  {/* Custom Search Input */}
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (customSymbolInput.trim()) {
+                        let query = customSymbolInput.trim().toUpperCase();
+                        // Auto-prefix XM: or BINANCE: for crypto/common assets if not specified
+                        if (!query.includes(":")) {
+                          if (query.includes("BTC") || query.includes("ETH") || query.includes("SOL") || query.includes("USDT")) {
+                            query = `BINANCE:${query}`;
+                          } else if (query.includes("XAU") || query.includes("XAG")) {
+                            query = `XM:${query}`;
+                          } else {
+                            query = `XM:${query}`;
+                          }
+                        }
+                        setSelectedSymbol(query);
+                        setCustomSymbolInput("");
+                      }
+                    }}
+                    className="flex items-center bg-black border border-white/10 p-0.5 rounded text-[10px]"
+                  >
+                    <input
+                      type="text"
+                      value={customSymbolInput}
+                      onChange={(e) => setCustomSymbolInput(e.target.value)}
+                      placeholder="Custom Symbol... (e.g. USDCAD)"
+                      className="bg-transparent border-none text-[9px] text-zinc-300 font-mono focus:outline-none w-32 px-1.5 focus:ring-0 placeholder:text-zinc-650"
+                    />
                     <button
-                      key={preset.symbol}
-                      onClick={() => setSelectedSymbol(preset.symbol)}
-                      className={`px-2 py-1 text-[9px] font-mono rounded cursor-pointer select-none transition ${
-                        selectedSymbol === preset.symbol 
-                          ? "bg-white text-black font-bold" 
-                          : "text-zinc-500 hover:text-white"
-                      }`}
+                      type="submit"
+                      className="px-2 py-0.5 bg-neutral-800 hover:bg-neutral-700 text-white font-bold font-mono rounded select-none cursor-pointer text-[8px]"
                     >
-                      {preset.title}
+                      APPLY
                     </button>
-                  ))}
+                  </form>
+
+                  {/* Micro-Selector */}
+                  <div className="flex flex-wrap items-center gap-1 bg-neutral-950 border border-white/5 p-0.5 rounded">
+                    {SYMBOLS.map((preset) => {
+                      const isCurrent = cleanSymbol(selectedSymbol) === cleanSymbol(preset.symbol);
+                      return (
+                        <button
+                          key={preset.symbol}
+                          type="button"
+                          onClick={() => setSelectedSymbol(preset.symbol)}
+                          className={`px-1.5 py-0.5 text-[8.5px] font-mono rounded cursor-pointer select-none transition ${
+                            isCurrent 
+                              ? "bg-white text-black font-bold" 
+                              : "text-zinc-500 hover:text-white"
+                          }`}
+                        >
+                          {preset.title}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
@@ -1742,9 +2144,15 @@ export default function TradingTerminal({
                         GBPUSD: ["gbp", "usd", "sterling", "pound", "boe", "uk", "dollar", "fed", "inflation"],
                         USDJPY: ["jpy", "usd", "yen", "japan", "boj", "dollar", "fed", "treasury", "yield"],
                         XAUUSD: ["gold", "xau", "metal", "silver", "bullion", "commodity", "metals"],
+                        XAGUSD: ["silver", "xag", "metal", "gold", "bullion", "commodity", "metals"],
+                        USDCAD: ["cad", "usd", "loonie", "canada", "boc", "oil", "dollar", "fed"],
                         BTCUSDT: ["btc", "bitcoin", "crypto", "ether", "binance", "coin"]
                       };
-                      const keywords = kwMap[activeSymbolCode] || [];
+                      const keywords = kwMap[activeSymbolCode] || [
+                        activeSymbolCode.toLowerCase(),
+                        activeSymbolCode.substring(0, 3).toLowerCase(),
+                        activeSymbolCode.substring(3).toLowerCase()
+                      ].filter(Boolean);
                       const filteredRssArticles = rssArticles.filter(art => {
                         const text = `${art.title} ${art.snip}`.toLowerCase();
                         return keywords.some(kw => text.includes(kw));
@@ -1915,27 +2323,40 @@ export default function TradingTerminal({
       {/* ========================================================== */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-6 animate-fadeIn">
         {/* Forex Cross-Rates Heatmap Widget */}
-        <div className="lg:col-span-6 metric-card p-5 rounded border border-white/10 bg-neutral-950/10 flex flex-col justify-between">
+        <div className="lg:col-span-4 metric-card p-5 rounded border border-white/10 bg-neutral-950/10 flex flex-col justify-between">
           <div className="w-full">
             <h3 className="text-sm font-serif italic text-white mb-4 flex items-center font-normal pb-2 border-b border-white/5">
               <Globe className="w-4 h-4 mr-2 text-zinc-500 animate-pulse" />
               Sovereign Spot Forex Cross Rates Heatmap
             </h3>
-            <div className="h-[400px] w-full bg-neutral-950/10 border border-white/5 rounded overflow-hidden">
+            <div className="h-[430px] w-full bg-neutral-950/10 border border-white/5 rounded overflow-hidden">
               <div ref={forexCrossRatesRef} className="width-full h-full" />
             </div>
           </div>
         </div>
 
         {/* Live Technical Screener Tool */}
-        <div className="lg:col-span-6 metric-card p-5 rounded border border-white/10 bg-neutral-950/10 flex flex-col justify-between">
+        <div className="lg:col-span-4 metric-card p-5 rounded border border-white/10 bg-neutral-950/10 flex flex-col justify-between">
           <div className="w-full">
             <h3 className="text-sm font-serif italic text-white mb-4 flex items-center font-normal pb-2 border-b border-white/5">
               <Sparkles className="w-4 h-4 mr-2 text-zinc-500" />
               Real-Time Global Market Screener & Opportunities Scanner
             </h3>
-            <div className="h-[400px] w-full bg-neutral-950/10 border border-white/5 rounded overflow-hidden">
+            <div className="h-[430px] w-full bg-neutral-950/10 border border-white/5 rounded overflow-hidden">
               <div ref={screenerRef} className="width-full h-full" />
+            </div>
+          </div>
+        </div>
+
+        {/* Live Economic Calendar Tool */}
+        <div className="lg:col-span-4 metric-card p-5 rounded border border-white/10 bg-neutral-950/10 flex flex-col justify-between">
+          <div className="w-full">
+            <h3 className="text-sm font-serif italic text-white mb-4 flex items-center font-normal pb-2 border-b border-white/5">
+              <Calendar className="w-4 h-4 mr-2 text-sky-400" />
+              Real-Time Sovereign Economic Calendar
+            </h3>
+            <div className="h-[430px] w-full bg-neutral-950/10 border border-white/5 rounded overflow-hidden">
+              <div ref={economicCalendarRef} className="width-full h-full" />
             </div>
           </div>
         </div>

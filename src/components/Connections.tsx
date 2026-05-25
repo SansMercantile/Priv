@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link2, Globe, Server, Radio, ShieldCheck, Play, ArrowRight, Activity, Brain, Cpu, Landmark, Cloud, Database, Layers, Zap, Sparkles, RefreshCw, CheckCircle2, Terminal } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface ConnectionNode {
   id: string;
@@ -21,6 +22,7 @@ interface DatadogStatus {
 }
 
 export default function Connections({ demoMode }: { demoMode?: boolean }) {
+  const navigate = useNavigate();
   const [ddStatus, setDdStatus] = useState<DatadogStatus | null>(null);
 
   // Sovereign AI Connection State
@@ -528,6 +530,8 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
                         setStep("");
                         setIsConnected(true);
                         localStorage.setItem(`ex_conn_${ex.id}`, "true");
+                        // Automatically navigate to Profile focusing KYC steps
+                        navigate("/dashboard/profile?triggerKYC=true");
                       }, 1000);
                     }, 800);
                   }, 800);
@@ -605,7 +609,7 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
       </div>
 
       {/* GCP Sovereign Sovereign Deployment & Free-Operations Core */}
-      <div id="gcpSovereignBlock" className="metric-card p-6 rounded border border-white/10 bg-neutral-900/10 space-y-6">
+      <div id="gcpSovereignBlock" className="hidden metric-card p-6 rounded border border-white/10 bg-neutral-900/10 space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between pb-3 border-b border-white/5 gap-4">
           <div className="flex items-center space-x-3.5">
             <div className="w-10 h-10 rounded bg-sky-500/15 border border-sky-400/25 flex items-center justify-center text-sky-400">

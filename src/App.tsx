@@ -15,6 +15,8 @@ import News from "./components/News";
 import Analytics from "./components/Analytics";
 import History from "./components/History";
 import Connections from "./components/Connections";
+import ProfilePage from "./components/profile/ProfilePage";
+import KycAdminReviewPage from "./components/profile/KycAdminReviewPage";
 import UnifiedAssistant from "./ui/UnifiedAssistant";
 import GuidedWalkthrough from "./components/GuidedWalkthrough";
 import { initDatadog } from "./lib/datadog";
@@ -89,12 +91,51 @@ function App({ initialDevice = "desktop" }: AppProps) {
         
         {/* Demo Mode Banner */}
         {demoMode && (
-          <div className="fixed top-0 left-0 right-0 bg-orange-500/90 text-white text-center py-2 text-sm font-semibold z-40 backdrop-blur-sm">
-            🎭 DEMO MODE - Using free public data sources (delayed ~15 min)
+          <div className="fixed top-0 left-0 right-0 bg-gradient-to-r from-black via-[#1c080d] to-black border-b border-rose-500/30 text-xs font-mono text-rose-200 py-2.5 px-4 z-40 backdrop-blur-md flex items-center justify-center gap-3 shadow-[0_2px_15px_rgba(225,29,72,0.12)]">
+            <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="rose-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#ff4b72" />
+                  <stop offset="100%" stopColor="#e11d48" />
+                </linearGradient>
+                <style>{`
+                  @keyframes sway {
+                    0%, 100% { transform: translateY(0px) rotate(-3deg); }
+                    50% { transform: translateY(-2px) rotate(3deg); }
+                  }
+                  .sway-group { 
+                    animation: sway 5s infinite ease-in-out; 
+                    transform-origin: 16px 16px; 
+                  }
+                  .comedy-glow {
+                    filter: drop-shadow(0 0 3px #e11d48);
+                  }
+                `}</style>
+              </defs>
+              <g className="sway-group">
+                {/* Background Tragedy Mask */}
+                <g transform="translate(-1, 2) scale(0.9)" opacity="0.5">
+                  <path d="M12 4C7 4 4 7 4 12C4 18 8 22 12 25C16 22 20 18 20 12C20 7 17 4 12 4Z" stroke="url(#rose-glow)" strokeWidth="1.5" />
+                  <circle cx="9" cy="11" r="1.2" fill="#ff4b72" />
+                  <circle cx="15" cy="11" r="1.2" fill="#ff4b72" />
+                  <path d="M9 17C10 16 14 16 15 17" stroke="#e11d48" strokeWidth="1.5" strokeLinecap="round" />
+                </g>
+                {/* Foreground Comedy Mask */}
+                <g transform="translate(6, 0) scale(0.95)" className="comedy-glow">
+                  <path d="M14 3C9 3 6 6 6 11C6 17 10 21 14 24C18 21 22 17 22 11C22 6 19 3 14 3Z" fill="#120206" stroke="#ff4b72" strokeWidth="1.8" />
+                  <path d="M10 10C11 9 12 9 13 10" stroke="#ff4b72" strokeWidth="1.5" strokeLinecap="round" />
+                  <path d="M15 10C16 9 17 9 18 10" stroke="#ff4b72" strokeWidth="1.5" strokeLinecap="round" />
+                  <path d="M10 15C11 17 17 17 18 15" stroke="#ff4b72" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                </g>
+              </g>
+            </svg>
+            <span className="tracking-widest text-[9px] sm:text-xs">
+              <span className="text-[#ff4b72] font-semibold">DEMO ENVIRONMENT</span> — USING COBALT-RATED DELAYED DATA INDEXING (SANS SECURE PUBLIC ROUTER)
+            </span>
           </div>
         )}
         
-        <div className="flex" style={{ paddingTop: demoMode ? "40px" : "0" }}>
+        <div className="flex" style={{ paddingTop: demoMode ? "42px" : "0" }}>
           <Sidebar 
             device={device} 
             setDevice={setDevice}
@@ -129,6 +170,8 @@ function App({ initialDevice = "desktop" }: AppProps) {
                   <Route path="/dashboard/analytics" element={<Analytics demoMode={demoMode} />} />
                   <Route path="/dashboard/history" element={<History demoMode={demoMode} />} />
                   <Route path="/dashboard/connections" element={<Connections demoMode={demoMode} />} />
+                  <Route path="/dashboard/profile" element={<ProfilePage demoMode={demoMode} />} />
+                  <Route path="/dashboard/admin/kyc" element={<KycAdminReviewPage />} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </Routes>
               </motion.div>
