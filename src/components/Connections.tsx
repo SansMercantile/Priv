@@ -62,7 +62,7 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
           };
           setConnectedAi(newAi);
           localStorage.setItem("priv_connected_ai", JSON.stringify(newAi));
-          // Notify listening components (like PrivCopilot) across the applet
+          // Notify listening components (like PRIV automated core) across the applet
           window.dispatchEvent(new Event("priv_ai_connection_changed"));
         }, 1200);
       }, 1000);
@@ -328,7 +328,7 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
                 <input 
                   type="text" 
                   placeholder="https://api.sansmercantile.com/v1"
-                  className="w-full bg-neutral-900 border border-white/10 rounded p-2.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-white/30 font-mono"
+                  className="w-full bg-neutral-900 border border-white/10 rounded p-2.5 text-xs text-white placeholder-zinc-650 focus:outline-none focus:border-white/30 font-mono"
                   readOnly
                 />
               </div>
@@ -337,7 +337,7 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
                 <input 
                   type="password" 
                   value="sans_merchant_ecc_token_sh_256"
-                  className="w-full bg-neutral-900 border border-white/10 rounded p-2.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-white/30 font-mono"
+                  className="w-full bg-neutral-900 border border-white/10 rounded p-2.5 text-xs text-white placeholder-zinc-650 focus:outline-none focus:border-white/30 font-mono"
                   readOnly
                 />
               </div>
@@ -383,7 +383,7 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
               <span className="text-[9px] text-[#FF6B35] bg-[#FF6B35]/10 border border-[#FF6B35]/30 px-1.5 py-0.5 rounded font-mono uppercase font-bold text-[8.5px]">Tax Safe</span>
             </div>
 
-            <p className="text-stone-450 text-xs leading-relaxed">
+            <p className="text-stone-400 text-xs leading-relaxed">
               Authenticate into regional jurisdictions to automatically optimize capital gains exemptions and file real-time tax shelter statements.
             </p>
 
@@ -431,11 +431,11 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
                 };
 
                 return (
-                  <div key={tax.id} className="p-4 border border-white/5 rounded bg-black/40 space-y-3.5 transition hover:border-white/10">
-                    <div className="flex items-center justify-between">
+                  <div key={tax.id} className="p-4 border border-white/5 rounded bg-black/40 space-y-3.5 transition hover:border-white/10 text-xs">
+                    <div className="flex items-center justify-between animate-fadeIn">
                       <div>
                         <h4 className="text-xs font-mono font-bold text-white">{tax.name}</h4>
-                        <span className="text-[10px] text-zinc-550 leading-none block mt-0.5">{tax.location} &bull; {tax.desc}</span>
+                        <span className="text-[10px] text-zinc-500 leading-none block mt-0.5">{tax.location} &bull; {tax.desc}</span>
                       </div>
                       <span className={`text-[9px] font-mono uppercase px-2 py-0.5 rounded border ${
                         isConnected 
@@ -458,13 +458,13 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
                         ⌛ {step}
                       </div>
                     ) : (
-                      <form onSubmit={handleConnect} className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                      <form onSubmit={handleConnect} className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 font-mono">
                         <input 
                           type="text" 
                           placeholder="Portal ID / User"
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
-                          className="bg-neutral-950 border border-white/10 rounded p-1.5 text-[10px] text-white focus:outline-none focus:border-white/30 font-mono"
+                          className="bg-neutral-955 border border-white/10 rounded p-1.5 text-[10px] text-white focus:outline-none focus:border-white/30"
                           required
                         />
                         <input 
@@ -472,12 +472,12 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
                           placeholder="Secret Passkey"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="bg-neutral-950 border border-white/10 rounded p-1.5 text-[10px] text-white focus:outline-none focus:border-white/30 font-mono"
+                          className="bg-neutral-955 border border-white/10 rounded p-1.5 text-[10px] text-white focus:outline-none focus:border-white/30"
                           required
                         />
                         <button 
                           type="submit"
-                          className="bg-white hover:bg-neutral-200 text-neutral-950 font-bold text-[10px] py-1.5 px-3 rounded text-center transition cursor-pointer font-mono"
+                          className="bg-white hover:bg-neutral-200 text-neutral-950 font-bold text-[10px] py-1.5 px-3 rounded text-center transition cursor-pointer"
                         >
                           SIGN INTO PLATFORM
                         </button>
@@ -492,11 +492,11 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
           {/* Column 2: Binance Exchange and trading portfolios */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-mono uppercase text-sky-400 tracking-widest font-bold">Exchange & Broker Integrations</h3>
+              <h3 className="text-xs font-mono uppercase text-sky-400 tracking-widest font-bold font-bold">Exchange & Broker Integrations</h3>
               <span className="text-[9px] text-sky-400 bg-sky-400/10 border border-sky-400/30 px-1.5 py-0.5 rounded font-mono uppercase font-bold text-[8.5px]">Portfolio Linked</span>
             </div>
 
-            <p className="text-stone-450 text-xs leading-relaxed">
+            <p className="text-stone-400 text-xs leading-relaxed">
               Connect exchanges and brokerages like Binance directly. This authorizes PRIV algorithms to execute low-latency arbitrage and trade portfolios autonomously on your behalf.
             </p>
 
@@ -545,8 +545,8 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
                 };
 
                 return (
-                  <div key={ex.id} className="p-4 border border-white/5 rounded bg-black/40 space-y-3.5 transition hover:border-white/10">
-                    <div className="flex items-center justify-between">
+                  <div key={ex.id} className="p-4 border border-white/5 rounded bg-black/40 space-y-3.5 transition hover:border-white/10 text-xs">
+                    <div className="flex items-center justify-between animate-fadeIn">
                       <div>
                         <h4 className="text-xs font-mono font-bold text-white mb-0.5">{ex.name}</h4>
                         <span className="text-[10px] text-zinc-550 leading-none block">{ex.desc}</span>
@@ -575,13 +575,13 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
                         ⚡ {step}
                       </div>
                     ) : (
-                      <form onSubmit={handleConnect} className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                      <form onSubmit={handleConnect} className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 font-mono">
                         <input 
                           type="text" 
                           placeholder="API Access Key"
                           value={apiKey}
                           onChange={(e) => setApiKey(e.target.value)}
-                          className="bg-neutral-950 border border-white/10 rounded p-1.5 text-[10px] text-white focus:outline-none focus:border-white/30 font-mono"
+                          className="bg-neutral-955 border border-white/10 rounded p-1.5 text-[10px] text-white focus:outline-none focus:border-white/30"
                           required
                         />
                         <input 
@@ -589,12 +589,12 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
                           placeholder="API Secret Token"
                           value={apiSecret}
                           onChange={(e) => setApiSecret(e.target.value)}
-                          className="bg-neutral-950 border border-white/10 rounded p-1.5 text-[10px] text-white focus:outline-none focus:border-white/30 font-mono"
+                          className="bg-neutral-955 border border-white/10 rounded p-1.5 text-[10px] text-white focus:outline-none focus:border-white/30"
                           required
                         />
                         <button 
                           type="submit"
-                          className="bg-sky-450 hover:bg-sky-500 text-black font-bold text-[10px] py-1.5 px-3 rounded text-center transition cursor-pointer font-mono"
+                          className="bg-sky-450 hover:bg-sky-500 text-black font-bold text-[10px] py-1.5 px-3 rounded text-center transition cursor-pointer"
                         >
                           SYNC WITH BINANCE
                         </button>
@@ -608,30 +608,30 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
         </div>
       </div>
 
-      {/* GCP Sovereign Sovereign Deployment & Free-Operations Core */}
-      <div id="gcpSovereignBlock" className="hidden metric-card p-6 rounded border border-white/10 bg-neutral-900/10 space-y-6">
+      {/* SANS Constellation Sandbox Network & Datadog Core */}
+      <div id="gcpSovereignBlock" className="metric-card p-6 rounded border border-white/10 bg-neutral-900/10 space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between pb-3 border-b border-white/5 gap-4">
           <div className="flex items-center space-x-3.5">
             <div className="w-10 h-10 rounded bg-sky-500/15 border border-sky-400/25 flex items-center justify-center text-sky-400">
-              <Cloud className="w-5 h-5 animate-pulse" />
+              <Layers className="w-5 h-5 animate-pulse text-sky-400" />
             </div>
             <div>
               <h2 className="text-xl font-serif italic text-white flex items-center gap-2">
-                GCP Sovereign Deployment & Free-Operations Core
+                SANS Sandbox Constellation & Compartmentalizer DB Core
               </h2>
               <p className="text-white/40 text-xs mt-0.5 font-light font-mono">
-                Model SANS trading microservices, trigger API lot syncs, and provision compliant nodes utilizing Google Cloud Platform free tier offerings.
+                Provision isolated Vercel hypervisor sandboxes securely connected of Datadog APM metrics, and manage strategically compartmentalized databases to optimize core execution resources.
               </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[10px] font-mono uppercase bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded text-emerald-400 font-semibold">
-              ● GCP Active Free Coverage Status: 100% Eligible
+              ● ACTIVE CONSTELLATION MIGRATION: 100% WORKSPACE CERTIFIED
             </span>
           </div>
         </div>
 
-        {/* Dynamic GCP Controller State Logic */}
+        {/* Dynamic Sandbox Controller and Compartmentalized Databases Logic */}
         <GcpOperationsPanel />
       </div>
 
@@ -673,7 +673,7 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
           </div>
 
           <div className="p-4 rounded border border-white/5 bg-black/40">
-            <span className="block text-zinc-500 text-[9px] uppercase tracking-wider mb-1">Orchestration Params</span>
+            <span className="block text-[#a1a1aa] text-[9px] uppercase tracking-wider mb-1">Orchestration Params</span>
             <div className="space-y-0.5 mt-1 text-[10px]">
               <div className="flex justify-between"><span className="text-zinc-500">Service:</span><span className="text-white">{ddStatus?.service || 'sans-priv-core'}</span></div>
               <div className="flex justify-between"><span className="text-zinc-500">Env:</span><span className="text-white">{ddStatus?.env || 'development'}</span></div>
@@ -695,38 +695,43 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
 }
 
 export function GcpOperationsPanel() {
-  // Compute Engine State
-  const [vmRegion, setVmRegion] = useState("us-central1");
-  const [vmPrebuilt, setVmPrebuilt] = useState(true);
-  const [vmStatus, setVmStatus] = useState<"Idle" | "Deploying" | "Running">(() => {
-    return (localStorage.getItem("gcp_vm_status") as any) || "Idle";
-  });
-  const [vmProgress, setVmProgress] = useState(0);
-  const [vmLogs, setVmLogs] = useState<string[]>([]);
+  // Sandboxes in executive constellation
+  const [sandboxes, setSandboxes] = useState([
+    { id: "sb-omega", name: "sandbox-omega-broker", role: "High-Frequency Automated Trading", status: "Active", uptime: "14h 25m", cpu: "2.4%", tracesLink: "Connected to Datadog" },
+    { id: "sb-ledger", name: "sandbox-vault-ledger", role: "Production Balances Sync Node", status: "Active", uptime: "74h 12m", cpu: "1.1%", tracesLink: "Connected to Datadog" },
+    { id: "sb-compliance", name: "sandbox-compliance-parser", role: "Biometric KYC Document Parser", status: "Idle", uptime: "0", cpu: "0%", tracesLink: "Standby" },
+  ]);
 
-  // Cloud Storage State
-  const [gcsBucket, setGcsBucket] = useState("sans-sovereign-vault");
-  const [gcsTier, setGcsTier] = useState("Standard");
-  const [gcsStatus, setGcsStatus] = useState<"Idle" | "Configuring" | "Active">(() => {
-    return (localStorage.getItem("gcp_gcs_status") as any) || "Idle";
-  });
-  const [gcsProgress, setGcsProgress] = useState(0);
+  const [selectedSandbox, setSelectedSandbox] = useState("sb-omega");
+  const [runningCmd, setRunningCmd] = useState(false);
+  const [terminalLogs, setTerminalLogs] = useState<string[]>([
+    "[SANS Constellation] Sandbox orchestration terminal initialized.",
+    "[SANS Constellation] All sandboxes verified connected to Datadog APM tracing pipelines.",
+    "Ready for user input."
+  ]);
+  const [sandboxCmd, setSandboxCmd] = useState("npx sandbox create --connect");
 
-  // Cloud Run State
-  const [runProgress, setRunProgress] = useState(0);
-  const [runStatus, setRunStatus] = useState<"Idle" | "Building" | "Active">(() => {
-    return (localStorage.getItem("gcp_run_status") as any) || "Idle";
-  });
-  const [runImage, setRunImage] = useState("gcr.io/sans-mercantile/priv-core:latest");
+  // Private Databases Compartmentalization Parameters
+  const [mongoUri, setMongoUri] = useState("mongodb+srv://priv-admin:••••••••••••••••@onstellation-db.iad1.mongodb.net/priv?retryWrites=true&w=majority");
+  const [mongoConnected, setMongoConnected] = useState(true);
+  const [poolOptimized, setPoolOptimized] = useState(true); // attachDatabasePool
 
-  // Cloud Run Functions State
-  const [funcTemplate, setFuncTemplate] = useState("doc-summarizer");
-  const [funcStatus, setFuncStatus] = useState<"Idle" | "Deploying" | "Active">(() => {
-    return (localStorage.getItem("gcp_func_status") as any) || "Idle";
-  });
-  const [funcProgress, setFuncProgress] = useState(0);
+  // Vercel Blob store simulations
+  const [blobContent, setBlobContent] = useState("Hello from the secure SANS Blob Store!");
+  const [blobPrefix, setBlobPrefix] = useState("articles/blob.txt");
+  const [blobsList, setBlobsList] = useState<Array<{ url: string; path: string; size: string; created: string }>>([
+    { url: "https://iad1.public.blob.vercel-storage.com/articles/signatures-Biometric_ECC-2026.png", path: "articles/signatures.png", size: "142 KB", created: "May 3, 2026" },
+    { url: "https://iad1.public.blob.vercel-storage.com/articles/client_profile_keys.txt", path: "articles/client_profile_keys.txt", size: "4.2 KB", created: "May 5, 2026" },
+  ]);
+  const [blobLoading, setBlobLoading] = useState(false);
 
-  // BigQuery State
+  // Stats / Resource tracking multipliers
+  const [storageBytes, setStorageBytes] = useState(145028); 
+  const [simpleOps, setSimpleOps] = useState(148);
+  const [advancedOps, setAdvancedOps] = useState(24);
+  const [dataTransfer, setDataTransfer] = useState(2.8);
+
+  // BigQuery state keeping (already active analytical widget in design)
   const [bqQuery, setBqQuery] = useState(`SELECT 
   DATE(timestamp) AS trade_date,
   AVG(profit_factor) AS avg_profit,
@@ -738,139 +743,146 @@ ORDER BY trade_date DESC LIMIT 5;`);
   const [bqResult, setBqResult] = useState<any>(null);
   const [bqLogs, setBqLogs] = useState("");
 
-  // VM Deploy Handshake Simulated Workflow
-  const handleDeployVM = () => {
-    setVmStatus("Deploying");
-    setVmProgress(10);
-    setVmLogs(["[GCP Compute Engine] Initiating e2-micro virtual machine deployment...", `[GCP Compute Engine] Assigned region: ${vmRegion}`, `[GCP Compute Engine] Mode: ${vmPrebuilt ? "SANS Prebuilt Load-Balanced Cluster" : "Dynamic Sovereign Shell"}`]);
+  const handleExecuteSandbox = () => {
+    setRunningCmd(true);
+    setTerminalLogs(prev => [
+      ...prev,
+      `[User Terminal] Routing command to ${selectedSandbox}: ${sandboxCmd}`
+    ]);
 
-    let currentProgress = 10;
+    let step = 0;
     const interval = setInterval(() => {
-      currentProgress += 15;
-      if (currentProgress >= 100) {
-        clearInterval(interval);
-        setVmProgress(100);
-        setVmStatus("Running");
-        setVmLogs(prev => [
-          ...prev,
-          "[GCP Compute Engine] Allocating 30GB free persistent SSD...",
-          "[GCP Compute Engine] Mounting networking ingress routes...",
-          "[GCP Compute Engine] Virtual Machine instance is online! Public IP: 34.120.45.181",
-          `[GCP Compute Engine] OK - 1 non-preemptible e2-micro VM free instance running successfully.`
-        ]);
-        localStorage.setItem("gcp_vm_status", "Running");
+      step++;
+      if (sandboxCmd.includes("connect") || sandboxCmd.includes("create")) {
+        if (step === 1) {
+          setTerminalLogs(prev => [...prev, "[Vercel Sandbox] Initializing connection tunnel pipeline..."]);
+        } else if (step === 2) {
+          setTerminalLogs(prev => [
+            ...prev,
+            "import { Sandbox } from \"@vercel/sandbox\";",
+            "const sandbox = await Sandbox.create();",
+            "// Establishing encrypted secure sockets tunnels connected to Vercel and Datadog..."
+          ]);
+        } else if (step === 3) {
+          setTerminalLogs(prev => [
+            ...prev,
+            `[Vercel Sandbox] Connected sandbox '${selectedSandbox}' to project infrastructure.`,
+            "[Vercel Sandbox] Pulling secure MongoDB and Vercel Blob access constants dynamically..."
+          ]);
+        } else if (step === 4) {
+          clearInterval(interval);
+          setRunningCmd(false);
+          setSandboxes(prev => prev.map(sb => sb.id === selectedSandbox ? { ...sb, status: "Active", cpu: "1.6%", tracesLink: "Connected to Datadog" } : sb));
+          setTerminalLogs(prev => [
+            ...prev,
+            "SUCCESS: npx sandbox connection finalized with return code 0.",
+            "[Datadog APM] Sandbox linked. Streaming real-time telemetry metrics to Datadog core agent...",
+            "✓ Active tracing is now active for this sandbox lot."
+          ]);
+          setAdvancedOps(o => o + 1);
+        }
+      } else if (sandboxCmd.includes("echo")) {
+        if (step === 1) {
+          setTerminalLogs(prev => [
+            ...prev,
+            "const cmd = await sandbox.runCommand(\"echo\", [\"Hello from Vercel Sandbox!\"]);",
+            "console.log(await cmd.stdout());"
+          ]);
+        } else if (step === 2) {
+          clearInterval(interval);
+          setRunningCmd(false);
+          setTerminalLogs(prev => [
+            ...prev,
+            "[stdout] Hello from Vercel Sandbox!",
+            "[Vercel Sandbox] Telemetry stream registered with return code 0."
+          ]);
+          setSimpleOps(o => o + 1);
+        }
+      } else if (sandboxCmd.includes("stop")) {
+        if (step === 1) {
+          setTerminalLogs(prev => [...prev, "[Vercel Sandbox] Dispatching await sandbox.stop() command..."]);
+        } else if (step === 2) {
+          clearInterval(interval);
+          setRunningCmd(false);
+          setSandboxes(prev => prev.map(sb => sb.id === selectedSandbox ? { ...sb, status: "Idle", cpu: "0%", tracesLink: "Standby" } : sb));
+          setTerminalLogs(prev => [
+            ...prev,
+            "[Vercel Sandbox] Isolated hypervisor shut down. Container dismantled cleanly.",
+            "[SANS Constellation] Resource released for next scheduled tasks queue."
+          ]);
+          setSimpleOps(o => o + 1);
+        }
+      } else if (sandboxCmd.includes("pull") || sandboxCmd.includes("env")) {
+        if (step === 1) {
+          setTerminalLogs(prev => [...prev, "[Vercel CLI] Contacting project secure environment vault..."]);
+        } else if (step === 2) {
+          setTerminalLogs(prev => [...prev, "[Vercel CLI] project 'sans-priv-terminal' located."]);
+        } else if (step === 3) {
+          clearInterval(interval);
+          setRunningCmd(false);
+          setTerminalLogs(prev => [
+            ...prev,
+            "✓ Local parameters updated: .env.local created containing MongoDB connections, Vercel Blob tokens, and Datadog secure parameters.",
+            "✓ Sandbox synced with constellation-db credentials."
+          ]);
+          setSimpleOps(o => o + 1);
+        }
       } else {
-        setVmProgress(currentProgress);
-        if (currentProgress === 25) {
-          setVmLogs(prev => [...prev, "[GCP Compute Engine] Provisioning network virtual routing layer..."]);
-        } else if (currentProgress === 55) {
-          setVmLogs(prev => [...prev, "[GCP Compute Engine] Downloading SANS sovereign core template bundle..."]);
-        } else if (currentProgress === 85) {
-          setVmLogs(prev => [...prev, "[GCP Compute Engine] Securing TLS security handshakes on proxy layer..."]);
+        if (step === 1) {
+          setTerminalLogs(prev => [...prev, `[Vercel Sandbox] Launching custom terminal process: '${sandboxCmd}'`]);
+        } else if (step === 2) {
+          clearInterval(interval);
+          setRunningCmd(false);
+          setTerminalLogs(prev => [
+            ...prev,
+            `[stdout] Task finished for command: '${sandboxCmd}' (status code 0).`,
+            "✓ Command stream flushed successfully."
+          ]);
+          setSimpleOps(o => o + 1);
         }
       }
     }, 600);
   };
 
-  const handleResetVM = () => {
-    setVmStatus("Idle");
-    setVmProgress(0);
-    setVmLogs([]);
-    localStorage.removeItem("gcp_vm_status");
+  const handlePutBlob = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!blobContent.trim()) return;
+    setBlobLoading(true);
+
+    const hashId = Math.floor(100000 + Math.random() * 900000);
+    const newBlob = {
+      url: `https://iad1.public.blob.vercel-storage.com/${blobPrefix.replace('.txt', '')}-${hashId}.txt`,
+      path: blobPrefix,
+      size: `${(blobContent.length / 1024).toFixed(2)} KB`,
+      created: "Just now"
+    };
+
+    setTimeout(() => {
+      setBlobLoading(false);
+      setBlobsList(prev => [newBlob, ...prev]);
+      setStorageBytes(prev => prev + blobContent.length);
+      setSimpleOps(ops => ops + 1);
+      setDataTransfer(dt => parseFloat((dt + (blobContent.length / 1048576)).toFixed(4)));
+      setBlobContent("");
+    }, 800);
   };
 
-  // Cloud Storage Simulated Workflow
-  const handleDeployGCS = () => {
-    setGcsStatus("Configuring");
-    setGcsProgress(20);
-
-    let progress = 20;
-    const interval = setInterval(() => {
-      progress += 20;
-      if (progress >= 100) {
-        clearInterval(interval);
-        setGcsProgress(100);
-        setGcsStatus("Active");
-        localStorage.setItem("gcp_gcs_status", "Active");
-      } else {
-        setGcsProgress(progress);
-      }
-    }, 400);
-  };
-
-  const handleResetGCS = () => {
-    setGcsStatus("Idle");
-    setGcsProgress(0);
-    localStorage.removeItem("gcp_gcs_status");
-  };
-
-  // Cloud Run Deployment Workflow
-  const handleDeployRun = () => {
-    setRunStatus("Building");
-    setRunProgress(15);
-
-    let progress = 15;
-    const interval = setInterval(() => {
-      progress += 25;
-      if (progress >= 100) {
-        clearInterval(interval);
-        setRunProgress(100);
-        setRunStatus("Active");
-        localStorage.setItem("gcp_run_status", "Active");
-      } else {
-        setRunProgress(progress);
-      }
-    }, 500);
-  };
-
-  const handleResetRun = () => {
-    setRunStatus("Idle");
-    setRunProgress(0);
-    localStorage.removeItem("gcp_run_status");
-  };
-
-  // Cloud Run Functions Deployment Workflow
-  const handleDeployFunc = () => {
-    setFuncStatus("Deploying");
-    setFuncProgress(20);
-
-    let progress = 20;
-    const interval = setInterval(() => {
-      progress += 20;
-      if (progress >= 100) {
-        clearInterval(interval);
-        setFuncProgress(100);
-        setFuncStatus("Active");
-        localStorage.setItem("gcp_func_status", "Active");
-      } else {
-        setFuncProgress(progress);
-      }
-    }, 400);
-  };
-
-  const handleResetFunc = () => {
-    setFuncStatus("Idle");
-    setFuncProgress(0);
-    localStorage.removeItem("gcp_func_status");
-  };
-
-  // BigQuery Analytical Run Workflow
   const handleRunBQ = () => {
     setBqLoading(true);
-    setBqLogs("Connecting to BigQuery distributed cluster... Scanning 412 MB of table archives...");
+    setBqLogs("Connecting to SANS analytical query cluster... Scanning big data partitions...");
     setBqResult(null);
 
     setTimeout(() => {
-      setBqLogs("Executing dynamic parsing against SANS lots metadata schema... Analyzing 1.4 TB query equivalent data limits...");
+      setBqLogs("Executing optimized parsing against MongoDB/Blob strategic schemas... Resource limits verified... ");
       
       setTimeout(() => {
         setBqLoading(false);
-        setBqLogs("Query completed successfully. Free Tier quota remaining is optimal. Standard SQL execution output:");
+        setBqLogs("Strategic resource analysis complete. Compartmentalized query results:");
         setBqResult([
-          { trade_date: "2026-05-23", avg_profit: "+$41,205.80 USD", total_lots: "28 lots (High Leveraged)" },
-          { trade_date: "2026-05-22", avg_profit: "+$18,460.12 USD", total_lots: "14 lots" },
+          { trade_date: "2026-05-23", avg_profit: "+$41,205.80 USD", total_lots: "28 lots (Strategic main partition)" },
+          { trade_date: "2026-05-22", avg_profit: "+$18,460.12 USD", total_lots: "14 lots (Capped connection lot)" },
           { trade_date: "2026-05-21", avg_profit: "+$55,901.40 USD", total_lots: "41 lots" },
-          { trade_date: "2026-05-20", avg_profit: "-$4,105.10 USD", total_lots: "12 lots (Mitigated)" },
+          { trade_date: "2026-05-20", avg_profit: "-$4,105.10 USD", total_lots: "12 lots (Mitigated pool error)" },
           { trade_date: "2026-05-19", avg_profit: "+$29,081.44 USD", total_lots: "19 lots" }
         ]);
       }, 900);
@@ -881,371 +893,253 @@ ORDER BY trade_date DESC LIMIT 5;`);
     <div className="space-y-6 font-sans select-text">
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
-        {/* 1. COMPUTE ENGINE VIRTUAL MACHINES */}
-        <div className="p-5 border border-white/5 rounded-lg bg-black/40 space-y-4">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded bg-orange-500/15 border border-orange-500/25 flex items-center justify-center text-orange-400">
-                <Cpu className="w-4 h-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-white font-mono">1. Compute Engine (Launch Virtual Machines)</h3>
-                <span className="text-[10px] text-zinc-550 block font-mono">Create and manage VMs for custom trading & arbitrage nodes</span>
-              </div>
-            </div>
-            <span className={`text-[9px] font-mono px-2 py-0.5 rounded uppercase border ${
-              vmStatus === "Running" 
-                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 animate-pulse" 
-                : vmStatus === "Deploying"
-                ? "bg-amber-500/10 text-amber-400 border-amber-500/30 font-bold"
-                : "bg-neutral-900 text-stone-500 border-white/5"
-            }`}>
-              {vmStatus === "Running" ? "Active Free VM" : vmStatus === "Deploying" ? "HANDSHAKING..." : "DEPLOYABLE"}
-            </span>
-          </div>
-
-          <p className="text-stone-400 text-xs leading-relaxed">
-            Get <strong>one non-preemptible e2-micro VM instance free per month</strong>. Create custom servers running micro-arbitrage algorithms in optimal cloud environments.
-          </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            {/* Region Selector */}
-            <div className="space-y-1">
-              <label htmlFor="vmRegionSelect" className="text-[10px] uppercase font-mono text-zinc-500 block">Select Free Tier Region</label>
-              <select
-                id="vmRegionSelect"
-                value={vmRegion}
-                onChange={(e) => setVmRegion(e.target.value)}
-                disabled={vmStatus !== "Idle"}
-                className="w-full bg-neutral-950 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-white/30 font-mono"
-              >
-                <option value="us-central1">us-central1 (Iowa - Free Tier Eligible)</option>
-                <option value="us-east1">us-east1 (S. Carolina - Free Tier Eligible)</option>
-                <option value="us-west1">us-west1 (Oregon - Free Tier Eligible)</option>
-              </select>
-            </div>
-
-            {/* Config Mode Toggle */}
-            <div className="space-y-1">
-              <label htmlFor="vmPrebuiltSelect" className="text-[10px] uppercase font-mono text-zinc-500 block">Server Instance Template</label>
-              <select
-                id="vmPrebuiltSelect"
-                value={vmPrebuilt ? "true" : "false"}
-                onChange={(e) => setVmPrebuilt(e.target.value === "true")}
-                disabled={vmStatus !== "Idle"}
-                className="w-full bg-neutral-950 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-white/30 font-mono"
-              >
-                <option value="true">Sample prebuilt load balanced VM</option>
-                <option value="false">Spin up new dynamic shell instance</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Action Row */}
-          <div className="pt-1.5 flex items-center justify-between gap-3">
-            <span className="text-[9.5px] font-mono text-amber-400/95 bg-amber-500/10 border border-amber-500/20 rounded px-2 py-1">
-              Limits: 1 Instance Free &bull; E2-Micro Standard Slot
-            </span>
-            {vmStatus === "Idle" ? (
-              <button
-                id="vmDeployBtn"
-                onClick={handleDeployVM}
-                className="px-4 py-1.5 bg-white text-black font-semibold text-xs rounded hover:bg-neutral-200 transition font-mono cursor-pointer"
-              >
-                SPIN UP ENGINE INSTANCE
-              </button>
-            ) : vmStatus === "Deploying" ? (
-              <div className="w-[180px] bg-neutral-950 border border-white/10 rounded overflow-hidden">
-                <div 
-                  className="bg-orange-500 h-full text-[8.5px] text-white text-center font-mono py-1 font-bold animate-pulse transition-all duration-300" 
-                  style={{ width: `${vmProgress}%` }}
-                >
-                  DEPLOYING {vmProgress}%
-                </div>
-              </div>
-            ) : (
-              <button
-                id="vmResetBtn"
-                onClick={handleResetVM}
-                className="px-4 py-1.5 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/30 font-bold text-xs rounded transition font-mono cursor-pointer"
-              >
-                TERMINATE MACHINE
-              </button>
-            )}
-          </div>
-
-          {/* Terminal Console Logs */}
-          {(vmLogs.length > 0) && (
-            <div className="p-3 bg-black border border-white/10 rounded text-[9.5px] font-mono text-green-400 space-y-1.5 h-28 overflow-y-auto scrollbar-hide">
-              {vmLogs.map((log, lIdx) => (
-                <div key={lIdx} className="leading-tight">{log}</div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* 2. CLOUD STORAGE BUCKETS */}
-        <div className="p-5 border border-white/5 rounded-lg bg-black/40 space-y-4 flex flex-col justify-between">
-          <div className="space-y-4">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded bg-sky-500/15 border border-sky-400/25 flex items-center justify-center text-sky-400">
-                  <Database className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white font-mono">2. Cloud Storage (Set Up Object Storage)</h3>
-                  <span className="text-[10px] text-zinc-550 block font-mono">Reliable & cost-effective object and asset store</span>
-                </div>
-              </div>
-              <span className={`text-[9px] font-mono px-2 py-0.5 rounded uppercase border ${
-                gcsStatus === "Active" 
-                  ? "bg-sky-500/10 text-sky-400 border-sky-500/30" 
-                  : gcsStatus === "Configuring"
-                  ? "bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse"
-                  : "bg-neutral-900 text-stone-500 border-white/5"
-              }`}>
-                {gcsStatus === "Active" ? "Active Bucket" : gcsStatus === "Configuring" ? "PROVISIONING..." : "PENDING"}
-              </span>
-            </div>
-
-            <p className="text-stone-400 text-xs leading-relaxed">
-              Get <strong>5 GB-months of regional storage (US regions only) free per month</strong>. Easily set up storage for trade reports, historical CSVs, and audit documents.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="space-y-1">
-                <label htmlFor="gcsBucketInput" className="text-[10px] uppercase font-mono text-zinc-500 block">SANS Bucket Name</label>
-                <input
-                  id="gcsBucketInput"
-                  type="text"
-                  value={gcsBucket}
-                  onChange={(e) => setGcsBucket(e.target.value)}
-                  disabled={gcsStatus !== "Idle"}
-                  className="w-full bg-neutral-950 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-white/30 font-mono"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label htmlFor="gcsTierSelect" className="text-[10px] uppercase font-mono text-zinc-500 block">Default Storage Class</label>
-                <select
-                  id="gcsTierSelect"
-                  value={gcsTier}
-                  onChange={(e) => setGcsTier(e.target.value)}
-                  disabled={gcsStatus !== "Idle"}
-                  className="w-full bg-neutral-950 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-white/30 font-mono"
-                >
-                  <option value="Standard">Standard (High-frequency access)</option>
-                  <option value="Nearline">Nearline (Backup lots audit checks)</option>
-                  <option value="Coldline">Coldline (Disaster recovery logs)</option>
-                  <option value="Archival">Archival (Arbitrary strategic vaults)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-2 flex items-center justify-between gap-3">
-            <span className="text-[9.5px] font-mono text-sky-400 bg-sky-500/10 border border-sky-500/20 rounded px-2 py-1">
-              5 GB free storage &bull; US Regional Limits apply
-            </span>
-            {gcsStatus === "Idle" ? (
-              <button
-                id="gcsDeployBtn"
-                onClick={handleDeployGCS}
-                className="px-4 py-1.5 bg-white text-black font-semibold text-xs rounded hover:bg-neutral-200 transition font-mono cursor-pointer animate-pulse"
-              >
-                PROVISION STORAGE ASSETS
-              </button>
-            ) : gcsStatus === "Configuring" ? (
-              <div className="w-[140px] bg-neutral-950 border border-white/10 rounded overflow-hidden">
-                <div 
-                  className="bg-sky-500 h-full text-[8.5px] text-white text-center font-mono py-1 font-bold animate-pulse transition-all duration-300" 
-                  style={{ width: `${gcsProgress}%` }}
-                >
-                  CREATING {gcsProgress}%
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-[9px] font-mono text-emerald-400">● Storage Bucket Ready</span>
-                <button
-                  id="gcsResetBtn"
-                  onClick={handleResetGCS}
-                  className="px-2.5 py-1 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/20 font-bold text-[10px] rounded transition font-mono cursor-pointer"
-                >
-                  PURGE
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 3. CLOUD RUN SERVERLESS APPLICATIONS */}
+        {/* SECTION 1: VERCEL SANDBOXES CONFLICT COORD CONTROL */}
         <div className="p-5 border border-white/5 rounded-lg bg-black/40 space-y-4">
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-2.5">
               <div className="w-8 h-8 rounded bg-sky-500/15 border border-sky-400/25 flex items-center justify-center text-sky-400">
-                <Layers className="w-4 h-4" />
+                <Terminal className="w-4 h-4 text-sky-400" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-white font-mono">3. Cloud Run (Build Applications & Web-platforms)</h3>
-                <span className="text-[10px] text-zinc-550 block font-mono">Run autoscaling stateless containers with native ingress</span>
+                <h3 className="text-sm font-bold text-white font-mono">Vercel Constellation Sandbox Manager</h3>
+                <span className="text-[10px] text-zinc-500 block font-mono">Isolated containers linked with Datadog and Vercel Projects</span>
               </div>
             </div>
-            <span className={`text-[9px] font-mono px-2 py-0.5 rounded uppercase border ${
-              runStatus === "Active" 
-                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 animate-pulse" 
-                : runStatus === "Building"
-                ? "bg-amber-500/10 text-amber-400 border-amber-500/30 font-bold"
-                : "bg-neutral-900 text-stone-500 border-white/5"
-            }`}>
-              {runStatus === "Active" ? "LIVE CONTAINER" : runStatus === "Building" ? "BUILDING..." : "DEPLOYABLE"}
+            <span className="text-[9px] font-mono px-2 py-0.5 rounded uppercase border bg-sky-500/10 text-sky-400 border-sky-500/25">
+              Secure Isolated Execution
             </span>
           </div>
 
-          <p className="text-stone-400 text-xs leading-relaxed">
-            Deploy full-stack applications and secure APIs that auto-scale. Only pay when your code runs, with <strong>2 million free requests per month</strong>.
-          </p>
-
-          <div className="space-y-1 text-xs">
-            <label htmlFor="runImageInput" className="text-[10px] uppercase font-mono text-zinc-500 block">Sovereign Container Image Path</label>
-            <input
-              id="runImageInput"
-              type="text"
-              value={runImage}
-              onChange={(e) => setRunImage(e.target.value)}
-              disabled={runStatus !== "Idle"}
-              className="w-full bg-neutral-950 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-white/30 font-mono"
-            />
-          </div>
-
-          <div className="pt-1.5 flex items-center justify-between gap-3">
-            <span className="text-[9.5px] font-mono text-[#FF6B35] bg-[#FF6B35]/10 border border-[#FF6B35]/20 rounded px-2 py-1">
-              2M Requests Free/Month &bull; Autoscales from zero
-            </span>
-            {runStatus === "Idle" ? (
-              <button
-                id="runDeployBtn"
-                onClick={handleDeployRun}
-                className="px-4 py-1.5 bg-white text-black font-semibold text-xs rounded hover:bg-neutral-200 transition font-mono cursor-pointer"
-              >
-                DEPLOY APPLICATIONS CORE
-              </button>
-            ) : runStatus === "Building" ? (
-              <div className="w-[150px] bg-neutral-950 border border-white/10 rounded overflow-hidden">
+          <div className="space-y-2">
+            <span className="text-[10px] uppercase font-mono text-zinc-400 block tracking-wider">Active Constellation Sandboxes</span>
+            <div className="space-y-2">
+              {sandboxes.map(sb => (
                 <div 
-                  className="bg-sky-500 h-full text-[8.5px] text-white text-center font-mono py-1 font-bold animate-pulse transition-all duration-300" 
-                  style={{ width: `${runProgress}%` }}
+                  key={sb.id}
+                  onClick={() => setSelectedSandbox(sb.id)}
+                  className={`p-3 rounded border text-xs cursor-pointer transition flex items-center justify-between font-mono ${
+                    selectedSandbox === sb.id 
+                      ? "bg-sky-950/20 border-sky-500/40 text-white" 
+                      : "bg-neutral-950/40 border-white/5 text-zinc-400 hover:border-white/10"
+                  }`}
                 >
-                  BUILDING {runProgress}%
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <strong className="text-white text-xs">{sb.name}</strong>
+                      <span className={`text-[8.5px] px-1.5 py-0.2 rounded border ${
+                        sb.status === "Active" 
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                          : "bg-zinc-900 text-zinc-500 border-white/5"
+                      }`}>
+                        {sb.status}
+                      </span>
+                    </div>
+                    <span className="text-[9.5px] text-zinc-500 block mt-1">{sb.role}</span>
+                  </div>
+
+                  <div className="text-right text-[10px] space-y-0.5">
+                    <div>CPU: <strong className="text-white">{sb.cpu}</strong></div>
+                    <div className="text-zinc-500 text-[9px]">{sb.tracesLink}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Sandbox code execution simulator */}
+          <div className="space-y-2 bg-neutral-950/70 p-4 rounded-lg border border-white/5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono font-bold text-sky-400 uppercase flex items-center gap-1.5">
+                <Cpu className="w-3.5 h-3.5" /> Execute Vercel Sandbox Console
+              </span>
+              <span className="text-[9px] font-mono text-zinc-500">selected: {selectedSandbox}</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+              <div className="sm:col-span-2">
+                <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">Select / Write Command</label>
+                <div className="flex gap-1.5">
+                  <select
+                    value={sandboxCmd}
+                    onChange={(e) => setSandboxCmd(e.target.value)}
+                    className="bg-black border border-white/10 rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none"
+                  >
+                    <option value="npx sandbox create --connect">npx sandbox create --connect</option>
+                    <option value="echo 'Hello from Vercel Sandbox!'">echo 'Hello Sandbox!'</option>
+                    <option value="vercel env pull">vercel env pull</option>
+                    <option value="await sandbox.stop()">await sandbox.stop()</option>
+                  </select>
+                  <input
+                    type="text"
+                    value={sandboxCmd}
+                    onChange={(e) => setSandboxCmd(e.target.value)}
+                    placeholder="Custom command execution"
+                    className="flex-1 bg-black border border-white/10 rounded px-2 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-white/30"
+                  />
                 </div>
               </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono text-emerald-400 uppercase">Live: https://priv-service-jcnhp.run.app</span>
+
+              <div>
+                <label className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">&nbsp;</label>
                 <button
-                  id="runResetBtn"
-                  onClick={handleResetRun}
-                  className="px-2.5 py-1 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/20 font-bold text-[10px] rounded transition font-mono cursor-pointer"
+                  type="button"
+                  onClick={handleExecuteSandbox}
+                  disabled={runningCmd}
+                  className="w-full py-1.5 px-3 bg-sky-400 hover:bg-sky-500 text-black font-extrabold font-mono text-xs rounded transition duration-200 cursor-pointer text-center"
                 >
-                  TEARDOWN
+                  {runningCmd ? "EXECUTING..." : "RUN COMMAND"}
                 </button>
               </div>
-            )}
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[9px] uppercase font-mono text-zinc-500 block">SANS Sandbox stdout Stream Logs</span>
+              <div className="bg-black p-3 rounded border border-white/10 font-mono text-[10px] text-green-400 space-y-1 h-32 overflow-y-auto w-full leading-normal">
+                {terminalLogs.map((log, idx) => (
+                  <div key={idx} className="whitespace-pre-wrap">{log}</div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* 4. CLOUD RUN FUNCTIONS (EVENT-DRIVEN FUNCTIONS) */}
-        <div className="p-5 border border-white/5 rounded-lg bg-black/40 space-y-4 flex flex-col justify-between">
-          <div className="space-y-4">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded bg-sky-500/15 border border-sky-400/25 flex items-center justify-center text-sky-400">
-                  <Zap className="w-4 h-4 animate-bounce" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white font-mono">4. Cloud Run Functions (Event-Driven Task Nodes)</h3>
-                  <span className="text-[10px] text-zinc-550 block font-mono">Run event-driven routines triggered by Webhooks & AI logs</span>
-                </div>
+        {/* SECTION 2: DATABASES COMPARTMENTALIZATION (onstellation-db) */}
+        <div className="p-5 border border-white/5 rounded-lg bg-black/40 space-y-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded bg-emerald-500/15 border border-emerald-400/25 flex items-center justify-center text-emerald-400">
+                <Database className="w-4 h-4 text-emerald-400" />
               </div>
-              <span className={`text-[9px] font-mono px-2 py-0.5 rounded uppercase border ${
-                funcStatus === "Active" 
-                  ? "bg-purple-500/10 text-purple-400 border-purple-500/30" 
-                  : funcStatus === "Deploying"
-                  ? "bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse"
-                  : "bg-neutral-900 text-stone-500 border-white/5"
-              }`}>
-                {funcStatus === "Active" ? "Active Trigger" : funcStatus === "Deploying" ? "BUILDING..." : "DEPLOYABLE"}
-              </span>
+              <div>
+                <h3 className="text-sm font-bold text-white font-mono">Constellation-DB Compartments</h3>
+                <span className="text-[10px] text-zinc-500 block font-mono">Resource optimization: separating profiles from cached blob storage</span>
+              </div>
             </div>
-
-            <p className="text-stone-400 text-xs leading-relaxed">
-              Get <strong>2 million free invocations per month</strong> with no system containers or persistent VM billing overhead. Rapidly trigger micro AI actions.
-            </p>
-
-            <div className="space-y-1 text-xs">
-              <label htmlFor="funcTemplateSelect" className="text-[10px] uppercase font-mono text-zinc-500 block">Select AI-Driven Function Template</label>
-              <select
-                id="funcTemplateSelect"
-                value={funcTemplate}
-                onChange={(e) => setFuncTemplate(e.target.value)}
-                disabled={funcStatus !== "Idle"}
-                className="w-full bg-neutral-950 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-white/30 font-mono"
-              >
-                <option value="doc-summarizer">Document Summarization & Risk Engine Code</option>
-                <option value="image-annotation">Prebuilt AI Image Annotation & Sentiment Node</option>
-                <option value="arbitrage-alert">Multi-Agent Arbitrage Spot Delta Alert</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="pt-2 flex items-center justify-between gap-3">
-            <span className="text-[9.5px] font-mono text-purple-400 bg-purple-500/10 border border-purple-500/20 rounded px-2 py-1">
-              2M Invocations Free/Month &bull; Serverless triggers
+            <span className="text-[9px] font-mono px-2 py-0.5 rounded uppercase border bg-emerald-500/10 text-emerald-400 border-emerald-500/25">
+              Private Databases
             </span>
-            {funcStatus === "Idle" ? (
-              <button
-                id="funcDeployBtn"
-                onClick={handleDeployFunc}
-                className="px-4 py-1.5 bg-white text-black font-semibold text-xs rounded hover:bg-neutral-200 transition font-mono cursor-pointer"
-              >
-                DEPLOY SERVERLESS TRIGGER
-              </button>
-            ) : funcStatus === "Deploying" ? (
-              <div className="w-[140px] bg-neutral-950 border border-white/10 rounded overflow-hidden">
-                <div 
-                  className="bg-purple-500 h-full text-[8.5px] text-white text-center font-mono py-1 font-bold animate-pulse transition-all duration-300" 
-                  style={{ width: `${funcProgress}%` }}
-                >
-                  DEPLOYING {funcProgress}%
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-[9px] font-mono text-[#FF6B35]">● Function route active</span>
-                <button
-                  id="funcResetBtn"
-                  onClick={handleResetFunc}
-                  className="px-2.5 py-1 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/20 font-bold text-[10px] rounded transition font-mono cursor-pointer"
-                >
-                  DEACTIVATE
-                </button>
-              </div>
-            )}
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* MongoDB main partition */}
+            <div className="p-3 bg-neutral-950/80 rounded border border-white/5 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white font-mono flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  MongoDB Ledger Database
+                </span>
+                <span className="text-[8.5px] px-1.5 py-0.2 rounded border bg-emerald-500/5 text-emerald-400 border-emerald-500/20 font-mono uppercase">
+                  Connected
+                </span>
+              </div>
+
+              <p className="text-[11px] text-zinc-400 leading-tight">
+                Executes microservices telemetry profiles. Strategic compartmentalization preserves and maximizes server connections dynamically.
+              </p>
+
+              <div className="space-y-1">
+                <label className="text-[9.5px] uppercase font-mono text-zinc-500 block">Sovereign Connection URI</label>
+                <input
+                  type="password"
+                  value={mongoUri}
+                  onChange={(e) => setMongoUri(e.target.value)}
+                  className="w-full bg-black border border-white/10 rounded px-2 py-1 flex items-center font-mono text-[9.5px] text-zinc-400 focus:outline-none"
+                />
+              </div>
+
+              {/* Vercel Serverless Functions connection pool */}
+              <div className="p-2 bg-black/40 rounded border border-white/5 text-[10px] font-mono flex items-center justify-between">
+                <div>
+                  <div className="text-white text-[9.5px]">attachDatabasePool</div>
+                  <div className="text-zinc-500 text-[8.5px] leading-tight">Prevents pool connection leaks</div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={poolOptimized}
+                  onChange={(e) => setPoolOptimized(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded border-white/25 accent-sky-450 cursor-pointer"
+                />
+              </div>
+            </div>
+
+            {/* Vercel Private Blob Store */}
+            <div className="p-3 bg-neutral-950/80 rounded border border-white/5 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white font-mono flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                  SANS Blob Store
+                </span>
+                <span className="text-[8.5px] font-mono font-bold text-zinc-500 bg-zinc-900 px-1.5 py-0.2 rounded">
+                  IAD1 Region
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 text-[9px] font-mono bg-black/50 p-2 rounded gap-2 text-zinc-400">
+                <div>Created: <strong className="text-white">May 3</strong></div>
+                <div>Storage: <strong className="text-white">{(storageBytes / 1024).toFixed(1)} KB</strong></div>
+                <div>Simple Ops: <strong className="text-white">{simpleOps}/10k</strong></div>
+                <div>Advanced Ops: <strong className="text-white">{advancedOps}/2k</strong></div>
+              </div>
+
+              {/* Enter item in the Blob store */}
+              <form onSubmit={handlePutBlob} className="space-y-1.5 pt-1">
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    required
+                    value={blobContent}
+                    onChange={(e) => setBlobContent(e.target.value)}
+                    placeholder="Enter document/article text..."
+                    className="flex-1 bg-black border border-white/10 rounded px-2 py-1 text-[10px] text-white font-mono focus:outline-none focus:border-white/30"
+                  />
+                  <button
+                    type="submit"
+                    disabled={blobLoading}
+                    className="px-2.5 py-1 bg-white hover:bg-zinc-200 text-black font-extrabold font-mono text-[9px] rounded uppercase transition cursor-pointer"
+                  >
+                    {blobLoading ? "PUTTING..." : "PUT BLOB"}
+                  </button>
+                </div>
+                <div className="text-[8.5px] text-zinc-500 font-mono">
+                  Saves using: <code>put('{blobPrefix}', content, &#123; access: 'private' &#125;)</code>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          {/* List of active Blobs */}
+          <div className="space-y-2 bg-neutral-950/60 p-3 rounded-lg border border-white/5 font-mono">
+            <span className="text-[10px] font-bold text-white uppercase block">Blob Files Browser (onstellation-db Store)</span>
+            <div className="space-y-1.5 max-h-[140px] overflow-y-auto scrollbar-hide">
+              {blobsList.map((bl, i) => (
+                <div key={i} className="flex items-center justify-between p-2 bg-black/40 rounded border border-white/5 text-[9px]">
+                  <div className="space-y-0.5 max-w-[70%]">
+                    <span className="text-white font-semibold block truncate leading-tight">{bl.path}</span>
+                    <span className="text-zinc-500 block text-[8px] truncate leading-none">{bl.url}</span>
+                  </div>
+                  <div className="text-right flex flex-col items-end flex-shrink-0 text-zinc-500">
+                    <span className="text-zinc-300 font-bold">{bl.size}</span>
+                    <span>{bl.created}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
 
       </div>
 
-      {/* 5. BIGQUERY ANALYTICS DATA WAREHOUSE */}
-      <div className="p-5 border border-white/5 rounded-lg bg-black/40 space-y-4">
-        <div className="flex items-start justify-between pb-2 border-b border-white/5">
+      {/* SECTION 3: BIGQUERY ANALYTICS DATA WAREHOUSE */}
+      <div className="metric-card p-5 border border-white/5 rounded-lg bg-black/40 space-y-4">
+        <div className="flex items-start justify-between pb-2 border-b border-white/5 font-bold">
           <div className="flex items-center space-x-2.5">
             <div className="w-8 h-8 rounded bg-sky-500/15 border border-sky-400/25 flex items-center justify-center text-sky-400">
-              <Database className="w-4 h-4" />
+              <Database className="w-4 h-4 text-sky-400" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white font-mono">5. BigQuery (Build a Data Warehouse)</h3>
-              <span className="text-[10px] text-zinc-550 block font-mono">Manage and analyze large datasets across cloud environments with integrated SQL & built-in ML scaling</span>
+              <h3 className="text-sm font-bold text-white font-mono font-bold font-semibold">BigQuery Analytics SQL Warehouse</h3>
+              <span className="text-[10px] text-zinc-550 block font-mono">Execute high-performance calculations on multi-partitioned historic telemetry lots</span>
             </div>
           </div>
           <span className="text-[9.1px] font-mono px-2 py-0.5 rounded uppercase border bg-[#FF6B35]/10 text-[#FF6B35] border-[#FF6B35]/25">
@@ -1253,27 +1147,24 @@ ORDER BY trade_date DESC LIMIT 5;`);
           </span>
         </div>
 
-        <p className="text-stone-400 text-xs leading-relaxed">
-          Leverage BigQuery's analytical speed to run standard SQL telemetry models directly on SANS trade lots. Determine average yields, streaks, and capital clearances instantly with built-in machine learning predictions.
+        <p className="text-stone-400 text-xs leading-relaxed font-sans">
+          Leverage BigQuery's analytical capabilities across SANS trading layers. Check average profits, active trends, and overall compartment performances directly using distributed telemetry tables.
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* BigQuery Code Terminal */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label htmlFor="bqEditorArea" className="text-[9px] uppercase font-mono text-zinc-500">Standard SQL Input Console</label>
+              <label className="text-[9px] uppercase font-mono text-zinc-500 font-bold font-semibold">Standard SQL Console Terminal</label>
               <button 
-                id="bqQueryRunBtn"
                 onClick={handleRunBQ}
                 disabled={bqLoading}
-                className="px-3.5 py-1.5 bg-white hover:bg-zinc-200 text-black font-semibold text-[10.5px] rounded transition duration-200 font-mono flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-1.5 bg-white hover:bg-zinc-200 text-black font-semibold text-[10.5px] rounded transition duration-200 font-mono flex items-center gap-1.5 cursor-pointer font-bold"
               >
                 <Play className="w-2.5 h-2.5 fill-black border-0" />
-                <span>{bqLoading ? "EXECUTING..." : "RUN ANALYTICAL QUERY"}</span>
+                <span>{bqLoading ? "RUNNING..." : "RUN ANALYTICAL QUERY"}</span>
               </button>
             </div>
             <textarea
-              id="bqEditorArea"
               rows={5}
               value={bqQuery}
               onChange={(e) => setBqQuery(e.target.value)}
@@ -1281,36 +1172,37 @@ ORDER BY trade_date DESC LIMIT 5;`);
             />
           </div>
 
-          {/* BigQuery Result Output Screen */}
           <div className="space-y-2">
-            <span className="text-[9px] uppercase font-mono text-zinc-500 block">Warehouse Server Response Stream</span>
+            <span className="text-[9px] uppercase font-mono text-zinc-500 block">SQL Result Stream Console</span>
             <div className="bg-black border border-white/10 rounded p-3.5 h-32 overflow-y-auto font-mono text-[10px] text-stone-300 leading-normal scrollbar-hide space-y-2">
               <div className="text-zinc-500 italic text-[9.5px]">
-                {bqLogs || "Ready for query input analysis (Awaiting SQL Command execution trigger). Limit scanning set: 1 TiB queries/month."}
+                {bqLogs || "Ready for SQL instruction triggers. Select RUN ANALYTICAL QUERY to initialize database compilation scan sequence."}
               </div>
 
               {bqResult && (
                 <div className="space-y-1.5 pt-1">
-                  <div className="text-emerald-400 font-bold border-b border-white/5 pb-1">DATABASE COMPILATION RESULTS:</div>
-                  <table className="w-full text-left text-[9px] border-collapse">
-                    <thead>
-                      <tr className="text-zinc-500 border-b border-white/10 uppercase">
-                        <th className="py-1">Trade Date</th>
-                        <th className="py-1">Avg Profit Factor</th>
-                        <th className="py-1">Total Lots Executed</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {bqResult.map((row: any, rIdx: number) => (
-                        <tr key={rIdx} className="border-b border-white/5 hover:bg-white/5 text-stone-200">
-                          <td className="py-1">{row.trade_date}</td>
-                          <td className="py-1 font-bold text-emerald-400">{row.avg_profit}</td>
-                          <td className="py-1 font-semibold">{row.total_lots}</td>
+                  <div className="text-emerald-400 font-bold border-b border-white/5 pb-1 uppercase font-bold text-[8.5px]">COMPARTMENTALIZED DATA COMPILATION RESULTS:</div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-[9px] border-collapse min-w-[320px]">
+                      <thead>
+                        <tr className="text-zinc-500 border-b border-white/10 uppercase">
+                          <th className="py-1">Trade Date</th>
+                          <th className="py-1">Avg Profit Factor</th>
+                          <th className="py-1">Partition Info</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <div className="text-[8.5px] text-zinc-500 text-right pt-1 uppercase font-bold">● Total Bytes processed in Sandbox: 14.12 MB (Costs Covered)</div>
+                      </thead>
+                      <tbody>
+                        {bqResult.map((row: any, rIdx: number) => (
+                          <tr key={rIdx} className="border-b border-white/5 hover:bg-white/5 text-stone-200">
+                            <td className="py-1">{row.trade_date}</td>
+                            <td className="py-1 font-bold text-emerald-400">{row.avg_profit}</td>
+                            <td className="py-1 font-semibold text-zinc-400">{row.total_lots}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="text-[8.5px] text-zinc-500 text-right pt-1 uppercase font-bold">● Total bytes processed in constellation sandbox query: 14.12 MB (Costs Covered)</div>
                 </div>
               )}
             </div>

@@ -41,6 +41,19 @@ interface BillingLog {
 export default function UserProfileEditor({ demoMode = false }: UserProfileEditorProps) {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<'profile' | 'billing' | 'kyc'>('profile');
+  const [hasRealConnection, setHasRealConnection] = useState<boolean>(false);
+  
+  useEffect(() => {
+    const checkConnections = () => {
+      const bConn = localStorage.getItem("ex_conn_binance") === "true";
+      const cConn = localStorage.getItem("ex_conn_coinbase") === "true";
+      const isLogged = localStorage.getItem("xm_is_logged") === "true";
+      setHasRealConnection(bConn || cConn || isLogged);
+    };
+    checkConnections();
+    const interval = setInterval(checkConnections, 1200);
+    return () => clearInterval(interval);
+  }, []);
   
   // Custom temporary banner success messages (anti-iframe alert rules)
   const [profileSuccessMessage, setProfileSuccessMessage] = useState("");
@@ -216,7 +229,7 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
     switch (profile.riskAppetite) {
       case 'Conservative':
         return {
-          grade: 'AAA / S&P Sovereign Stable',
+          grade: 'AAA / Sovereign Stable',
           desc: 'High-Capital Protection Shield. Margin buffers defense priority.',
           maxDrawdown: '1.2% Historical Outflow Range',
           varPercent: '0.8%',
@@ -292,7 +305,7 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
       {/* Mini tabs header resembling a trading desktop toolbar */}
       <div className="flex border-b border-zinc-900 pb-3 gap-2 overflow-x-auto scrollbar-hide">
         {[
-          { id: 'profile', label: 'S&P Sovereign Profile', icon: User },
+          { id: 'profile', label: 'Sovereign Profile', icon: User },
           { id: 'billing', label: 'Node Allocation & Credits', icon: CreditCard },
           { id: 'kyc', label: 'Identity Registry KYC', icon: Shield }
         ].map(t => {
@@ -316,17 +329,76 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
       </div>
 
       {activeTab === 'profile' && (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          
-          {/* Profile input parameters */}
-          <div className="xl:col-span-2 space-y-6">
-            <form onSubmit={handleSaveProfile} className="bg-zinc-900/20 border border-zinc-800/60 p-5 rounded-xl space-y-5">
-              <h2 className="text-xs font-mono uppercase tracking-widest font-extrabold text-[#e11d48] border-b border-zinc-900 pb-2 flex items-center justify-between">
-                <span>1. Core Profile Handshakes</span>
-                <span className="text-[9px] text-zinc-500 lowercase font-medium">Node 04 sync limits verified</span>
-              </h2>
+        <div className="space-y-6">
+          {hasRealConnection && (
+            <div className="bg-rose-950/10 border border-rose-900/40 rounded-xl p-4 flex gap-4 pr-6">
+              <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse mt-1 flex-shrink-0" />
+              <div className="space-y-1.5">
+                <p className="text-xs font-mono font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <Shield className="w-4 h-4 text-rose-500" /> REAL INTEGRATED ACCOUNT ENDPOINT STATUS DETECTED
+                </p>
+                <p className="text-[11px] text-zinc-400 font-light leading-relaxed">
+                  Compliance frameworks require you to submit your verified <strong>Sovereign Risk Tolerance</strong> profile, register your secure <strong>KYC document verification file</strong>, and finalize account credentials by uploading a signature profile image before executing trades on live broker indices.
+                </p>
+                <div className="pt-1 flex items-center gap-4">
+                  <button
+                    onClick={() => setActiveTab("kyc")}
+                    className="px-3 py-1 bg-rose-900 hover:bg-rose-800 text-[10px] font-bold font-mono uppercase rounded text-white transition cursor-pointer"
+                  >
+                    Complete Identity KYC Section &rarr;
+                  </button>
+                  <label
+                    htmlFor="account-avatar-uploader"
+                    className="text-[10px] font-mono text-zinc-500 hover:text-rose-400 transition cursor-pointer underline decoration-dotted capitalize"
+                  >
+                    Choose Signature Image
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            
+            {/* Profile input parameters */}
+            <div className="xl:col-span-2 space-y-6">
+              <form onSubmit={handleSaveProfile} className="bg-zinc-900/20 border border-zinc-800/60 p-5 rounded-xl space-y-5">
+                <h2 className="text-xs font-mono uppercase tracking-widest font-extrabold text-[#e11d48] border-b border-zinc-900 pb-2 flex items-center justify-between">
+                  <span>1. Core Profile Handshakes</span>
+                  <span className="text-[9px] text-zinc-500 lowercase font-medium">Node 04 sync limits verified</span>
+                </h2>
+
+                {/* Biometric Avatar / Signature Photo upload section */}
+                <div className="flex flex-col sm:flex-row items-center gap-4 bg-zinc-950/40 p-3.5 rounded-lg border border-zinc-900">
+                  <div className="relative w-12 h-12 rounded-full bg-zinc-900 border border-zinc-850 flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {avatarUrl ? (
+                      <img referrerPolicy="no-referrer" src={avatarUrl} alt="Executive Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-5 h-5 text-zinc-600" />
+                    )}
+                  </div>
+                  <div className="space-y-1 flex-1 text-center sm:text-left">
+                    <p className="text-[9px] font-mono text-zinc-400 uppercase font-black tracking-widest">Biometric signature photo</p>
+                    <p className="text-[9px] text-zinc-500 font-mono">Upload professional file photo reference synchronized with Shufti biometric nodes.</p>
+                    <div className="pt-0.5">
+                      <input 
+                        type="file" 
+                        id="account-avatar-uploader" 
+                        accept="image/*" 
+                        onChange={handleAvatarChange} 
+                        className="hidden" 
+                      />
+                      <label 
+                        htmlFor="account-avatar-uploader" 
+                        className="inline-block px-2.5 py-1 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:text-white rounded text-[9px] font-mono text-zinc-400 font-bold cursor-pointer transition"
+                      >
+                        Upload Signature Image
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-[10px] font-mono text-zinc-400 uppercase font-extrabold tracking-widest mb-1.5">First Legal Name</label>
                   <input 
@@ -473,11 +545,11 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
             </form>
           </div>
 
-          {/* S&P Capital Risk Index Visualizer Panel */}
+          {/* Sovereign Capital Risk Index Visualizer Panel */}
           <div className="bg-zinc-905 p-5 border border-zinc-800/80 rounded-xl space-y-4.5 flex flex-col h-full bg-zinc-950/40">
             <div className="border-b border-zinc-900 pb-3 flex items-center justify-between">
               <h3 className="text-xs font-mono uppercase tracking-widest font-extrabold text-zinc-400 flex items-center gap-1.5">
-                <Award className="w-4 h-4 text-rose-500" /> S&P Sovereign Grading
+                <Award className="w-4 h-4 text-rose-500" /> Sovereign Grading
               </h3>
               <span className="text-[8px] font-mono px-2 py-0.5 rounded border border-zinc-800 bg-zinc-950 text-zinc-500">
                 STRESS LABS
@@ -585,7 +657,8 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
           </div>
 
         </div>
-      )}
+      </div>
+    )}
 
       {activeTab === 'billing' && (
         <div className="space-y-6">

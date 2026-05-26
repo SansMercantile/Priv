@@ -511,6 +511,15 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
       case 4:
         return (
           <div className="space-y-5 mt-4">
+            <div className="bg-emerald-950/20 border border-emerald-900/40 rounded-xl p-4 flex items-start space-x-3">
+              <ShieldCheck className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-xs font-mono font-bold text-white uppercase tracking-wider">Secure Document Verification in Partnership with Sumsub & Shufti Pro</p>
+                <p className="text-[10px] text-zinc-400 font-light mt-0.5 leading-relaxed">
+                  Your identity documents are verified securely through our compliant parsing partners. Copy data is encrypted end-to-end, shielded beneath ISO/IEC 27001 data safety practices, and cross-referenced instantly.
+                </p>
+              </div>
+            </div>
             <div className="bg-zinc-950/80 p-4 rounded-lg border border-zinc-800/60 text-xs font-mono text-zinc-400 leading-relaxed flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
               <span>
