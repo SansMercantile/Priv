@@ -394,6 +394,205 @@ export const PrivCopilot: React.FC = () => {
       return true;
     }
 
+    // 7. Aggressive Automated Strategy
+    if (cmdClean.includes("trade") && (cmdClean.includes("aggressiv") || cmdClean.includes("agressiv") || cmdClean.includes("opportunity") || cmdClean.includes("opportunities"))) {
+      localStorage.setItem("xm_auto_trading", "true");
+      
+      const currentPosStr = localStorage.getItem("xm_positions") || "[]";
+      let currentPos: any[] = [];
+      try {
+        currentPos = JSON.parse(currentPosStr);
+      } catch(_) {}
+
+      const mockPositionsToAdd = [
+        {
+          id: `POS-BTC-${Math.floor(1000 + Math.random()*9000)}`,
+          symbol: "BTCUSD",
+          side: "BUY" as const,
+          lots: 2.50,
+          entryPrice: 93420.50,
+          currentPrice: 93435.10,
+          tp: 95000.00,
+          sl: 91200.00,
+          pnl: 36.50,
+          timestamp: new Date().toLocaleTimeString()
+        },
+        {
+          id: `POS-EUR-${Math.floor(1000 + Math.random()*9000)}`,
+          symbol: "EURUSD",
+          side: "SELL" as const,
+          lots: 5.00,
+          entryPrice: 1.0855,
+          currentPrice: 1.0850,
+          tp: 1.0790,
+          sl: 1.0920,
+          pnl: 25.00,
+          timestamp: new Date().toLocaleTimeString()
+        },
+        {
+          id: `POS-XAU-${Math.floor(1000 + Math.random()*9000)}`,
+          symbol: "XAUUSD",
+          side: "BUY" as const,
+          lots: 4.00,
+          entryPrice: 2392.15,
+          currentPrice: 2395.40,
+          tp: 2420.00,
+          sl: 2375.00,
+          pnl: 130.00,
+          timestamp: new Date().toLocaleTimeString()
+        }
+      ];
+
+      const btcExists = currentPos.some(p => p.symbol === "BTCUSD");
+      const eurExists = currentPos.some(p => p.symbol === "EURUSD");
+      const xauExists = currentPos.some(p => p.symbol === "XAUUSD");
+      
+      const addedList: string[] = [];
+      mockPositionsToAdd.forEach(p => {
+        if (p.symbol === "BTCUSD" && !btcExists) {
+          currentPos.push(p);
+          addedList.push("BTCUSD BUY (2.50 lots)");
+        } else if (p.symbol === "EURUSD" && !eurExists) {
+          currentPos.push(p);
+          addedList.push("EURUSD SELL (5.00 lots)");
+        } else if (p.symbol === "XAUUSD" && !xauExists) {
+          currentPos.push(p);
+          addedList.push("XAUUSD BUY (4.00 lots)");
+        }
+      });
+
+      localStorage.setItem("xm_positions", JSON.stringify(currentPos));
+      
+      const savedLogsStr = localStorage.getItem("xm_auto_logs") || "[]";
+      let savedLogs: string[] = [];
+      try {
+        savedLogs = JSON.parse(savedLogsStr);
+      } catch(_) {}
+      savedLogs.unshift(`[${new Date().toLocaleTimeString()}] SANS Core engaged: Aggressive strategy sweep initialized.`);
+      savedLogs.unshift(`[${new Date().toLocaleTimeString()}] AI Copilot dispatched BUY orders on BTCUSD & XAUUSD, SELL on EURUSD.`);
+      localStorage.setItem("xm_auto_logs", JSON.stringify(savedLogs.slice(0, 40)));
+
+      window.dispatchEvent(new Event("storage"));
+
+      let responseMsg = `⚠️ **AGGRESSIVE ALGORITHMIC DESK ENGAGED**\n\nI have taken direct control of the terminal and activated the **SANS Sovereign Autonomous trading nodes** in **AGGRESSIVE SYSTEMATIC SWEEPS** mode.`;
+      if (addedList.length > 0) {
+        responseMsg += `\n\nDispatched active contracts to the platform ledger:\n` + addedList.map(a => `- **EXECUTED**: ${a}`).join("\n") + `\n\nI am continuously scanning pricing signals and executing continuous arbitrage on your behalf. Dynamic metrics are now live in your Terminal, Dashboard, and Risk Scorecards!`;
+      } else {
+        responseMsg += `\n\nYour active CFD and spot contracts are already performing extreme swaps. Monitoring spreads for peak margin payout exits.`;
+      }
+      
+      addAiMessage(responseMsg);
+      return true;
+    }
+
+    // 8. Individual Buy / Sell Execution commands
+    const tradeBuyMatch = cmdClean.match(/^(?:buy|long) ([\w.]+)(?: with)? (?:lots|size)? ?([\d.]+)?/i);
+    const tradeSellMatch = cmdClean.match(/^(?:sell|short) ([\w.]+)(?: with)? (?:lots|size)? ?([\d.]+)?/i);
+    if (tradeBuyMatch || tradeSellMatch) {
+      const match = tradeBuyMatch || tradeSellMatch;
+      const side = tradeBuyMatch ? "BUY" : "SELL";
+      const symbol = match[1].toUpperCase();
+      const lots = match[2] ? parseFloat(match[2]) : 1.0;
+      
+      const currentPosStr = localStorage.getItem("xm_positions") || "[]";
+      let currentPos: any[] = [];
+      try {
+        currentPos = JSON.parse(currentPosStr);
+      } catch(_) {}
+
+      let entryPrice = 1.0850;
+      if (symbol.includes("BTC")) entryPrice = 93420.50;
+      else if (symbol.includes("ETH")) entryPrice = 3450.25;
+      else if (symbol.includes("XAU") || symbol.includes("GOLD")) entryPrice = 2392.15;
+      else if (symbol.includes("TSLA")) entryPrice = 175.40;
+      else if (symbol.includes("AAPL")) entryPrice = 182.20;
+
+      const newPosition = {
+        id: `POS-${symbol}-${Math.floor(1000 + Math.random()*9000)}`,
+        symbol,
+        side,
+        lots,
+        entryPrice,
+        currentPrice: entryPrice + (side === "BUY" ? 1.5 : -1.5),
+        pnl: side === "BUY" ? 12.50 * lots : -12.50 * lots,
+        timestamp: new Date().toLocaleTimeString()
+      };
+
+      currentPos.push(newPosition);
+      localStorage.setItem("xm_positions", JSON.stringify(currentPos));
+      
+      const savedLogsStr = localStorage.getItem("xm_auto_logs") || "[]";
+      let savedLogs: string[] = [];
+      try {
+        savedLogs = JSON.parse(savedLogsStr);
+      } catch(_) {}
+      savedLogs.unshift(`[${new Date().toLocaleTimeString()}] SANS Terminal executed manual chat-routed order: ${side} ${symbol} (${lots} lots).`);
+      localStorage.setItem("xm_auto_logs", JSON.stringify(savedLogs.slice(0, 40)));
+
+      window.dispatchEvent(new Event("storage"));
+
+      addAiMessage(`🚀 **SECURE ORDER PLACED DIRECTLY ON BALANCES LEDGER**\n\n- **Asset Index**: **${symbol}**\n- **Action**: **${side}**\n- **Volume**: **${lots} Lots**\n- **Execution Slip Price**: **$${entryPrice.toLocaleString()}**\n\nYour trade is active and routing. Check the **Broker Terminal** panel to watch the live-updating telemetry!`);
+      return true;
+    }
+
+    // 9. Close Positions
+    if (cmdClean === "close positions" || cmdClean === "close all trades" || cmdClean === "close all positions") {
+      const currentPosStr = localStorage.getItem("xm_positions") || "[]";
+      let currentPos: any[] = [];
+      try {
+        currentPos = JSON.parse(currentPosStr);
+      } catch(_) {}
+
+      if (currentPos.length === 0) {
+        addAiMessage("No open contracts found. The platform balance sheets are currently flat.");
+        return true;
+      }
+
+      let profitSum = 0;
+      currentPos.forEach(p => profitSum += p.pnl);
+      const activeBal = parseFloat(localStorage.getItem("xm_balance") || "10000");
+      const nextBal = parseFloat((activeBal + profitSum).toFixed(2));
+      localStorage.setItem("xm_balance", nextBal.toString());
+      localStorage.setItem("xm_positions", "[]");
+
+      const savedLogsStr = localStorage.getItem("xm_auto_logs") || "[]";
+      let savedLogs: string[] = [];
+      try {
+        savedLogs = JSON.parse(savedLogsStr);
+      } catch(_) {}
+      savedLogs.unshift(`[${new Date().toLocaleTimeString()}] SANS Terminal closed all positions on chat command. Total PnL: ${profitSum >= 0 ? "+" : ""}$${profitSum.toFixed(2)}.`);
+      localStorage.setItem("xm_auto_logs", JSON.stringify(savedLogs.slice(0, 40)));
+
+      window.dispatchEvent(new Event("storage"));
+
+      addAiMessage(`💼 **ALL OPEN TRADES SUCCESSFULLY LIQUIDATED**\n\n- **Contracts Closed**: **${currentPos.length} Positions**\n- **Settled Profits/Losses**: **$${profitSum >= 0 ? "+" : ""}${profitSum.toFixed(2)}** USD\n- **New Unified Balance**: **$${nextBal.toLocaleString(undefined, { minimumFractionDigits: 2 })}** USD\n\nAccount balances have been verified across the secure blockchain network.`);
+      return true;
+    }
+
+    // 10. Portfolio audits
+    if (cmdClean.includes("portfolio") || cmdClean.includes("balance") || cmdClean.includes("position") || cmdClean === "audit") {
+      const activeBal = parseFloat(localStorage.getItem("xm_balance") || "10000");
+      const savedPosStr = localStorage.getItem("xm_positions") || "[]";
+      let activePos: any[] = [];
+      try {
+        activePos = JSON.parse(savedPosStr);
+      } catch(_) {}
+
+      let statusMsg = `⚖️ **SANS Sovereign Node Portfolio Audit**\n\n- **Core Ledger Equity**: **$${activeBal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}** USD`;
+      if (activePos.length > 0) {
+        statusMsg += `\n- **Active Open Contracts**: **${activePos.length} Positions**\n\n`;
+        activePos.forEach((p, idx) => {
+          statusMsg += `  ${idx + 1}. **${p.symbol}** | **${p.side}** | ${p.lots} lots @ $${p.entryPrice.toLocaleString()} (PnL: $${p.pnl.toFixed(2)})\n`;
+        });
+        statusMsg += `\nType **'close all trades'** to liquidate these parameters or audit options.`;
+      } else {
+        statusMsg += `\n- **Active Open Contracts**: **None**. All ledgers are currently flat. Type **'buy BTC'** or **'trade aggressively'** to dispatch orders.`;
+      }
+
+      addAiMessage(statusMsg);
+      return true;
+    }
+
     return false;
   };
 

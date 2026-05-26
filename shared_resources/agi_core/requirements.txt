@@ -1,4 +1,0 @@
-# AGI Core requirements
-numpy
-scipy
-networkx

@@ -1,7 +1,0 @@
-priv/backend/multi_agent/priv_sensory_agent/requirements.txt
-Minimal requirements for the PrivSensoryAgent example
-pydantic # For BaseModel if used in sensory_protocol.py
-google-cloud-pubsub
-google-cloud-firestore
-
-Add any other specific dependencies for vision/audio analysis if they were real

@@ -330,8 +330,35 @@ export default function TradingTerminal({
 }) {
   // --- STATE DECLARATIONS ---
   // Active TradingView Ticker Selection
-  const [selectedSymbol, setSelectedSymbol] = useState<string>("FX_IDC:EURUSD");
+  const [selectedSymbol, setSelectedSymbol] = useState<string>(() => {
+    return localStorage.getItem("xm_selected_symbol") || "FX_IDC:EURUSD";
+  });
   const [customSymbolInput, setCustomSymbolInput] = useState<string>("");
+
+  const [livePrices, setLivePrices] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    localStorage.setItem("xm_selected_symbol", selectedSymbol);
+  }, [selectedSymbol]);
+
+  useEffect(() => {
+    const fetchLivePrices = async () => {
+      try {
+        const res = await fetch("/api/v1/live-prices");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.prices) {
+            setLivePrices(data.prices);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not retrieve real-time rates:", err);
+      }
+    };
+    fetchLivePrices();
+    const priceInterval = setInterval(fetchLivePrices, 10000);
+    return () => clearInterval(priceInterval);
+  }, []);
 
   // Dynamic instrument intelligence state mapping
   const activeSymbolCodeGlobal = cleanSymbol(selectedSymbol);
@@ -435,6 +462,10 @@ export default function TradingTerminal({
   });
   const [password, setPassword] = useState<string>("••••••••••••");
   const [leverage, setLeverage] = useState<string>(() => {
+    const savedProfileLev = localStorage.getItem("xm_profile_leverage");
+    if (savedProfileLev) {
+      return `1:${savedProfileLev}`;
+    }
     return localStorage.getItem("xm_leverage") || "1:500";
   });
   const [accountType, setAccountType] = useState<"LIVE" | "DEMO">("DEMO");
@@ -531,6 +562,37 @@ export default function TradingTerminal({
   useEffect(() => {
     localStorage.setItem("xm_auto_logs", JSON.stringify(autoLogs));
   }, [autoLogs]);
+
+  useEffect(() => {
+    const handleSync = () => {
+      const savedBal = localStorage.getItem("xm_balance");
+      if (savedBal) {
+        const pVal = parseFloat(savedBal);
+        if (pVal !== balance) setBalance(pVal);
+      }
+      const savedPosStr = localStorage.getItem("xm_positions");
+      if (savedPosStr) {
+        try {
+          const parsed = JSON.parse(savedPosStr);
+          if (JSON.stringify(parsed) !== JSON.stringify(positions)) {
+            setPositions(parsed);
+          }
+        } catch(_) {}
+      }
+      const savedLogs = localStorage.getItem("xm_auto_logs");
+      if (savedLogs) {
+        try {
+          const parsed = JSON.parse(savedLogs);
+          if (JSON.stringify(parsed) !== JSON.stringify(autoLogs)) {
+            setAutoLogs(parsed);
+          }
+        } catch(_) {}
+      }
+      setIsAutoTrading(localStorage.getItem("xm_auto_trading") === "true");
+    };
+    window.addEventListener("storage", handleSync);
+    return () => window.removeEventListener("storage", handleSync);
+  }, [balance, positions, autoLogs]);
 
   const [history, setHistory] = useState<HistoricalTrade[]>([]);
   const [executionLogs, setExecutionLogs] = useState<string[]>([]);
@@ -831,11 +893,7 @@ export default function TradingTerminal({
   // --- CALC MARGIN INTERACTIVE TOOL ---
   useEffect(() => {
     const assetRef = calcMarginSymbol;
-    let price = 1.0652; // EURUSD
-    if (assetRef === "GBPUSD") price = 1.2543;
-    if (assetRef === "USDJPY") price = 0.0064;
-    if (assetRef === "XAUUSD") price = 2420.50;
-    if (assetRef === "BTCUSD") price = 91200.00;
+    const price = getAssetRefPrice(assetRef);
 
     let contractSize = 100000;
     if (assetRef === "XAUUSD") contractSize = 100;
@@ -843,11 +901,21 @@ export default function TradingTerminal({
 
     const res = (calcMarginLots * contractSize * price) / calcMarginLeverage;
     setCalcResultMargin(parseFloat(res.toFixed(2)));
-  }, [calcMarginSymbol, calcMarginLots, calcMarginLeverage]);
+  }, [calcMarginSymbol, calcMarginLots, calcMarginLeverage, livePrices]);
 
   // Helper pricing list for custom execution trades
   const getAssetRefPrice = (sym: string): number => {
     const s = cleanSymbol(sym);
+    if (livePrices[s]) {
+      return livePrices[s];
+    }
+    // Handle approximate matching
+    for (const [key, value] of Object.entries(livePrices)) {
+      if (s.includes(key) || key.includes(s)) {
+        return value;
+      }
+    }
+
     if (s.includes("EURUSD")) return 1.08250;
     if (s.includes("GBPUSD")) return 1.26430;
     if (s.includes("USDJPY")) return 156.425;
@@ -883,12 +951,32 @@ export default function TradingTerminal({
       const activePrice = getAssetRefPrice(selectedSymbol);
       const cleanSym = selectedSymbol.replace("XM:", "").replace("BINANCE:", "").replace("FX:", "");
       
+      const savedProfileStr = localStorage.getItem("xm_user_profile");
+      let riskAppetite = "Aggressive";
+      let tradingGoal = "Capital Expansion & Systematic Arbitrage";
+      let firstName = "Alistair";
+      let lastName = "Sterling";
+      if (savedProfileStr) {
+        try {
+          const parsed = JSON.parse(savedProfileStr);
+          riskAppetite = parsed.riskAppetite || riskAppetite;
+          tradingGoal = parsed.tradingGoal || tradingGoal;
+          firstName = parsed.firstName || firstName;
+          lastName = parsed.lastName || lastName;
+        } catch (_) {}
+      }
+      const savedLeverageVal = parseInt(localStorage.getItem("xm_profile_leverage") || "20");
+
       const reqBody = {
         symbol: selectedSymbol,
         price: activePrice,
         balance,
         news: rssArticles.slice(0, 5).map(art => ({ title: art.title })),
-        existingPositions: positions
+        existingPositions: positions,
+        riskAppetite,
+        tradingGoal,
+        leverage: savedLeverageVal,
+        userIdentity: `${firstName} ${lastName}`
       };
 
       const response = await fetch("/api/autonomous/trade", {
@@ -974,6 +1062,23 @@ export default function TradingTerminal({
     setAutoAnalysis(null);
     try {
       const activePrice = getAssetRefPrice(selectedSymbol);
+      
+      const savedProfileStr = localStorage.getItem("xm_user_profile");
+      let riskAppetite = "Aggressive";
+      let tradingGoal = "Capital Expansion & Systematic Arbitrage";
+      let firstName = "Alistair";
+      let lastName = "Sterling";
+      if (savedProfileStr) {
+        try {
+          const parsed = JSON.parse(savedProfileStr);
+          riskAppetite = parsed.riskAppetite || riskAppetite;
+          tradingGoal = parsed.tradingGoal || tradingGoal;
+          firstName = parsed.firstName || firstName;
+          lastName = parsed.lastName || lastName;
+        } catch (_) {}
+      }
+      const savedLeverageVal = parseInt(localStorage.getItem("xm_profile_leverage") || "20");
+
       const reqBody = {
         symbol: selectedSymbol,
         price: activePrice,
@@ -983,7 +1088,11 @@ export default function TradingTerminal({
           screener: "Live Oscillators",
           rsi: Math.floor(45 + Math.random() * 25),
           sentiment: "Positive Delta Integration"
-        }
+        },
+        riskAppetite,
+        tradingGoal,
+        leverage: savedLeverageVal,
+        userIdentity: `${firstName} ${lastName}`
       };
 
       const response = await fetch("/api/autonomous/analyze", {

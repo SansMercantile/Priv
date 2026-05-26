@@ -1,6 +1,0 @@
-stripe==7.8.0
-requests==2.31.0
-payfast==0.1.4
-pycountry==23.12.7
-forex-python==1.8.0
-

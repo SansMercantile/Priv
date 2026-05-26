@@ -1,5 +1,0 @@
-fastapi
-uvicorn
-gunicorn
-google-cloud-pubsub
-google-cloud-firestore

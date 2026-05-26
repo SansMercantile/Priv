@@ -646,14 +646,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
             Real-time autonomous AI execution & diagnostics node
           </p>
           <p className="text-[10px] font-mono tracking-widest text-[#10b981] uppercase font-medium">
-            Reimagine &bull; Rebuild &bull; Transcend &bull; Bloomberg terminal integration
+            Reimagine &bull; Rebuild &bull; Transcend
           </p>
         </div>
         
         {/* Bloomberg-class Sovereign Header Rail */}
         <div className="flex flex-wrap items-center gap-2.5">
           <div className={`px-2.5 py-1.5 border rounded font-mono text-[9px] flex flex-col justify-center ${gradeInfo.color}`}>
-            <span className="text-zinc-500 leading-none mb-0.5 text-[8px] uppercase font-black">S&P RISK CLASS</span>
+            <span className="text-zinc-500 leading-none mb-0.5 text-[8px] uppercase font-black">SOVEREIGN RISK CLASS</span>
             <strong className="font-extrabold leading-none">{gradeInfo.g}</strong>
           </div>
 

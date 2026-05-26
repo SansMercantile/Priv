@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   Newspaper, 
   Bell, 
@@ -13,7 +14,12 @@ import {
   CheckCircle2, 
   Clock, 
   ChevronDown, 
-  ChevronUp 
+  ChevronUp,
+  Brain,
+  TrendingUp,
+  TrendingDown,
+  X,
+  Gauge
 } from "lucide-react";
 
 interface Article {
@@ -228,13 +234,104 @@ const GLOBAL_CALENDAR_EVENTS: CalendarEvent[] = [
 ];
 
 export default function News({ demoMode }: { demoMode?: boolean }) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"NEWS" | "CALENDAR">("NEWS");
+  
+  // Dynamic Economic Calendar events state
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(GLOBAL_CALENDAR_EVENTS);
+  const [calendarLoading, setCalendarLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    let active = true;
+    const fetchCalendar = async () => {
+      setCalendarLoading(true);
+      try {
+        const response = await fetch("/api/v1/economic-calendar");
+        if (response.ok) {
+          const data = await response.json();
+          if (active && data.success && data.events && data.events.length > 0) {
+            setCalendarEvents(data.events);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not retrieve live economic calendar events:", err);
+      } finally {
+        if (active) setCalendarLoading(false);
+      }
+    };
+    fetchCalendar();
+    const interval = setInterval(fetchCalendar, 60000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
   
   // Articles filters
   const [filter, setFilter] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [realArticles, setRealArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+
+  // Analysis Modal States
+  const [selectedAnalysis, setSelectedAnalysis] = useState<any | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analyzingArticle, setAnalyzingArticle] = useState<Article | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+
+  const runFundamentalAnalysis = async (article: Article) => {
+    setAnalyzingArticle(article);
+    setIsAnalyzing(true);
+    setSelectedAnalysis(null);
+    setAnalysisError(null);
+
+    try {
+      const response = await fetch("/api/v1/news/analyze-impact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: article.title,
+          summary: article.summary,
+          source: article.source,
+          sentiment: article.sentiment
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("Analysis engine server fault");
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setSelectedAnalysis(data);
+      } else {
+        throw new Error(data.error || "Analysis was inconclusive");
+      }
+    } catch (err: any) {
+      console.error("[SANS Analytical Core] Error during fundamental analysis:", err);
+      setAnalysisError(err.message || "Cognitive server feedback exception. Safe sandbox modes engaged.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleLoadAssetInTerminal = (symbol: string) => {
+    const symbolMap: Record<string, string> = {
+      "XAUUSD": "OANDA:XAUUSD",
+      "XAGUSD": "OANDA:XAGUSD",
+      "BTCUSD": "BINANCE:BTCUSDT",
+      "EURUSD": "FX_IDC:EURUSD",
+      "GBPUSD": "FX_IDC:GBPUSD",
+      "USDJPY": "FX_IDC:USDJPY",
+      "USDCAD": "FX_IDC:USDCAD"
+    };
+
+    const targetTicker = symbolMap[symbol.toUpperCase().replace("-", "")] || symbolMap["EURUSD"];
+    localStorage.setItem("xm_selected_symbol", targetTicker);
+    setSelectedAnalysis(null);
+    setAnalyzingArticle(null);
+    navigate("/dashboard/terminal");
+  };
 
   // Economic Calendar filters
   const [calendarCountry, setCalendarCountry] = useState<string>("All");
@@ -435,7 +532,7 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
   };
 
   // Filter Calendar Events
-  const filteredEvents = GLOBAL_CALENDAR_EVENTS.filter(ev => {
+  const filteredEvents = calendarEvents.filter(ev => {
     const matchesCountry = calendarCountry === "All" || ev.country === calendarCountry || ev.currency === calendarCountry;
     const matchesImpact = calendarImpact === "All" || ev.impact === calendarImpact;
     const matchesSearch = ev.event.toLowerCase().includes(calendarQuery.toLowerCase()) ||
@@ -459,7 +556,7 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
           <p className="text-white/40 text-xs mt-1 font-light">Sovereign alternative data stream and financial intelligence aggregator</p>
         </div>
         <div className="flex items-center space-x-2 px-3 py-1.5 bg-white/5 rounded border border-white/10 font-mono text-xs self-start sm:self-auto">
-          {loading ? (
+          {loading || calendarLoading ? (
             <RefreshCw className="w-3.5 h-3.5 text-amber-500 animate-spin" />
           ) : (
             <Globe className="w-3.5 h-3.5 text-white/50" />
@@ -467,7 +564,7 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
           <span className="text-white/60">
             {activeTab === "NEWS" 
               ? `${articles.length} INTELLIGENCE BRIEFS ACTIVE` 
-              : `${GLOBAL_CALENDAR_EVENTS.length} MACRO INDICATORS STREAMING`}
+              : `${calendarEvents.length} MACRO INDICATORS STREAMING`}
           </span>
         </div>
       </div>
@@ -574,7 +671,10 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
                     </div>
 
                     <div className="self-end md:self-start">
-                      <button className="flex items-center space-x-1 border border-white/10 bg-white/5 hover:bg-white hover:text-black py-1.5 px-3 rounded text-xs select-none transition duration-200 cursor-pointer text-white">
+                      <button 
+                        onClick={() => runFundamentalAnalysis(art)}
+                        className="flex items-center space-x-1 border border-white/10 bg-white/5 hover:bg-white hover:text-black py-1.5 px-3 rounded text-xs select-none transition duration-200 cursor-pointer text-white"
+                      >
                         <span>Analyze Impact</span>
                         <ArrowUpRight className="w-3.5 h-3.5" />
                       </button>
@@ -590,6 +690,58 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
       {/* 2. GLOBAL ECONOMIC CALENDAR TAB */}
       {activeTab === "CALENDAR" && (
         <div id="economic-calendar-section" className="space-y-6 animate-fadeIn">
+          {/* HIGH IMPACT WEEKLY TICKER TAPE */}
+          <div className="bg-red-950/20 border border-red-500/20 py-2.5 px-4 rounded-xl flex items-center overflow-hidden font-mono text-[10px] text-red-400 select-none shadow-[0_4px_12px_rgba(239,68,68,0.05)]">
+            <div className="flex items-center space-x-1.5 flex-shrink-0 z-10 bg-neutral-950 dark:bg-black pr-4 font-bold uppercase tracking-wider text-red-500 animate-pulse border-r border-red-500/20 mr-4">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-2 animate-ping" />
+              <span>HIGH IMPACT ALERTS (WEEKLY TAPE)</span>
+            </div>
+            
+            <style>{`
+              @keyframes marquee-economic {
+                0% { transform: translate3d(0, 0, 0); }
+                100% { transform: translate3d(-50%, 0, 0); }
+              }
+              .marquee-scroll-economic {
+                display: flex;
+                white-space: nowrap;
+                animation: marquee-economic 35s linear infinite;
+              }
+              .marquee-scroll-economic:hover {
+                animation-play-state: paused;
+              }
+            `}</style>
+
+            <div className="marquee-scroll-economic flex gap-8">
+              <span className="flex items-center gap-2">
+                <strong>[NFP]</strong> Non-Farm Employment Change — <span className="text-zinc-400">JUN 05, 12:30 UTC</span> &bull; Forecast: <span className="font-bold text-white">185k</span> (Previous: 175k) <span className="bg-red-500/20 text-[8px] px-1 py-0.5 rounded border border-red-500/20 font-bold">REVOLUTION ALERTS</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <strong>[CPI]</strong> Core CPI Inflation YoY (USA) — <span className="text-zinc-400">JUN 10, 12:30 UTC</span> &bull; Forecast: <span className="font-bold text-white">3.5%</span> (Previous: 3.6%) <span className="bg-red-500/20 text-[8px] px-1 py-0.5 rounded border border-red-500/20 font-bold">HIGH VOLATILITY</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <strong>[ECB]</strong> Eurozone Rate Decision — <span className="text-zinc-400">MAY 28, 09:00 UTC</span> &bull; Forecast: <span className="font-bold text-white">4.25%</span> (Previous: 4.50%) <span className="bg-amber-500/20 text-[8px] px-1 py-0.5 text-amber-400 rounded border border-amber-500/20 font-bold">RATE MOVE EXPECTED</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <strong>[FOMC]</strong> US Meeting Minutes released — <span className="text-emerald-400">HAWKISH BIAS EXTENDED</span> &bull; SANS risk matrix advises buying spot metal above support <span className="bg-emerald-500/20 text-[8px] px-1 py-0.5 text-emerald-400 rounded border border-emerald-500/20 font-bold">METRICS RECORDED</span>
+              </span>
+              
+              {/* Duplicate for seamless looping marquee */}
+              <span className="flex items-center gap-2">
+                <strong>[NFP]</strong> Non-Farm Employment Change — <span className="text-zinc-400">JUN 05, 12:30 UTC</span> &bull; Forecast: <span className="font-bold text-white">185k</span> (Previous: 175k) <span className="bg-red-500/20 text-[8px] px-1 py-0.5 rounded border border-red-500/20 font-bold">REVOLUTION ALERTS</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <strong>[CPI]</strong> Core CPI Inflation YoY (USA) — <span className="text-zinc-400">JUN 10, 12:30 UTC</span> &bull; Forecast: <span className="font-bold text-white">3.5%</span> (Previous: 3.6%) <span className="bg-red-500/20 text-[8px] px-1 py-0.5 rounded border border-red-500/20 font-bold">HIGH VOLATILITY</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <strong>[ECB]</strong> Eurozone Rate Decision — <span className="text-zinc-400">MAY 28, 09:00 UTC</span> &bull; Forecast: <span className="font-bold text-white">4.25%</span> (Previous: 4.50%) <span className="bg-amber-500/20 text-[8px] px-1 py-0.5 text-amber-400 rounded border border-amber-500/20 font-bold">RATE MOVE EXPECTED</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <strong>[FOMC]</strong> US Meeting Minutes released — <span className="text-emerald-400">HAWKISH BIAS EXTENDED</span> &bull; SANS risk matrix advises buying spot metal above support <span className="bg-emerald-500/20 text-[8px] px-1 py-0.5 text-emerald-400 rounded border border-emerald-500/20 font-bold">METRICS RECORDED</span>
+              </span>
+            </div>
+          </div>
+
           {/* Calendar Controller Filters */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-neutral-950/60 p-4 rounded-xl border border-white/10">
             {/* Country Selector */}
@@ -756,6 +908,206 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
             <div className="text-zinc-500">
               TIME INTERLOCK: CENTRAL DECENTRALIZED EPOCH SECURE
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. COGNITIVE ANALYSIS LOADER OVERLAY */}
+      {isAnalyzing && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#09090b] border border-white/10 rounded-2xl shadow-2xl p-8 relative overflow-hidden flex flex-col items-center text-center space-y-6 animate-fadeIn">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-400 via-indigo-500 to-sky-400 animate-pulse" />
+            
+            {/* Spinning/pulsing Brain Icon and Neon Grid */}
+            <div className="relative">
+              <div className="w-20 h-20 rounded-full bg-sky-500/10 border border-sky-500/30 flex items-center justify-center animate-pulse">
+                <Brain className="w-10 h-10 text-sky-400 animate-pulse" />
+              </div>
+              <span className="absolute inset-0 rounded-full border border-sky-400/30 animate-ping" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-lg font-mono font-bold tracking-widest text-white uppercase">SANS COGNITIVE ENGINE</h3>
+              <p className="text-xs text-sky-400 font-mono animate-pulse text-center">RUNNING GENERALIZED FUNDAMENTAL ANALYSIS...</p>
+            </div>
+
+            <div className="w-full bg-white/5 rounded-full h-1 overflow-hidden">
+              <div className="bg-sky-400 h-1 rounded-full animate-pulse" style={{ width: "60%" }} />
+            </div>
+
+            <div className="font-mono text-[9px] text-zinc-500 space-y-1">
+              <div>INGESTING MACRO DATA FOR: "{analyzingArticle?.title.substring(0, 45)}..."</div>
+              <div>CROSS-REFERENCING WEEKLY ECONOMIC CALENDAR...</div>
+              <div>CORRELATING VOLATILITY RATINGS...</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. REAL-TIME FUNDAMENTAL ANALYSIS OVERLAY MODAL */}
+      {selectedAnalysis && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-[#09090b] border border-white/10 rounded-2xl shadow-2xl p-6 relative overflow-hidden flex flex-col max-h-[90vh] animate-fadeIn">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 via-sky-400 to-amber-400" />
+            
+            {/* Modal Header */}
+            <div className="flex items-start justify-between pb-4 border-b border-white/10 mb-5 text-left">
+              <div className="flex items-center space-x-2.5 text-left">
+                <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center">
+                  <Brain className="w-4 h-4 text-sky-400" />
+                </div>
+                <div className="text-left">
+                  <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-white">SANS Cognitive Intelligence Report</h3>
+                  <p className="text-[10px] font-mono text-zinc-500">PROPRIETARY FUNDAMENTAL REASONING ROUTER</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { setSelectedAnalysis(null); setAnalyzingArticle(null); }}
+                className="p-1 rounded bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition duration-150 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body (Scrollable) */}
+            <div className="flex-1 overflow-y-auto space-y-5 pr-1 text-left font-sans">
+              
+              {/* Source Article Title */}
+              <div className="p-3 bg-neutral-900/60 rounded-xl border border-white/5 text-left">
+                <span className="text-[9px] font-mono text-zinc-500 uppercase block">Input Sentiment Asset Stream</span>
+                <h4 className="text-white font-medium text-sm mt-0.5 leading-snug">{analyzingArticle?.title}</h4>
+              </div>
+
+              {/* Analysis Scores Columns */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-left">
+                
+                {/* Confidence */}
+                <div className="p-3 bg-white/5 rounded-xl border border-white/5 flex flex-col justify-between text-left">
+                  <span className="text-[9px] text-zinc-500 uppercase leading-none block">Confidence Rating</span>
+                  <div className="flex items-baseline space-x-1.5 mt-2">
+                    <span className="text-2xl font-bold text-white font-sans">{selectedAnalysis.confidence}%</span>
+                    <span className="text-[9px] text-zinc-500 leading-none">PRECISION</span>
+                  </div>
+                  <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden mt-3">
+                    <div className="bg-sky-400 h-1.5 rounded-full" style={{ width: `${selectedAnalysis.confidence}%` }} />
+                  </div>
+                </div>
+
+                {/* Volatility */}
+                <div className="p-3 bg-white/5 rounded-xl border border-white/5 flex flex-col justify-between text-left">
+                  <span className="text-[9px] text-zinc-500 uppercase leading-none block">Volatility Factor</span>
+                  <div className="flex items-baseline space-x-1.5 mt-2">
+                    <span className="text-2xl font-bold text-white font-sans">{selectedAnalysis.impact}</span>
+                    <span className="text-[9px] text-rose-400 leading-none">RATING</span>
+                  </div>
+                  <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden mt-3">
+                    <div 
+                      className="bg-rose-400 h-1.5 rounded-full" 
+                      style={{ width: selectedAnalysis.impact === 'HIGH' ? '90%' : selectedAnalysis.impact === 'MEDIUM' ? '60%' : '30%' }} 
+                    />
+                  </div>
+                </div>
+
+                {/* Consensus Strategy */}
+                <div className="p-3 bg-white/5 rounded-xl border border-white/5 flex flex-col justify-between text-left">
+                  <span className="text-[9px] text-zinc-500 uppercase leading-none font-bold block">Consensus Sentiment</span>
+                  <div className="flex items-center space-x-2 mt-2">
+                    {selectedAnalysis.consensus_strategy?.toUpperCase() === 'BUY' ? (
+                      <TrendingUp className="w-5 h-5 text-emerald-400" />
+                    ) : selectedAnalysis.consensus_strategy?.toUpperCase() === 'SELL' ? (
+                      <TrendingDown className="w-5 h-5 text-rose-400" />
+                    ) : (
+                      <Gauge className="w-5 h-5 text-amber-400" />
+                    )}
+                    <span className={`text-xl font-bold ${
+                      selectedAnalysis.consensus_strategy?.toUpperCase() === 'BUY' ? 'text-emerald-400' :
+                      selectedAnalysis.consensus_strategy?.toUpperCase() === 'SELL' ? 'text-rose-400' : 'text-amber-400'
+                    }`}>
+                      {selectedAnalysis.consensus_strategy || "HOLD"}
+                    </span>
+                  </div>
+                  <span className="mt-2 text-[9px] text-zinc-500 uppercase leading-none block">SANS SYSTEM CONSENSUS</span>
+                </div>
+
+              </div>
+
+              {/* Signals and symbols */}
+              <div className="p-4 rounded-xl border border-sky-500/10 bg-sky-500/5 space-y-3.5 text-left">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 font-mono">
+                  <div>
+                    <span className="text-[9px] text-sky-400 uppercase font-bold block">Fundamental Signal Tag</span>
+                    <span className="text-white text-xs font-bold bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded uppercase block mt-1">{selectedAnalysis.signal || "NEUTRAL CORRELATION"}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-sky-400 uppercase font-bold block">Target Assets Affected</span>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {selectedAnalysis.affected_symbols?.map((sym: string) => (
+                        <button 
+                          key={sym}
+                          onClick={() => handleLoadAssetInTerminal(sym)}
+                          className="bg-black border border-white/10 hover:border-sky-400 text-sky-300 font-bold px-2 py-0.5 rounded text-[10px] select-none cursor-pointer transition flex items-center gap-1 group"
+                          title={`Click to route in Terminal`}
+                        >
+                          <span>{sym}</span>
+                          <ArrowUpRight className="w-2.5 h-2.5 text-zinc-500 group-hover:text-sky-400" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Deep Narrative Output */}
+              <div className="space-y-1.5 text-left">
+                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block">Reasoning Narrative</span>
+                <p className="text-xs text-zinc-300 leading-relaxed font-sans bg-zinc-950 p-4 rounded-xl border border-white/5 whitespace-pre-line text-left">
+                  {selectedAnalysis.narrative || "The SANS fundamental intelligence core was unable to detail a specific threat direction due to conflicting central banking indices. Trading terminal standard protective levels are recommended."}
+                </p>
+              </div>
+
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 mt-5 pt-4 border-t border-white/10">
+              <button 
+                onClick={() => { setSelectedAnalysis(null); setAnalyzingArticle(null); }}
+                className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-zinc-300 font-mono text-xs rounded border border-white/5 cursor-pointer select-none transition"
+              >
+                Close Report
+              </button>
+              {selectedAnalysis.affected_symbols && selectedAnalysis.affected_symbols.length > 0 && (
+                <button 
+                  onClick={() => handleLoadAssetInTerminal(selectedAnalysis.affected_symbols[0])}
+                  className="px-4 py-2 bg-sky-500 hover:bg-sky-400 text-black font-mono font-bold text-xs rounded select-none cursor-pointer transition flex items-center space-x-1"
+                >
+                  <span>Load {selectedAnalysis.affected_symbols[0]} Terminal Route</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. ANALYSIS ERROR FALLBACK POPUP */}
+      {analysisError && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-[#09090b] border border-red-500/20 rounded-2xl shadow-2xl p-6 relative flex flex-col items-center text-center space-y-4 animate-fadeIn">
+            <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+              <AlertTriangle className="w-6 h-6 text-red-400" />
+            </div>
+            
+            <div className="space-y-1">
+              <h3 className="text-sm font-mono font-bold text-white uppercase tracking-wider text-center">Analysis Engine Fault</h3>
+              <p className="text-xs text-zinc-400 text-center">{analysisError}</p>
+            </div>
+
+            <button 
+              onClick={() => setAnalysisError(null)}
+              className="w-full py-2 bg-red-500/10 hover:bg-red-500/20 text-red-200 border border-red-500/20 rounded text-xs font-mono font-semibold transition cursor-pointer"
+            >
+              Close Alert
+            </button>
           </div>
         </div>
       )}

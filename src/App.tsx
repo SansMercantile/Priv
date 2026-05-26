@@ -43,6 +43,18 @@ function App({ initialDevice = "desktop" }: AppProps) {
       setWalkthroughActive(true);
       localStorage.setItem("hasSeenWalkthrough", "true");
     }
+
+    // Auto-detect responsive orientation and screen sizing for handheld devices
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        setDevice("mobile");
+      } else {
+        setDevice("desktop");
+      }
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   // Save demo mode to localStorage whenever it changes
@@ -135,7 +147,7 @@ function App({ initialDevice = "desktop" }: AppProps) {
           </div>
         )}
         
-        <div className="flex" style={{ paddingTop: demoMode ? "42px" : "0" }}>
+        <div className="flex" style={{ paddingTop: device === "mobile" ? (demoMode ? "106px" : "64px") : (demoMode ? "42px" : "0") }}>
           <Sidebar 
             device={device} 
             setDevice={setDevice}
@@ -146,7 +158,7 @@ function App({ initialDevice = "desktop" }: AppProps) {
             isDemoLocked={false}
           />
           
-          <main className={`flex-1 transition-all duration-300 ${isSidebarMinimized ? "ml-20" : "ml-64"}`}>
+          <main className={`flex-1 transition-all duration-300 ${device === "mobile" ? "ml-0 pt-0" : isSidebarMinimized ? "ml-20" : "ml-64"}`}>
             <AnimatePresence mode="wait">
               <motion.div
                 key={location.pathname}
@@ -154,7 +166,7 @@ function App({ initialDevice = "desktop" }: AppProps) {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.3 }}
-                className="p-6"
+                className="p-4 sm:p-6"
               >
                 <Routes>
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
