@@ -32,7 +32,8 @@ import { createServer as createViteServer } from "vite";
 import { antiBotMiddleware, securityHeadersMiddleware } from "./src/middleware/antiBot.js";
 
 const app = express();
-const PORT = 3000;
+// Azure App Service injects PORT=8080; fall back to 3000 for local dev
+const PORT = parseInt(process.env.PORT || "3000", 10);
 
 // ── Bot & scraper protection (runs before all routes) ──────────────────────
 app.use(securityHeadersMiddleware);
