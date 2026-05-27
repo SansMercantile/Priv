@@ -506,43 +506,282 @@ export default function TradingTerminal({
   }, [demoMode]);
   const [accountCurrency, setAccountCurrency] = useState<string>("USD");
 
-  // Balance parameters
-  const [balance, setBalance] = useState<number>(() => {
+  // Multi-account profile selection state
+  const [activeTradingAccount, setActiveTradingAccount] = useState<"XM" | "BINANCE" | "COINBASE">("XM");
+
+  // --- XM ACCOUNT STATES ---
+  const [xmBalance, setXmBalance] = useState<number>(() => {
     const saved = localStorage.getItem("xm_balance");
     if (demoMode) return saved ? parseFloat(saved) : 10000.0;
     return localStorage.getItem("xm_is_logged") === "true" 
       ? parseFloat(saved || "5218.42")
       : 0;
   });
-  const [initialBalance, setInitialBalance] = useState<number>(() => {
+  const [xmInitialBalance, setXmInitialBalance] = useState<number>(() => {
     const saved = localStorage.getItem("xm_initial_balance");
     if (demoMode) return saved ? parseFloat(saved) : 10000.0;
     return localStorage.getItem("xm_is_logged") === "true" 
       ? parseFloat(saved || "5000.00")
       : 0;
   });
-  const [positions, setPositions] = useState<OpenPosition[]>(() => {
+  const [xmPositions, setXmPositions] = useState<OpenPosition[]>(() => {
     try {
       const saved = localStorage.getItem("xm_positions");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+      const parsed = saved ? JSON.parse(saved) : [];
+      const seen = new Set<string>();
+      return parsed.filter((p: any) => p && p.id && !seen.has(p.id) && seen.add(p.id));
+    } catch { return []; }
+  });
+  const [xmHistory, setXmHistory] = useState<HistoricalTrade[]>(() => {
+    try {
+      const saved = localStorage.getItem("xm_history");
+      const parsed = saved ? JSON.parse(saved) : [];
+      const seen = new Set<string>();
+      return parsed.filter((h: any) => h && h.id && !seen.has(h.id) && seen.add(h.id));
+    } catch { return []; }
   });
 
-  // Sync positions to localStorage whenever they update
+  // --- BINANCE ACCOUNT STATES ---
+  const [binanceBalance, setBinanceBalance] = useState<number>(() => {
+    const saved = localStorage.getItem("binance_balance");
+    return saved ? parseFloat(saved) : 842019.45;
+  });
+  const [binanceInitialBalance, setBinanceInitialBalance] = useState<number>(() => {
+    const saved = localStorage.getItem("binance_initial_balance");
+    return saved ? parseFloat(saved) : 842019.45;
+  });
+  const [binancePositions, setBinancePositions] = useState<OpenPosition[]>(() => {
+    try {
+      const saved = localStorage.getItem("binance_positions");
+      let parsed: OpenPosition[] = [];
+      if (saved) {
+        parsed = JSON.parse(saved);
+      } else {
+        // Beautiful mock positions for instant sandbox demo
+        parsed = [
+          {
+            id: "BIN-AI-2895",
+            symbol: "BTCUSDT",
+            side: "BUY",
+            lots: 1.5,
+            entryPrice: 67250.00,
+            currentPrice: 67310.20,
+            pnl: 90.30,
+            timestamp: new Date().toLocaleTimeString(),
+            sl: 64000.00,
+            tp: 71000.00
+          }
+        ];
+      }
+      const seen = new Set<string>();
+      return parsed.filter(p => p && p.id && !seen.has(p.id) && seen.add(p.id));
+    } catch { return []; }
+  });
+  const [binanceHistory, setBinanceHistory] = useState<HistoricalTrade[]>(() => {
+    try {
+      const saved = localStorage.getItem("binance_history");
+      const parsed = saved ? JSON.parse(saved) : [];
+      const seen = new Set<string>();
+      return parsed.filter((h: any) => h && h.id && !seen.has(h.id) && seen.add(h.id));
+    } catch { return []; }
+  });
+
+  // --- COINBASE ACCOUNT STATES ---
+  const [coinbaseBalance, setCoinbaseBalance] = useState<number>(() => {
+    const saved = localStorage.getItem("coinbase_balance");
+    return saved ? parseFloat(saved) : 610064.77;
+  });
+  const [coinbaseInitialBalance, setCoinbaseInitialBalance] = useState<number>(() => {
+    const saved = localStorage.getItem("coinbase_initial_balance");
+    return saved ? parseFloat(saved) : 610064.77;
+  });
+  const [coinbasePositions, setCoinbasePositions] = useState<OpenPosition[]>(() => {
+    try {
+      const saved = localStorage.getItem("coinbase_positions");
+      let parsed: OpenPosition[] = [];
+      if (saved) {
+        parsed = JSON.parse(saved);
+      } else {
+        parsed = [
+          {
+            id: "COIN-AI-3341",
+            symbol: "ETHUSD",
+            side: "BUY",
+            lots: 12.0,
+            entryPrice: 3110.50,
+            currentPrice: 3119.80,
+            pnl: 111.60,
+            timestamp: new Date().toLocaleTimeString(),
+            sl: 2950.00,
+            tp: 3350.00
+          }
+        ];
+      }
+      const seen = new Set<string>();
+      return parsed.filter(p => p && p.id && !seen.has(p.id) && seen.add(p.id));
+    } catch { return []; }
+  });
+  const [coinbaseHistory, setCoinbaseHistory] = useState<HistoricalTrade[]>(() => {
+    try {
+      const saved = localStorage.getItem("coinbase_history");
+      const parsed = saved ? JSON.parse(saved) : [];
+      const seen = new Set<string>();
+      return parsed.filter((h: any) => h && h.id && !seen.has(h.id) && seen.add(h.id));
+    } catch { return []; }
+  });
+
+  // --- SELECTORS FOR ACTIVE ACCOUNT VALUES ---
+  const balance = 
+    activeTradingAccount === "XM" ? xmBalance :
+    activeTradingAccount === "BINANCE" ? binanceBalance : coinbaseBalance;
+
+  const initialBalance = 
+    activeTradingAccount === "XM" ? xmInitialBalance :
+    activeTradingAccount === "BINANCE" ? binanceInitialBalance : coinbaseInitialBalance;
+
+  const positions = 
+    activeTradingAccount === "XM" ? xmPositions :
+    activeTradingAccount === "BINANCE" ? binancePositions : coinbasePositions;
+
+  // Stale closure shield: track exact positions dynamically in useRef for async threads
+  const positionsRef = useRef<OpenPosition[]>(positions);
   useEffect(() => {
-    localStorage.setItem("xm_positions", JSON.stringify(positions));
+    positionsRef.current = positions;
   }, [positions]);
 
-  // Sync balances to localStorage whenever they update
+  const history = 
+    activeTradingAccount === "XM" ? xmHistory :
+    activeTradingAccount === "BINANCE" ? binanceHistory : coinbaseHistory;
+
+  // --- SETTERS FOR ACTIVE ACCOUNT VALUES ---
+  const setBalance = (val: number | ((b: number) => number)) => {
+    const applyUpdate = (oldVal: number): number => {
+      if (typeof val === "function") {
+        return (val as Function)(oldVal);
+      }
+      return val;
+    };
+    if (activeTradingAccount === "XM") {
+      setXmBalance(applyUpdate);
+    } else if (activeTradingAccount === "BINANCE") {
+      setBinanceBalance(applyUpdate);
+    } else {
+      setCoinbaseBalance(applyUpdate);
+    }
+  };
+
+  const setInitialBalance = (val: number | ((b: number) => number)) => {
+    const applyUpdate = (oldVal: number): number => {
+      if (typeof val === "function") {
+        return (val as Function)(oldVal);
+      }
+      return val;
+    };
+    if (activeTradingAccount === "XM") {
+      setXmInitialBalance(applyUpdate);
+    } else if (activeTradingAccount === "BINANCE") {
+      setBinanceInitialBalance(applyUpdate);
+    } else {
+      setCoinbaseInitialBalance(applyUpdate);
+    }
+  };
+
+  const setPositions = (val: OpenPosition[] | ((p: OpenPosition[]) => OpenPosition[])) => {
+    const applyUpdate = (oldVal: OpenPosition[]): OpenPosition[] => {
+      let updatedList: OpenPosition[];
+      if (typeof val === "function") {
+        updatedList = (val as Function)(oldVal);
+      } else {
+        updatedList = val;
+      }
+      // Guarantee key/id uniqueness to completely eliminate duplicate children keys
+      const unique: OpenPosition[] = [];
+      const seen = new Set<string>();
+      for (const pos of updatedList) {
+        if (!seen.has(pos.id)) {
+          seen.add(pos.id);
+          unique.push(pos);
+        }
+      }
+      return unique;
+    };
+    if (activeTradingAccount === "XM") {
+      setXmPositions(applyUpdate);
+    } else if (activeTradingAccount === "BINANCE") {
+      setBinancePositions(applyUpdate);
+    } else {
+      setCoinbasePositions(applyUpdate);
+    }
+  };
+
+  const setHistory = (val: HistoricalTrade[] | ((h: HistoricalTrade[]) => HistoricalTrade[])) => {
+    const applyUpdate = (oldVal: HistoricalTrade[]): HistoricalTrade[] => {
+      let updatedList: HistoricalTrade[];
+      if (typeof val === "function") {
+        updatedList = (val as Function)(oldVal);
+      } else {
+        updatedList = val;
+      }
+      // Guarantee key/id uniqueness for historical trades
+      const unique: HistoricalTrade[] = [];
+      const seen = new Set<string>();
+      for (const hist of updatedList) {
+        if (!seen.has(hist.id)) {
+          seen.add(hist.id);
+          unique.push(hist);
+        }
+      }
+      return unique;
+    };
+    if (activeTradingAccount === "XM") {
+      setXmHistory(applyUpdate);
+    } else if (activeTradingAccount === "BINANCE") {
+      setBinanceHistory(applyUpdate);
+    } else {
+      setCoinbaseHistory(applyUpdate);
+    }
+  };
+
+  // --- PERSISTENCE SYNCS ---
   useEffect(() => {
-    localStorage.setItem("xm_balance", balance.toString());
-  }, [balance]);
+    localStorage.setItem("xm_balance", xmBalance.toString());
+  }, [xmBalance]);
 
   useEffect(() => {
-    localStorage.setItem("xm_initial_balance", initialBalance.toString());
-  }, [initialBalance]);
+    localStorage.setItem("xm_initial_balance", xmInitialBalance.toString());
+  }, [xmInitialBalance]);
+
+  useEffect(() => {
+    localStorage.setItem("xm_positions", JSON.stringify(xmPositions));
+  }, [xmPositions]);
+
+  useEffect(() => {
+    localStorage.setItem("xm_history", JSON.stringify(xmHistory));
+  }, [xmHistory]);
+
+  useEffect(() => {
+    localStorage.setItem("binance_balance", binanceBalance.toString());
+  }, [binanceBalance]);
+
+  useEffect(() => {
+    localStorage.setItem("binance_positions", JSON.stringify(binancePositions));
+  }, [binancePositions]);
+
+  useEffect(() => {
+    localStorage.setItem("binance_history", JSON.stringify(binanceHistory));
+  }, [binanceHistory]);
+
+  useEffect(() => {
+    localStorage.setItem("coinbase_balance", coinbaseBalance.toString());
+  }, [coinbaseBalance]);
+
+  useEffect(() => {
+    localStorage.setItem("coinbase_positions", JSON.stringify(coinbasePositions));
+  }, [coinbasePositions]);
+
+  useEffect(() => {
+    localStorage.setItem("coinbase_history", JSON.stringify(coinbaseHistory));
+  }, [coinbaseHistory]);
 
   // Autonomous Trading states
   const [isAutoTrading, setIsAutoTrading] = useState<boolean>(() => {
@@ -554,9 +793,7 @@ export default function TradingTerminal({
     try {
       const saved = localStorage.getItem("xm_auto_logs");
       return saved ? JSON.parse(saved) : [`[${new Date().toLocaleTimeString()}] SANS Autonomous Trading Core in Standby mode.`];
-    } catch {
-      return [`[${new Date().toLocaleTimeString()}] SANS Autonomous Trading Core in Standby mode.`];
-    }
+    } catch { return [`[${new Date().toLocaleTimeString()}] SANS Autonomous Trading Core in Standby mode.`]; }
   });
 
   useEffect(() => {
@@ -568,14 +805,16 @@ export default function TradingTerminal({
       const savedBal = localStorage.getItem("xm_balance");
       if (savedBal) {
         const pVal = parseFloat(savedBal);
-        if (pVal !== balance) setBalance(pVal);
+        if (pVal !== xmBalance) setXmBalance(pVal);
       }
       const savedPosStr = localStorage.getItem("xm_positions");
       if (savedPosStr) {
         try {
           const parsed = JSON.parse(savedPosStr);
-          if (JSON.stringify(parsed) !== JSON.stringify(positions)) {
-            setPositions(parsed);
+          if (JSON.stringify(parsed) !== JSON.stringify(xmPositions)) {
+            const seen = new Set<string>();
+            const unique = parsed.filter((p: any) => p && p.id && !seen.has(p.id) && seen.add(p.id));
+            setXmPositions(unique);
           }
         } catch(_) {}
       }
@@ -592,9 +831,8 @@ export default function TradingTerminal({
     };
     window.addEventListener("storage", handleSync);
     return () => window.removeEventListener("storage", handleSync);
-  }, [balance, positions, autoLogs]);
+  }, [xmBalance, xmPositions, autoLogs]);
 
-  const [history, setHistory] = useState<HistoricalTrade[]>([]);
   const [executionLogs, setExecutionLogs] = useState<string[]>([]);
 
   // Order placing sub-states
@@ -638,8 +876,17 @@ export default function TradingTerminal({
     let contractSize = 100000;
     if (pos.symbol.includes("XAU") || pos.symbol.includes("Gold")) contractSize = 100;
     if (pos.symbol.includes("BTC")) contractSize = 1;
-    const levVal = parseInt(leverage.split(":")[1]) || 500;
-    return acc + (pos.lots * contractSize * pos.currentPrice) / levVal;
+    
+    let activeLeverageVal = 500;
+    if (activeTradingAccount === "XM") {
+      activeLeverageVal = parseInt(leverage.split(":")[1]) || 500;
+    } else if (activeTradingAccount === "BINANCE") {
+      activeLeverageVal = 20;
+    } else {
+      activeLeverageVal = 1;
+    }
+    
+    return acc + (pos.lots * contractSize * pos.currentPrice) / activeLeverageVal;
   }, 0);
 
   const freeMargin = equity - usedMargin;
@@ -860,35 +1107,159 @@ export default function TradingTerminal({
     fetchRssFeed(selectedRssUrl);
   }, [selectedRssUrl]);
 
-  // --- TRADING RANDOM WALK (Updates positions & prices every second) ---
+  // Cache live prices in ref to prevent interval tear-downs and enable stable 1.5s background ticks
+  const livePricesRef = useRef(livePrices);
   useEffect(() => {
+    livePricesRef.current = livePrices;
+  }, [livePrices]);
+
+  // Helper pricing lookup using latest ref values
+  const getAssetRefPriceLatest = (sym: string): number => {
+    const s = cleanSymbol(sym);
+    const prices = livePricesRef.current;
+    if (prices[s]) {
+      return prices[s];
+    }
+    for (const [key, value] of Object.entries(prices)) {
+      if (s.includes(key) || key.includes(s)) {
+        return value;
+      }
+    }
+    if (s.includes("EURUSD")) return 1.08250;
+    if (s.includes("GBPUSD")) return 1.26430;
+    if (s.includes("USDJPY")) return 156.88;
+    if (s.includes("AUDUSD")) return 0.66540;
+    if (s.includes("USDCAD")) return 1.36850;
+    if (s.includes("USDCHF")) return 0.91250;
+    if (s.includes("BTC")) return 67420.50;
+    if (s.includes("ETH")) return 3120.40;
+    if (s.includes("SOL")) return 148.50;
+    if (s.includes("XAU") || s.includes("GOLD")) return 2345.80;
+    return 100.0;
+  };
+
+  // --- TRADING RANDOM WALK (Updates positions & prices for ALL accounts every 1.5s) ---
+  useEffect(() => {
+    const tickPositions = (prev: OpenPosition[], setBal: Function, setHist: Function, accountKey: string) => {
+      if (prev.length === 0) return prev;
+      
+      let balanceImpact = 0;
+      const closedPositions: { pos: OpenPosition; exitPrice: number; logMessage: string; pnl: number }[] = [];
+      
+      const updated = prev.map(pos => {
+        // Retrieve the current live reference price from the chart data, or fallback to currentPrice
+        const liveRefPrice = getAssetRefPriceLatest(pos.symbol) || pos.currentPrice;
+        
+        // Define realistic volatility scaling by asset class (Forex vs Crypto vs Metals)
+        let baseVol = 0.0002;
+        if (pos.symbol.includes("BTC") || pos.symbol.includes("Crypto")) {
+          baseVol = 0.001; 
+        } else if (pos.symbol.includes("XAU") || pos.symbol.includes("Gold")) {
+          baseVol = 0.0004;
+        }
+        
+        // Dynamic brownian drift centered on liveRefPrice to authentically match live charts has small fluctuation spread
+        const volatility = liveRefPrice * baseVol;
+        const deviation = (Math.random() - 0.495) * volatility;
+        const nextPrice = Math.max(0.0001, liveRefPrice + deviation);
+        
+        // Contract sizes: Forex = 100k, Metals = 100, Crypto = 1
+        let contractSize = 100000;
+        if (pos.symbol.includes("XAU") || pos.symbol.includes("Gold")) contractSize = 100;
+        if (pos.symbol.includes("BTC")) contractSize = 1;
+
+        const priceDiff = pos.side === "BUY" ? (nextPrice - pos.entryPrice) : (pos.entryPrice - nextPrice);
+        const nextPnl = priceDiff * pos.lots * contractSize;
+
+        const exitPriceFormatted = parseFloat(nextPrice.toFixed(pos.symbol.includes("BTC") ? 2 : pos.symbol.includes("XAU") ? 2 : 5));
+        const pnlFormatted = parseFloat(nextPnl.toFixed(2));
+
+        // Evaluate Take Profit & Stop Loss
+        let hitSL = false;
+        let hitTP = false;
+
+        if (pos.sl) {
+          if (pos.side === "BUY" && exitPriceFormatted <= pos.sl) hitSL = true;
+          if (pos.side === "SELL" && exitPriceFormatted >= pos.sl) hitSL = true;
+        }
+        if (pos.tp) {
+          if (pos.side === "BUY" && exitPriceFormatted >= pos.tp) hitTP = true;
+          if (pos.side === "SELL" && exitPriceFormatted <= pos.tp) hitTP = true;
+        }
+
+        if (hitSL || hitTP) {
+          const triggerReason = hitSL ? "STOP LOSS (SL)" : "TAKE PROFIT (TP)";
+          const logMsg = `Ticket ${pos.id} hit ${triggerReason} threshold at ${exitPriceFormatted} (Entry: ${pos.entryPrice}). Closed trade session with realized gain/loss of ${pnlFormatted >= 0 ? "+" : ""}${pnlFormatted} USD`;
+          closedPositions.push({
+            pos,
+            exitPrice: exitPriceFormatted,
+            logMessage: logMsg,
+            pnl: pnlFormatted
+          });
+          balanceImpact += pnlFormatted;
+          return null; // remove pos
+        }
+
+        return {
+          ...pos,
+          currentPrice: exitPriceFormatted,
+          pnl: pnlFormatted
+        };
+      }).filter(Boolean) as OpenPosition[];
+
+      if (closedPositions.length > 0) {
+        // Update balance
+        setBal((b: number) => parseFloat((b + balanceImpact).toFixed(2)));
+        
+        // Add to historical trades ledger
+        const time = new Date().toLocaleTimeString();
+        const newHistory = closedPositions.map(c => ({
+          id: c.pos.id,
+          symbol: c.pos.symbol,
+          side: c.pos.side,
+          lots: c.pos.lots,
+          entryPrice: c.pos.entryPrice,
+          exitPrice: c.exitPrice,
+          pnl: c.pnl,
+          timestamp: time
+        }));
+        setHist((prevHist: HistoricalTrade[]) => {
+          const combined = [...newHistory, ...prevHist];
+          const seenHist = new Set<string>();
+          return combined.filter(h => h && h.id && !seenHist.has(h.id) && seenHist.add(h.id));
+        });
+
+        // Push beautiful notifications to both logging channels
+        setExecutionLogs(logs => [
+          ...closedPositions.map(c => `[${time}] ⚡ SANS RISK SENTINEL: ${c.logMessage}`),
+          ...logs
+        ]);
+
+        setAutoLogs(al => [
+          ...closedPositions.map(c => `[${time}] 🎯 SANS Shield automatic settlement executed [${accountKey}]: ${c.logMessage}`),
+          ...al
+        ]);
+      }
+
+      const seen = new Set<string>();
+      const finalUnique: OpenPosition[] = [];
+      for (const p of updated) {
+        if (p && p.id && !seen.has(p.id)) {
+          seen.add(p.id);
+          finalUnique.push(p);
+        }
+      }
+      return finalUnique;
+    };
+
     const timer = setInterval(() => {
-      setPositions(prev => 
-        prev.map(pos => {
-          // Determine asset random walk factor
-          const volatility = pos.symbol.includes("BTC") ? 4.5 : pos.symbol.includes("XAU") ? 0.45 : 0.00015;
-          const shift = (Math.random() - 0.495) * volatility; // Slight positive bias matching market trajectory
-          const nextPrice = Math.max(0.0001, pos.currentPrice + shift);
-          
-          // Calculate P&L based on contract size
-          let contractSize = 100000;
-          if (pos.symbol.includes("XAU") || pos.symbol.includes("Gold")) contractSize = 100;
-          if (pos.symbol.includes("BTC")) contractSize = 1;
-
-          const priceDiff = pos.side === "BUY" ? (nextPrice - pos.entryPrice) : (pos.entryPrice - nextPrice);
-          const nextPnl = priceDiff * pos.lots * contractSize;
-
-          return {
-            ...pos,
-            currentPrice: parseFloat(nextPrice.toFixed(pos.symbol.includes("BTC") ? 2 : pos.symbol.includes("XAU") ? 2 : 5)),
-            pnl: parseFloat(nextPnl.toFixed(2))
-          };
-        })
-      );
+      setXmPositions(prev => tickPositions(prev, setXmBalance, setXmHistory, "XM Prime Broker"));
+      setBinancePositions(prev => tickPositions(prev, setBinanceBalance, setBinanceHistory, "Binance Global"));
+      setCoinbasePositions(prev => tickPositions(prev, setCoinbaseBalance, setCoinbaseHistory, "Coinbase Advanced"));
     }, 1500);
 
     return () => clearInterval(timer);
-  }, [positions]);
+  }, []);
 
   // --- CALC MARGIN INTERACTIVE TOOL ---
   useEffect(() => {
@@ -972,7 +1343,7 @@ export default function TradingTerminal({
         price: activePrice,
         balance,
         news: rssArticles.slice(0, 5).map(art => ({ title: art.title })),
-        existingPositions: positions,
+        existingPositions: positionsRef.current,
         riskAppetite,
         tradingGoal,
         leverage: savedLeverageVal,
@@ -996,11 +1367,19 @@ export default function TradingTerminal({
 
       if (result.execute && result.trade) {
         const entryP = activePrice || result.trade.sl;
-        const id = `XM-AI-${Math.floor(100000 + Math.random() * 900000)}`;
+        
+        let id = "";
+        do {
+          id = `XM-AI-${Math.floor(100000 + Math.random() * 900000)}`;
+        } while (
+          positionsRef.current.some(p => p.id === id) || 
+          history.some(h => h.id === id)
+        );
+        
         const time = new Date().toLocaleTimeString();
 
         // Prevent immediate duplicates
-        const hasDouble = positions.some(p => p.symbol === cleanSym);
+        const hasDouble = positionsRef.current.some(p => p.symbol === cleanSym);
         if (hasDouble) {
           setAutoLogs(prev => [
             `[${time}] ⚠️ Risk ceiling reached. Exposure limit of 1 position for ${cleanSym} already fulfilled.`,
@@ -1025,7 +1404,16 @@ export default function TradingTerminal({
         let contractSize = 100000;
         if (newPos.symbol.includes("XAU") || newPos.symbol.includes("Gold")) contractSize = 100;
         if (newPos.symbol.includes("BTC")) contractSize = 1;
-        const levVal = parseInt(leverage.split(":")[1]) || 500;
+        
+        let levVal = 500;
+        if (activeTradingAccount === "XM") {
+          levVal = parseInt(leverage.split(":")[1]) || 500;
+        } else if (activeTradingAccount === "BINANCE") {
+          levVal = 20;
+        } else {
+          levVal = 1;
+        }
+        
         const marginReq = (newPos.lots * contractSize * entryP) / levVal;
 
         if (marginReq > freeMargin) {
@@ -1138,7 +1526,7 @@ export default function TradingTerminal({
       clearTimeout(bootTimer);
       clearInterval(intervalTimer);
     };
-  }, [isAutoTrading, selectedSymbol, balance]);
+  }, [isAutoTrading, selectedSymbol]);
 
   // --- BROKER ACTION HANDLERS ---
   const handleBrokerConnect = (e: React.FormEvent) => {
@@ -1276,7 +1664,15 @@ export default function TradingTerminal({
     }
 
     const tPrice = limitPrice || getAssetRefPrice(selectedSymbol);
-    const id = `XM-${Math.floor(100000 + Math.random() * 900000)}`;
+    
+    let id = "";
+    do {
+      id = `XM-${Math.floor(100000 + Math.random() * 900000)}`;
+    } while (
+      positions.some(p => p.id === id) || 
+      history.some(h => h.id === id)
+    );
+    
     const time = new Date().toLocaleTimeString();
 
     const newPosition: OpenPosition = {
@@ -1297,7 +1693,16 @@ export default function TradingTerminal({
     let contractSize = 100000;
     if (newPosition.symbol.includes("XAU") || newPosition.symbol.includes("Gold")) contractSize = 100;
     if (newPosition.symbol.includes("BTC")) contractSize = 1;
-    const levVal = parseInt(leverage.split(":")[1]) || 500;
+    
+    let levVal = 500;
+    if (activeTradingAccount === "XM") {
+      levVal = parseInt(leverage.split(":")[1]) || 500;
+    } else if (activeTradingAccount === "BINANCE") {
+      levVal = 20;
+    } else {
+      levVal = 1;
+    }
+    
     const marginReq = (orderLots * contractSize * tPrice) / levVal;
 
     if (marginReq > freeMargin) {
@@ -1507,20 +1912,48 @@ export default function TradingTerminal({
             <div className="absolute top-0 right-0 w-[1px] h-full bg-gradient-to-b from-white/10 to-transparent" />
             
             <div>
-              <div className="flex items-center justify-between pb-3 border-b border-white/5 mb-4 mb-2">
-                <span className="font-mono text-[10px] text-zinc-500 tracking-wider">XMGLOBAL PORT ROUTE</span>
+              <div className="flex items-center justify-between pb-3 border-b border-white/5 mb-4">
+                <span className="font-mono text-[10px] text-zinc-500 tracking-wider">SECURE BROKERAGE SYNC CHANNEL</span>
                 <span className={`flex items-center font-mono text-[9px] uppercase px-2 py-0.5 rounded border ${
-                  isLogged 
-                    ? "bg-emerald-500/5 text-emerald-400 border-emerald-500/30" 
+                  activeTradingAccount === "XM" && !isLogged
+                    ? "bg-red-500/5 text-red-500 border-red-500/30" 
                     : isLoggingIn 
                     ? "bg-amber-500/5 text-amber-400 border-amber-500/30 animate-pulse"
-                    : "bg-red-500/5 text-red-500 border-red-500/30"
+                    : "bg-emerald-500/5 text-emerald-400 border-emerald-500/30"
                 }`}>
-                  {isLogged ? "Handshake Live" : isLoggingIn ? "Syncing..." : "Offline Node"}
+                  {activeTradingAccount === "XM" && !isLogged ? "Offline Node" : isLoggingIn ? "Syncing..." : "Handshake Live"}
                 </span>
               </div>
 
-              {!isLogged ? (
+              {/* SLEEK ACCOUNT TOGGLE */}
+              <div className="mb-4">
+                <label className="block text-[8px] font-mono text-zinc-500 uppercase tracking-widest mb-1.5 font-bold">Select Active Routing Channel</label>
+                <div className="grid grid-cols-3 gap-1 bg-neutral-950 border border-white/10 p-0.5 rounded text-xs text-neutral-400 text-center">
+                  <button 
+                    type="button" 
+                    onClick={() => setActiveTradingAccount("XM")}
+                    className={`py-2 rounded text-[9px] font-mono font-bold transition select-none cursor-pointer ${activeTradingAccount === "XM" ? "bg-white/10 text-white" : "hover:text-zinc-200"}`}
+                  >
+                    XM Prime
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setActiveTradingAccount("BINANCE")}
+                    className={`py-2 rounded text-[9px] font-mono font-bold transition select-none cursor-pointer ${activeTradingAccount === "BINANCE" ? "bg-white/10 text-white" : "hover:text-zinc-200"}`}
+                  >
+                    Binance
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setActiveTradingAccount("COINBASE")}
+                    className={`py-2 rounded text-[9px] font-mono font-bold transition select-none cursor-pointer ${activeTradingAccount === "COINBASE" ? "bg-white/10 text-white" : "hover:text-zinc-200"}`}
+                  >
+                    Coinbase Adv
+                  </button>
+                </div>
+              </div>
+
+              {(activeTradingAccount === "XM" && !isLogged) ? (
                 /* Login Interface Form */
                 <form onSubmit={handleBrokerConnect} className="space-y-3.5">
                   <div className="space-y-1">
@@ -1625,17 +2058,27 @@ export default function TradingTerminal({
                         <Wifi className="w-4 h-4 text-emerald-400 animate-pulse" />
                       </div>
                       <div>
-                        <h4 className="text-xs font-mono font-bold text-white tracking-wide">{accountId} @ {server}</h4>
-                        <p className="text-[9px] font-mono text-zinc-500 uppercase mt-0.5">TYPE: {accountType} &bull; LEVERAGE {leverage}</p>
+                        <h4 className="text-xs font-mono font-bold text-white tracking-wide">
+                          {activeTradingAccount === "XM" ? `${accountId} @ ${server}` :
+                           activeTradingAccount === "BINANCE" ? `BIN-89420194 @ Binance API v3` :
+                           `COIN-61006477 @ Coinbase Advanced v2`}
+                        </h4>
+                        <p className="text-[9px] font-mono text-zinc-500 uppercase mt-0.5">
+                          {activeTradingAccount === "XM" ? `TYPE: ${accountType} • LEVERAGE ${leverage}` :
+                           activeTradingAccount === "BINANCE" ? `TYPE: COIN MULTI-ASSET • LEVERAGE 1:20` :
+                           `TYPE: COIN DIRECT • LEVERAGE 1:1`}
+                        </p>
                       </div>
                     </div>
-                    <button 
-                      onClick={handleBrokerDisconnect}
-                      className="p-2 bg-white/5 rounded hover:bg-red-500/10 hover:text-red-400 group transition duration-200"
-                      title="Terminate session protocol"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                    </button>
+                    {activeTradingAccount === "XM" && (
+                      <button 
+                        onClick={handleBrokerDisconnect}
+                        className="p-2 bg-white/5 rounded hover:bg-red-500/10 hover:text-red-400 group transition duration-200"
+                        title="Terminate session protocol"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
 
                   {/* Core Account Balance and Metrics grid */}
@@ -1689,12 +2132,12 @@ export default function TradingTerminal({
                   <Activity className="w-4 h-4 mr-2 text-stone-400" />
                   Order Dispatch Console
                 </span>
-                <span className="font-mono text-[9px] text-[#22c55e] border border-[#22c55e]/30 bg-[#22c55e]/5 px-2 py-0.5 rounded">
-                  XM-ROUTE: LIVE
+                <span className="font-mono text-[9px] text-[#22c55e] border border-[#22c55e]/30 bg-[#22c55e]/5 px-2 py-0.5 rounded uppercase">
+                  {activeTradingAccount}-ROUTE: READY
                 </span>
               </div>
 
-              {!isLogged ? (
+              {(activeTradingAccount === "XM" && !isLogged) ? (
                 <div className="p-12 text-center rounded border border-white/5 bg-neutral-900/10 font-mono text-[11px] text-stone-500">
                   <Unlock className="w-5 h-5 mx-auto mb-2.5 text-stone-600 block" />
                   手 SECURE BROKER HANDSHAKE REQUIRED TO ENABLE ORDER SUBMISSION GATE.
@@ -2492,6 +2935,7 @@ export default function TradingTerminal({
                   <th className="pb-3 pt-1">Directive</th>
                   <th className="pb-3 pt-1">Volume (Lots)</th>
                   <th className="pb-3 pt-1">Entry Price</th>
+                  <th className="pb-3 pt-1">SL / TP Limits</th>
                   <th className="pb-3 pt-1">Live price</th>
                   <th className="pb-3 pt-1 text-right">Adaptive P/L</th>
                   <th className="pb-3 pt-1 text-center">Settlement</th>
@@ -2500,7 +2944,7 @@ export default function TradingTerminal({
               <tbody className="divide-y divide-white/5">
                 {positions.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-zinc-600 text-[11px] font-mono">
+                    <td colSpan={9} className="py-8 text-center text-zinc-600 text-[11px] font-mono">
                       No active open positions on server gateway. Use Order Dispatch Desk to initiate exposure trades.
                     </td>
                   </tr>
@@ -2518,6 +2962,16 @@ export default function TradingTerminal({
                       </td>
                       <td className="py-3 text-white font-bold">{pos.lots}</td>
                       <td className="py-3 text-neutral-400">{pos.entryPrice}</td>
+                      <td className="py-3 text-neutral-500 font-mono text-[10px]">
+                        <div className="flex flex-col gap-0.5">
+                          <span className={pos.sl ? "text-rose-500/90 font-semibold" : "text-zinc-600"}>
+                            SL: {pos.sl ? pos.sl.toFixed(pos.symbol.includes("BTC") ? 1 : pos.symbol.includes("XAU") ? 2 : 5) : "—"}
+                          </span>
+                          <span className={pos.tp ? "text-emerald-500/90 font-semibold" : "text-zinc-600"}>
+                            TP: {pos.tp ? pos.tp.toFixed(pos.symbol.includes("BTC") ? 1 : pos.symbol.includes("XAU") ? 2 : 5) : "—"}
+                          </span>
+                        </div>
+                      </td>
                       <td className="py-3 text-zinc-300 transition-all duration-300">{pos.currentPrice}</td>
                       <td className={`py-3 text-right font-bold transition duration-300 font-bold ${pos.pnl >= 0 ? "text-emerald-400" : "text-rose-400 font-extrabold"}`}>
                         {pos.pnl >= 0 ? "+" : ""}{pos.pnl.toFixed(2)} USD
