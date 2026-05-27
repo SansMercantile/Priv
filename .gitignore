@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Backend and private resources - NEVER commit
+/backend/
+/shared_resources/
+/priv/
