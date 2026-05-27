@@ -29,9 +29,14 @@ import express from "express";
 import path from "path";
 import { GoogleGenAI } from "@google/genai";
 import { createServer as createViteServer } from "vite";
+import { antiBotMiddleware, securityHeadersMiddleware } from "./src/middleware/antiBot.js";
 
 const app = express();
 const PORT = 3000;
+
+// ── Bot & scraper protection (runs before all routes) ──────────────────────
+app.use(securityHeadersMiddleware);
+app.use(antiBotMiddleware);
 
 app.use(express.json());
 
