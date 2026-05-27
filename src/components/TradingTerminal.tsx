@@ -506,282 +506,43 @@ export default function TradingTerminal({
   }, [demoMode]);
   const [accountCurrency, setAccountCurrency] = useState<string>("USD");
 
-  // Multi-account profile selection state
-  const [activeTradingAccount, setActiveTradingAccount] = useState<"XM" | "BINANCE" | "COINBASE">("XM");
-
-  // --- XM ACCOUNT STATES ---
-  const [xmBalance, setXmBalance] = useState<number>(() => {
+  // Balance parameters
+  const [balance, setBalance] = useState<number>(() => {
     const saved = localStorage.getItem("xm_balance");
     if (demoMode) return saved ? parseFloat(saved) : 10000.0;
     return localStorage.getItem("xm_is_logged") === "true" 
       ? parseFloat(saved || "5218.42")
       : 0;
   });
-  const [xmInitialBalance, setXmInitialBalance] = useState<number>(() => {
+  const [initialBalance, setInitialBalance] = useState<number>(() => {
     const saved = localStorage.getItem("xm_initial_balance");
     if (demoMode) return saved ? parseFloat(saved) : 10000.0;
     return localStorage.getItem("xm_is_logged") === "true" 
       ? parseFloat(saved || "5000.00")
       : 0;
   });
-  const [xmPositions, setXmPositions] = useState<OpenPosition[]>(() => {
+  const [positions, setPositions] = useState<OpenPosition[]>(() => {
     try {
       const saved = localStorage.getItem("xm_positions");
-      const parsed = saved ? JSON.parse(saved) : [];
-      const seen = new Set<string>();
-      return parsed.filter((p: any) => p && p.id && !seen.has(p.id) && seen.add(p.id));
-    } catch { return []; }
-  });
-  const [xmHistory, setXmHistory] = useState<HistoricalTrade[]>(() => {
-    try {
-      const saved = localStorage.getItem("xm_history");
-      const parsed = saved ? JSON.parse(saved) : [];
-      const seen = new Set<string>();
-      return parsed.filter((h: any) => h && h.id && !seen.has(h.id) && seen.add(h.id));
-    } catch { return []; }
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
 
-  // --- BINANCE ACCOUNT STATES ---
-  const [binanceBalance, setBinanceBalance] = useState<number>(() => {
-    const saved = localStorage.getItem("binance_balance");
-    return saved ? parseFloat(saved) : 842019.45;
-  });
-  const [binanceInitialBalance, setBinanceInitialBalance] = useState<number>(() => {
-    const saved = localStorage.getItem("binance_initial_balance");
-    return saved ? parseFloat(saved) : 842019.45;
-  });
-  const [binancePositions, setBinancePositions] = useState<OpenPosition[]>(() => {
-    try {
-      const saved = localStorage.getItem("binance_positions");
-      let parsed: OpenPosition[] = [];
-      if (saved) {
-        parsed = JSON.parse(saved);
-      } else {
-        // Beautiful mock positions for instant sandbox demo
-        parsed = [
-          {
-            id: "BIN-AI-2895",
-            symbol: "BTCUSDT",
-            side: "BUY",
-            lots: 1.5,
-            entryPrice: 67250.00,
-            currentPrice: 67310.20,
-            pnl: 90.30,
-            timestamp: new Date().toLocaleTimeString(),
-            sl: 64000.00,
-            tp: 71000.00
-          }
-        ];
-      }
-      const seen = new Set<string>();
-      return parsed.filter(p => p && p.id && !seen.has(p.id) && seen.add(p.id));
-    } catch { return []; }
-  });
-  const [binanceHistory, setBinanceHistory] = useState<HistoricalTrade[]>(() => {
-    try {
-      const saved = localStorage.getItem("binance_history");
-      const parsed = saved ? JSON.parse(saved) : [];
-      const seen = new Set<string>();
-      return parsed.filter((h: any) => h && h.id && !seen.has(h.id) && seen.add(h.id));
-    } catch { return []; }
-  });
-
-  // --- COINBASE ACCOUNT STATES ---
-  const [coinbaseBalance, setCoinbaseBalance] = useState<number>(() => {
-    const saved = localStorage.getItem("coinbase_balance");
-    return saved ? parseFloat(saved) : 610064.77;
-  });
-  const [coinbaseInitialBalance, setCoinbaseInitialBalance] = useState<number>(() => {
-    const saved = localStorage.getItem("coinbase_initial_balance");
-    return saved ? parseFloat(saved) : 610064.77;
-  });
-  const [coinbasePositions, setCoinbasePositions] = useState<OpenPosition[]>(() => {
-    try {
-      const saved = localStorage.getItem("coinbase_positions");
-      let parsed: OpenPosition[] = [];
-      if (saved) {
-        parsed = JSON.parse(saved);
-      } else {
-        parsed = [
-          {
-            id: "COIN-AI-3341",
-            symbol: "ETHUSD",
-            side: "BUY",
-            lots: 12.0,
-            entryPrice: 3110.50,
-            currentPrice: 3119.80,
-            pnl: 111.60,
-            timestamp: new Date().toLocaleTimeString(),
-            sl: 2950.00,
-            tp: 3350.00
-          }
-        ];
-      }
-      const seen = new Set<string>();
-      return parsed.filter(p => p && p.id && !seen.has(p.id) && seen.add(p.id));
-    } catch { return []; }
-  });
-  const [coinbaseHistory, setCoinbaseHistory] = useState<HistoricalTrade[]>(() => {
-    try {
-      const saved = localStorage.getItem("coinbase_history");
-      const parsed = saved ? JSON.parse(saved) : [];
-      const seen = new Set<string>();
-      return parsed.filter((h: any) => h && h.id && !seen.has(h.id) && seen.add(h.id));
-    } catch { return []; }
-  });
-
-  // --- SELECTORS FOR ACTIVE ACCOUNT VALUES ---
-  const balance = 
-    activeTradingAccount === "XM" ? xmBalance :
-    activeTradingAccount === "BINANCE" ? binanceBalance : coinbaseBalance;
-
-  const initialBalance = 
-    activeTradingAccount === "XM" ? xmInitialBalance :
-    activeTradingAccount === "BINANCE" ? binanceInitialBalance : coinbaseInitialBalance;
-
-  const positions = 
-    activeTradingAccount === "XM" ? xmPositions :
-    activeTradingAccount === "BINANCE" ? binancePositions : coinbasePositions;
-
-  // Stale closure shield: track exact positions dynamically in useRef for async threads
-  const positionsRef = useRef<OpenPosition[]>(positions);
+  // Sync positions to localStorage whenever they update
   useEffect(() => {
-    positionsRef.current = positions;
+    localStorage.setItem("xm_positions", JSON.stringify(positions));
   }, [positions]);
 
-  const history = 
-    activeTradingAccount === "XM" ? xmHistory :
-    activeTradingAccount === "BINANCE" ? binanceHistory : coinbaseHistory;
-
-  // --- SETTERS FOR ACTIVE ACCOUNT VALUES ---
-  const setBalance = (val: number | ((b: number) => number)) => {
-    const applyUpdate = (oldVal: number): number => {
-      if (typeof val === "function") {
-        return (val as Function)(oldVal);
-      }
-      return val;
-    };
-    if (activeTradingAccount === "XM") {
-      setXmBalance(applyUpdate);
-    } else if (activeTradingAccount === "BINANCE") {
-      setBinanceBalance(applyUpdate);
-    } else {
-      setCoinbaseBalance(applyUpdate);
-    }
-  };
-
-  const setInitialBalance = (val: number | ((b: number) => number)) => {
-    const applyUpdate = (oldVal: number): number => {
-      if (typeof val === "function") {
-        return (val as Function)(oldVal);
-      }
-      return val;
-    };
-    if (activeTradingAccount === "XM") {
-      setXmInitialBalance(applyUpdate);
-    } else if (activeTradingAccount === "BINANCE") {
-      setBinanceInitialBalance(applyUpdate);
-    } else {
-      setCoinbaseInitialBalance(applyUpdate);
-    }
-  };
-
-  const setPositions = (val: OpenPosition[] | ((p: OpenPosition[]) => OpenPosition[])) => {
-    const applyUpdate = (oldVal: OpenPosition[]): OpenPosition[] => {
-      let updatedList: OpenPosition[];
-      if (typeof val === "function") {
-        updatedList = (val as Function)(oldVal);
-      } else {
-        updatedList = val;
-      }
-      // Guarantee key/id uniqueness to completely eliminate duplicate children keys
-      const unique: OpenPosition[] = [];
-      const seen = new Set<string>();
-      for (const pos of updatedList) {
-        if (!seen.has(pos.id)) {
-          seen.add(pos.id);
-          unique.push(pos);
-        }
-      }
-      return unique;
-    };
-    if (activeTradingAccount === "XM") {
-      setXmPositions(applyUpdate);
-    } else if (activeTradingAccount === "BINANCE") {
-      setBinancePositions(applyUpdate);
-    } else {
-      setCoinbasePositions(applyUpdate);
-    }
-  };
-
-  const setHistory = (val: HistoricalTrade[] | ((h: HistoricalTrade[]) => HistoricalTrade[])) => {
-    const applyUpdate = (oldVal: HistoricalTrade[]): HistoricalTrade[] => {
-      let updatedList: HistoricalTrade[];
-      if (typeof val === "function") {
-        updatedList = (val as Function)(oldVal);
-      } else {
-        updatedList = val;
-      }
-      // Guarantee key/id uniqueness for historical trades
-      const unique: HistoricalTrade[] = [];
-      const seen = new Set<string>();
-      for (const hist of updatedList) {
-        if (!seen.has(hist.id)) {
-          seen.add(hist.id);
-          unique.push(hist);
-        }
-      }
-      return unique;
-    };
-    if (activeTradingAccount === "XM") {
-      setXmHistory(applyUpdate);
-    } else if (activeTradingAccount === "BINANCE") {
-      setBinanceHistory(applyUpdate);
-    } else {
-      setCoinbaseHistory(applyUpdate);
-    }
-  };
-
-  // --- PERSISTENCE SYNCS ---
+  // Sync balances to localStorage whenever they update
   useEffect(() => {
-    localStorage.setItem("xm_balance", xmBalance.toString());
-  }, [xmBalance]);
+    localStorage.setItem("xm_balance", balance.toString());
+  }, [balance]);
 
   useEffect(() => {
-    localStorage.setItem("xm_initial_balance", xmInitialBalance.toString());
-  }, [xmInitialBalance]);
-
-  useEffect(() => {
-    localStorage.setItem("xm_positions", JSON.stringify(xmPositions));
-  }, [xmPositions]);
-
-  useEffect(() => {
-    localStorage.setItem("xm_history", JSON.stringify(xmHistory));
-  }, [xmHistory]);
-
-  useEffect(() => {
-    localStorage.setItem("binance_balance", binanceBalance.toString());
-  }, [binanceBalance]);
-
-  useEffect(() => {
-    localStorage.setItem("binance_positions", JSON.stringify(binancePositions));
-  }, [binancePositions]);
-
-  useEffect(() => {
-    localStorage.setItem("binance_history", JSON.stringify(binanceHistory));
-  }, [binanceHistory]);
-
-  useEffect(() => {
-    localStorage.setItem("coinbase_balance", coinbaseBalance.toString());
-  }, [coinbaseBalance]);
-
-  useEffect(() => {
-    localStorage.setItem("coinbase_positions", JSON.stringify(coinbasePositions));
-  }, [coinbasePositions]);
-
-  useEffect(() => {
-    localStorage.setItem("coinbase_history", JSON.stringify(coinbaseHistory));
-  }, [coinbaseHistory]);
+    localStorage.setItem("xm_initial_balance", initialBalance.toString());
+  }, [initialBalance]);
 
   // Autonomous Trading states
   const [isAutoTrading, setIsAutoTrading] = useState<boolean>(() => {
@@ -793,7 +554,9 @@ export default function TradingTerminal({
     try {
       const saved = localStorage.getItem("xm_auto_logs");
       return saved ? JSON.parse(saved) : [`[${new Date().toLocaleTimeString()}] SANS Autonomous Trading Core in Standby mode.`];
-    } catch { return [`[${new Date().toLocaleTimeString()}] SANS Autonomous Trading Core in Standby mode.`]; }
+    } catch {
+      return [`[${new Date().toLocaleTimeString()}] SANS Autonomous Trading Core in Standby mode.`];
+    }
   });
 
   useEffect(() => {
@@ -805,16 +568,14 @@ export default function TradingTerminal({
       const savedBal = localStorage.getItem("xm_balance");
       if (savedBal) {
         const pVal = parseFloat(savedBal);
-        if (pVal !== xmBalance) setXmBalance(pVal);
+        if (pVal !== balance) setBalance(pVal);
       }
       const savedPosStr = localStorage.getItem("xm_positions");
       if (savedPosStr) {
         try {
           const parsed = JSON.parse(savedPosStr);
-          if (JSON.stringify(parsed) !== JSON.stringify(xmPositions)) {
-            const seen = new Set<string>();
-            const unique = parsed.filter((p: any) => p && p.id && !seen.has(p.id) && seen.add(p.id));
-            setXmPositions(unique);
+          if (JSON.stringify(parsed) !== JSON.stringify(positions)) {
+            setPositions(parsed);
           }
         } catch(_) {}
       }
@@ -831,8 +592,9 @@ export default function TradingTerminal({
     };
     window.addEventListener("storage", handleSync);
     return () => window.removeEventListener("storage", handleSync);
-  }, [xmBalance, xmPositions, autoLogs]);
+  }, [balance, positions, autoLogs]);
 
+  const [history, setHistory] = useState<HistoricalTrade[]>([]);
   const [executionLogs, setExecutionLogs] = useState<string[]>([]);
 
   // Order placing sub-states
@@ -1343,7 +1105,7 @@ export default function TradingTerminal({
         price: activePrice,
         balance,
         news: rssArticles.slice(0, 5).map(art => ({ title: art.title })),
-        existingPositions: positionsRef.current,
+        existingPositions: positions,
         riskAppetite,
         tradingGoal,
         leverage: savedLeverageVal,
@@ -1367,19 +1129,11 @@ export default function TradingTerminal({
 
       if (result.execute && result.trade) {
         const entryP = activePrice || result.trade.sl;
-        
-        let id = "";
-        do {
-          id = `XM-AI-${Math.floor(100000 + Math.random() * 900000)}`;
-        } while (
-          positionsRef.current.some(p => p.id === id) || 
-          history.some(h => h.id === id)
-        );
-        
+        const id = `XM-AI-${Math.floor(100000 + Math.random() * 900000)}`;
         const time = new Date().toLocaleTimeString();
 
         // Prevent immediate duplicates
-        const hasDouble = positionsRef.current.some(p => p.symbol === cleanSym);
+        const hasDouble = positions.some(p => p.symbol === cleanSym);
         if (hasDouble) {
           setAutoLogs(prev => [
             `[${time}] ⚠️ Risk ceiling reached. Exposure limit of 1 position for ${cleanSym} already fulfilled.`,
@@ -1404,16 +1158,7 @@ export default function TradingTerminal({
         let contractSize = 100000;
         if (newPos.symbol.includes("XAU") || newPos.symbol.includes("Gold")) contractSize = 100;
         if (newPos.symbol.includes("BTC")) contractSize = 1;
-        
-        let levVal = 500;
-        if (activeTradingAccount === "XM") {
-          levVal = parseInt(leverage.split(":")[1]) || 500;
-        } else if (activeTradingAccount === "BINANCE") {
-          levVal = 20;
-        } else {
-          levVal = 1;
-        }
-        
+        const levVal = parseInt(leverage.split(":")[1]) || 500;
         const marginReq = (newPos.lots * contractSize * entryP) / levVal;
 
         if (marginReq > freeMargin) {
@@ -1526,7 +1271,7 @@ export default function TradingTerminal({
       clearTimeout(bootTimer);
       clearInterval(intervalTimer);
     };
-  }, [isAutoTrading, selectedSymbol]);
+  }, [isAutoTrading, selectedSymbol, balance]);
 
   // --- BROKER ACTION HANDLERS ---
   const handleBrokerConnect = (e: React.FormEvent) => {
