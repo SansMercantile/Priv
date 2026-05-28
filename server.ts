@@ -82,6 +82,169 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", mode: process.env.NODE_ENV || "development" });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  KYC / AML API routes
+//  In-memory store for dev; swap for MongoDB collection in production.
+// ─────────────────────────────────────────────────────────────────────────────
+const kycStore: Record<string, any> = {}; // keyed by email
+
+function kycKey(req: any): string {
+  // Prefer authenticated user id header; fall back to body email
+  return req.headers["x-user-id"] || req.body?.contact?.email || "anonymous";
+}
+
+// GET /api/kyc/record — return saved draft or empty
+app.get("/api/kyc/record", (req, res) => {
+  const key = req.headers["x-user-id"] as string || "anonymous";
+  res.json(kycStore[key] || {});
+});
+
+// GET /api/kyc/status — return completion percentage
+app.get("/api/kyc/status", (req, res) => {
+  const key = req.headers["x-user-id"] as string || "anonymous";
+  const record = kycStore[key];
+  if (!record) return res.json({ status: "not_started", completion_percent: 0 });
+  const filled = Object.values(record).filter(
+    (v) => v !== null && v !== undefined && v !== "" && v !== false
+  ).length;
+  const total = 20;
+  res.json({
+    status: record._submitted ? "submitted" : "draft",
+    completion_percent: Math.min(Math.round((filled / total) * 100), 99),
+  });
+});
+
+// POST /api/kyc/draft — save draft
+app.post("/api/kyc/draft", (req, res) => {
+  const key = kycKey(req);
+  kycStore[key] = { ...kycStore[key], ...req.body, _submitted: false, _updatedAt: new Date().toISOString() };
+  res.json({ ok: true, status: "draft" });
+});
+
+// POST /api/kyc/submit — final submission + AI verification
+app.post("/api/kyc/submit", async (req, res) => {
+  const key = kycKey(req);
+  const submission = { ...req.body, _submitted: true, _submittedAt: new Date().toISOString() };
+  kycStore[key] = submission;
+
+  // Attempt AI verification via Gemini
+  const gemini = getGeminiClient();
+  let verificationResult: any = { status: "pending", note: "AI verification queued" };
+  if (gemini) {
+    try {
+      const prompt = `You are an AML/KYC compliance officer. Review this KYC submission and flag any risks:
+Name: ${submission.fullName}
+DOB: ${submission.dob}
+Nationality: ${submission.nationality}
+Document: ${submission.documentType} ${submission.documentNumber}
+Country of residence: ${submission.personal?.country_of_residence}
+Source of funds: ${submission.financial?.source_of_funds}
+PEP: ${submission.financial?.is_politically_exposed}
+Tax residency: ${submission.tax?.tax_residency_country}
+US Person (FATCA): ${submission.tax?.us_person_fatca}
+Respond with JSON: { "risk_level": "low|medium|high", "flags": [], "recommendation": "approve|review|reject" }`;
+
+      const response = await gemini.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      });
+      const raw = response.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+      const cleaned = raw.replace(/```json|```/g, "").trim();
+      verificationResult = JSON.parse(cleaned);
+    } catch (e) {
+      verificationResult = { status: "error", note: String(e) };
+    }
+  }
+
+  res.json({
+    ok: true,
+    status: "submitted",
+    application_id: `AML-${Date.now()}`,
+    verification: verificationResult,
+  });
+});
+
+// POST /api/kyc/verify-document — AI document verification against form data
+app.post("/api/kyc/verify-document", async (req, res) => {
+  const { documentBase64, mimeType, formData } = req.body;
+  const gemini = getGeminiClient();
+  if (!gemini) return res.json({ verified: false, note: "AI client not configured" });
+
+  try {
+    const response = await gemini.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: [{
+        role: "user",
+        parts: [
+          {
+            inlineData: { mimeType: mimeType || "image/jpeg", data: documentBase64 }
+          },
+          {
+            text: `You are a KYC document verification system. Examine this identity document image carefully.
+The user claims:
+- Full name: ${formData?.fullName}
+- DOB: ${formData?.dob}
+- Document number: ${formData?.documentNumber}
+- Document type: ${formData?.documentType}
+- Issuing country: ${formData?.issuingCountry}
+
+Check if the document is:
+1. A genuine-looking identity document (not obviously fake or edited)
+2. If the name on the document matches the claimed name
+3. If the document number matches
+4. If the expiry date is still valid
+5. If there are any suspicious anomalies
+
+Respond ONLY with JSON (no markdown):
+{ "verified": true/false, "name_match": true/false, "doc_number_match": true/false, "expired": true/false, "suspicious": true/false, "confidence": 0-100, "notes": "brief note" }`
+          }
+        ]
+      }]
+    });
+    const raw = response.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    const cleaned = raw.replace(/```json|```/g, "").trim();
+    res.json(JSON.parse(cleaned));
+  } catch (e) {
+    res.json({ verified: false, note: String(e) });
+  }
+});
+
+// POST /api/kyc/verify-face — AI face verification (selfie vs document)
+app.post("/api/kyc/verify-face", async (req, res) => {
+  const { selfieBase64, documentBase64, mimeType } = req.body;
+  const gemini = getGeminiClient();
+  if (!gemini) return res.json({ match: false, note: "AI client not configured" });
+
+  try {
+    const response = await gemini.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: [{
+        role: "user",
+        parts: [
+          { inlineData: { mimeType: mimeType || "image/jpeg", data: selfieBase64 } },
+          ...(documentBase64 ? [{ inlineData: { mimeType: "image/jpeg", data: documentBase64 } }] : []),
+          {
+            text: `You are a biometric verification assistant. Examine the provided selfie photo.
+${documentBase64 ? "Also compare it with the provided ID document photo." : ""}
+Assess:
+1. Is this a clear, real photo of a live person (not a photo of a photo, screen, or printed image)?
+2. Is the person looking directly at the camera?
+3. Is the lighting adequate?
+${documentBase64 ? "4. Does the face appear to match the ID document photo?" : ""}
+Respond ONLY with JSON (no markdown):
+{ "is_live_person": true/false, "good_quality": true/false, "face_match": true/false, "confidence": 0-100, "notes": "brief note" }`
+          }
+        ]
+      }]
+    });
+    const raw = response.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    const cleaned = raw.replace(/```json|```/g, "").trim();
+    res.json(JSON.parse(cleaned));
+  } catch (e) {
+    res.json({ match: false, note: String(e) });
+  }
+});
+
 // REST API for Datadog integration status telemetry
 app.get("/api/datadog/status", (req, res) => {
   res.json({
@@ -1435,7 +1598,11 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
+    // SPA fallback — only for non-API routes; API 404s get proper JSON
+    app.use((req, res, next) => {
+      if (req.path.startsWith("/api/")) {
+        return res.status(404).json({ error: "API endpoint not found", path: req.path });
+      }
       res.sendFile(path.join(distPath, "index.html"));
     });
     console.log("Production static files mounted successfully.");

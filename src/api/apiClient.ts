@@ -1,75 +1,84 @@
-// High-integrity API Client for SANS PRIV Core KYC, Profile, and billing services using lightweight fetch
+// High-integrity API Client for SANS PRIV Core KYC, Profile, and billing services
+
+const BASE = (import.meta as any).env?.VITE_API_BASE_URL || "";
+
+async function safeFetch(url: string, options?: RequestInit) {
+  const fullUrl = `${BASE}${url}`;
+  const response = await fetch(fullUrl, options);
+  const contentType = response.headers.get("content-type") || "";
+  // Guard: if server returns HTML (404 page, error page) instead of JSON,
+  // throw a human-readable error instead of "Unexpected token 'T'..."
+  if (!contentType.includes("application/json")) {
+    const text = await response.text();
+    throw new Error(
+      `Server returned non-JSON (HTTP ${response.status}): ${text.slice(0, 120)}`
+    );
+  }
+  const data = await response.json();
+  if (!response.ok) {
+    throw Object.assign(
+      new Error(data?.detail || data?.error || `HTTP ${response.status}`),
+      { response: { data, status: response.status } }
+    );
+  }
+  return data;
+}
 
 export const apiClient = {
-  // Direct REST methods emulating axios return schema (with data property)
   get: async (url: string) => {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
+    const data = await safeFetch(url);
     return { data };
   },
 
   post: async (url: string, bodyData?: any) => {
-    const response = await fetch(url, {
+    const data = await safeFetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: bodyData ? JSON.stringify(bodyData) : undefined,
     });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
     return { data };
   },
 
-  // Dedicated KYC handlers as requested in KycVerificationPage
-  getKycRecord: async () => {
-    const response = await fetch("/api/kyc/record");
-    return response.json();
-  },
-
-  getKycStatus: async () => {
-    const response = await fetch("/api/kyc/status");
-    return response.json();
-  },
-
-  saveKycDraft: async (form: any) => {
-    const response = await fetch("/api/kyc/draft", {
+  // KYC handlers
+  getKycRecord: () => safeFetch("/api/kyc/record"),
+  getKycStatus: () => safeFetch("/api/kyc/status"),
+  saveKycDraft: (form: any) =>
+    safeFetch("/api/kyc/draft", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
-    });
-    return response.json();
-  },
-
-  submitKyc: async (form: any) => {
-    const response = await fetch("/api/kyc/submit", {
+    }),
+  submitKyc: (form: any) =>
+    safeFetch("/api/kyc/submit", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
-    });
-    return response.json();
-  },
+    }),
 
-  submitKYCDocument: async (file: File, docType: string) => {
-    // Return direct data mock block
-    return {
-      data: {
-        filename: file.name,
-        document_type: docType,
-        url: URL.createObjectURL(file),
-        status: "uploaded"
-      }
-    };
-  }
+  // AI document verification (sends base64 image to Gemini via backend)
+  verifyDocument: (documentBase64: string, mimeType: string, formData: any) =>
+    safeFetch("/api/kyc/verify-document", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ documentBase64, mimeType, formData }),
+    }),
+
+  // AI face / liveness verification
+  verifyFace: (selfieBase64: string, documentBase64?: string) =>
+    safeFetch("/api/kyc/verify-face", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ selfieBase64, documentBase64, mimeType: "image/jpeg" }),
+    }),
+
+  submitKYCDocument: async (file: File, docType: string) => ({
+    data: {
+      filename: file.name,
+      document_type: docType,
+      url: URL.createObjectURL(file),
+      status: "uploaded",
+    },
+  }),
 };
 
 export default apiClient;

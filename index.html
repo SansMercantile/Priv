@@ -16,6 +16,11 @@
     <meta name="Google-Extended" content="noindex, nofollow" />
     <meta http-equiv="X-Robots-Tag" content="noindex, nofollow, noarchive, nosnippet" />
     <meta name="referrer" content="no-referrer" />
+    <!-- Google Maps (loaded conditionally by KYC page; key injected at runtime) -->
+    <script>
+      // Expose Maps key to app from env — set VITE_GOOGLE_MAPS_KEY in your .env
+      window.__GOOGLE_MAPS_KEY__ = "%VITE_GOOGLE_MAPS_KEY%";
+    </script>
   </head>
   <body>
     <div id="root"></div>
