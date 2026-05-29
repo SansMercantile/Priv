@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "node_modules\\.bin\\vite build && node_modules\\.bin\\esbuild server.ts --bundle --platform=node --format=cjs --external:vite --external:dd-trace --external:rollup --external:esbuild --external:lightningcss --external:tsx --external:fsevents --sourcemap --outfile=dist/server.cjs",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --external:vite --external:dd-trace --external:rollup --external:esbuild --external:lightningcss --external:tsx --external:fsevents --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.cjs",
