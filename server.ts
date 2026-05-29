@@ -1,34 +1,28 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import tracer from "dd-trace";
-
-// Initialize Datadog Server APM immediately
+// dd-trace uses native C++ bindings — load dynamically so Azure deployments
+// without the package don't crash at startup.
 const ddService = process.env.DD_SERVICE || "sans-priv-core";
-const ddEnv = process.env.DD_ENV || "development";
-const ddApiKey = process.env.DD_API_KEY;
+const ddEnv     = process.env.DD_ENV     || "development";
+const ddApiKey  = process.env.DD_API_KEY;
 
 try {
-  tracer.init({
-    service: ddService,
-    env: ddEnv,
-    version: "1.0.0",
-    logInjection: true,
-    startupLogs: false
-  });
+  const tracer = require("dd-trace").default ?? require("dd-trace");
+  tracer.init({ service: ddService, env: ddEnv, version: "1.0.0", logInjection: true, startupLogs: false });
   if (ddApiKey) {
-    console.log(`[SANS Datadog] APM server-side tracer initialized for service: ${ddService} (${ddEnv})`);
+    console.log(`[SANS Datadog] APM tracer initialized: ${ddService} (${ddEnv})`);
   } else {
     console.log("[SANS Datadog] Server APM initialized in mock proxy environment.");
   }
 } catch (err: any) {
-  console.warn("[SANS Datadog] Could not initialize APM tracer module:", err.message || err);
+  console.warn("[SANS Datadog] dd-trace not available — APM disabled:", err.message || err);
 }
 
 import express from "express";
 import path from "path";
 import { GoogleGenAI } from "@google/genai";
-import { createServer as createViteServer } from "vite";
+// NOTE: vite imported dynamically inside the dev-only branch below
 import { antiBotMiddleware, securityHeadersMiddleware } from "./src/middleware/antiBot.js";
 
 const app = express();
@@ -40,6 +34,31 @@ app.use(securityHeadersMiddleware);
 app.use(antiBotMiddleware);
 
 app.use(express.json());
+
+// ── CORS — allow Vercel frontend + local dev to reach this API ─────────────
+const ALLOWED_ORIGINS = [
+  // Vercel deployments (update with your actual Vercel domain)
+  /https:\/\/.*\.vercel\.app$/,
+  /https:\/\/.*\.sans-mercantile\.com$/,
+  /https:\/\/priv.*\.vercel\.app$/,
+  // Local development
+  /^http:\/\/localhost:\d+$/,
+  /^http:\/\/127\.0\.0\.1:\d+$/,
+];
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin || "";
+  const allowed = ALLOWED_ORIGINS.some(pattern => pattern.test(origin));
+  if (allowed) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization,X-User-Id,X-Requested-With");
+    res.setHeader("Access-Control-Max-Age", "86400");
+  }
+  if (req.method === "OPTIONS") { res.sendStatus(204); return; }
+  next();
+});
 
 // Simple helper to detect boilerplate or unconfigured template keys
 function isPlaceholderKey(key: string | undefined): boolean {
