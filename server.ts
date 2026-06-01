@@ -1103,6 +1103,51 @@ app.get("/api/brokers/registered/:id", async (req, res) => {
   }
 });
 
+// POST /api/auth/xm-bridge
+// Specialized endpoint for browser extensions to push session tokens automatically.
+// Expects { broker_id, session_token, config }
+app.post("/api/auth/xm-bridge", async (req, res) => {
+  try {
+    const { broker_id, session_token, config } = req.body || {};
+    if (!broker_id || !session_token) {
+      return res.status(400).json({ success: false, error: "missing_broker_id_or_token" });
+    }
+
+    console.log(`[XM-Bridge] Received automatic token push for ${broker_id}`);
+
+    const record: any = {
+      broker_id,
+      broker_type: "xm",
+      config: config || { account_id: broker_id.replace("xm_user_account_", ""), server: "XMGlobal-Real 14" },
+      created_at: new Date().toISOString()
+    };
+
+    try {
+      const resp = await fetch("https://my.xm.com/member/", {
+        method: "GET",
+        headers: { "User-Agent": "PRIV-Server/1.0", "Cookie": session_token },
+        signal: AbortSignal.timeout(6000)
+      });
+      const text = await resp.text();
+      const validated = resp.ok && resp.status === 200 && (text.includes("Logout") || text.includes("My Account") || text.length > 500);
+      record.session_token = session_token;
+      record.session_validated = validated;
+      record.session_status = resp.status;
+    } catch (e: any) {
+      record.session_validated = false;
+      record.session_status = "bridge_fetch_failed";
+    }
+
+    registeredBrokers[broker_id] = record;
+    saveRegisteredBrokersToDisk();
+
+    return res.json({ success: true, session_validated: record.session_validated });
+  } catch (err: any) {
+    console.error("[XM-Bridge] error:", err?.message || err);
+    res.status(500).json({ success: false, error: "bridge_internal_error" });
+  }
+});
+
 // GET /api/auth/xm-siphon
 // This endpoint is used by the "Return to PRIV" button on the bridge.
 // It attempts to capture the session from the request headers (if the user is redirected)
@@ -1118,10 +1163,6 @@ app.get("/api/auth/xm-siphon", async (req, res) => {
 
     console.log(`[XM-Siphon] Attempting to capture session for ${brokerId}`);
 
-    // In a real-world scenario, the siphon would be a separate domain that can read the cookie
-    // and then forward it. For this implementation, we'll use the bridge logic.
-    
-    // If we have a cookie in the request, we try to register it.
     if (cookie) {
       const record: any = {
         broker_id: brokerId,

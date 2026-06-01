@@ -1678,7 +1678,7 @@ export default function TradingTerminal({
                   }}
                   className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[10px] font-mono font-bold transition-all"
                 >
-                  ⚡ ONE-CLICK SECURE SYNC
+                  SYNC Your XM account
                 </button>
                 <p className="text-[10px] text-zinc-500 mt-2 text-center">
                   SANS Secure Bridge will automatically capture your session upon XM login.
