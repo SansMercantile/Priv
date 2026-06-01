@@ -2569,7 +2569,7 @@ export default function TradingTerminal({
                         >
                           SYNC
                         </button>
-                      </div>
+                      ))}
                     </div>
                   </div>
 
