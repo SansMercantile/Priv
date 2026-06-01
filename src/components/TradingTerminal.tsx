@@ -683,6 +683,7 @@ export default function TradingTerminal({
   const [history, setHistory] = useState<HistoricalTrade[]>([]);
   useEffect(() => { setXmHistory(history); }, [history]);
   const [executionLogs, setExecutionLogs] = useState<string[]>([]);
+  const [terminalRenderError, setTerminalRenderError] = useState<string | null>(null);
 
   // Order placing sub-states
   const [orderSide, setOrderSide] = useState<"BUY" | "SELL">("BUY");
@@ -2475,34 +2476,41 @@ export default function TradingTerminal({
                         <button
                           key={f.name}
                           onClick={() => {
-                            setSelectedRssUrl(f.url);
-                          }}
-                          className={`w-full py-1 px-2.5 rounded text-[10px] font-mono text-left block border ${
-                            selectedRssUrl === f.url 
-                              ? "bg-white/5 border-white text-white font-bold" 
-                              : "bg-neutral-950/40 border-transparent text-zinc-500 hover:text-white"
-                          }`}
-                        >
-                          &bull;&nbsp;{f.name}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Custom dynamic importer */}
-                    <div className="pt-2 border-t border-white/5 space-y-1">
-                      <label className="block text-[9px] font-mono text-zinc-500 uppercase tracking-wide">CUSTOM FEED INJECT (XML ADDR)</label>
-                      <div className="flex gap-1">
-                        <input
-                          type="text"
-                          placeholder="https://example.com/rss.xml"
-                          value={customRssUrl}
-                          onChange={e => setCustomRssUrl(e.target.value)}
-                          className="flex-1 bg-neutral-950 border border-white/10 rounded p-1 text-[10px] font-mono text-white focus:outline-none"
-                        />
-                        <button
-                          onClick={() => {
-                            if (customRssUrl) {
-                              setSelectedRssUrl(customRssUrl);
+                            try {
+                              if (demoMode !== undefined) {
+                                console.debug("[TradingTerminal] demoMode effect start", { demoMode, isLogged, balance, positionsLength: positions.length, containerRefPresent: !!containerRef.current });
+                                setAccountType(demoMode ? "DEMO" : "LIVE");
+                                const savedIsLogged = localStorage.getItem("xm_is_logged") === "true";
+                                if (!demoMode) {
+                                  setIsLogged(savedIsLogged);
+                                  if (!savedIsLogged) {
+                                    setBalance(0);
+                                    setInitialBalance(0);
+                                    setPositions([]);
+                                    setHistory([]);
+                                    setExecutionLogs([
+                                      `[${new Date().toLocaleTimeString()}] Live connection required. Discarded simulated demo balances and open ledgers.`
+                                    ]);
+                                  } else {
+                                    setBalance(parseFloat(localStorage.getItem("xm_balance") || "5218.42"));
+                                    setInitialBalance(parseFloat(localStorage.getItem("xm_initial_balance") || "5000.00"));
+                                    setExecutionLogs([
+                                      `[${new Date().toLocaleTimeString()}] Restored verified handshaking node. Live portfolio synchronized.`
+                                    ]);
+                                  }
+                                } else {
+                                  setIsLogged(true); // Demo mode starts connected automatically for ease-of-use
+                                  setBalance(10000.0);
+                                  setInitialBalance(10000.0);
+                                  setExecutionLogs([
+                                    `[${new Date().toLocaleTimeString()}] Joined simulated Sandbox Environment. Simulated $10,000 credit allocated.`
+                                  ]);
+                                }
+                                console.debug("[TradingTerminal] demoMode effect end", { demoMode, isLoggedAfter: localStorage.getItem("xm_is_logged") === "true", balanceAfter: localStorage.getItem("xm_balance") });
+                              }
+                            } catch (err) {
+                              console.error("[TradingTerminal] demoMode effect error", err);
+                              setExecutionLogs(prev => [`[${new Date().toLocaleTimeString()}] ⚠ Demo transition error: ${String((err as any)?.message || err)}`, ...prev]);
                             }
                           }}
                           title="Proxy stream"
@@ -2873,6 +2881,20 @@ export default function TradingTerminal({
     );
   };
 
+  // compute workspace / prompt with safe fallback to avoid uncaught render errors
+  let terminalRenderFallback: React.ReactNode = null;
+  try {
+    terminalRenderFallback = (!demoMode && !isLogged) ? renderPrompt() : renderWorkspace();
+  } catch (err) {
+    console.error("[TradingTerminal] render error", err);
+    terminalRenderFallback = (
+      <div className="max-w-4xl mx-auto w-full bg-rose-950/20 border border-rose-800 p-6 rounded">
+        <p className="text-white font-mono text-sm font-bold">Terminal render failed</p>
+        <p className="text-zinc-400 text-xs">{String((err as any)?.message || err)}</p>
+      </div>
+    );
+  }
+
   return (
     <TerminalErrorBoundary>
     <div className="space-y-6">
@@ -2909,7 +2931,7 @@ export default function TradingTerminal({
         </div>
       </div>
 
-      {(!demoMode && !isLogged) ? renderPrompt() : renderWorkspace()}
+      {terminalRenderFallback}
 
       {showLivePrompt && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
