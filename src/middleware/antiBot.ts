@@ -68,6 +68,11 @@ const BLOCKED_IPS = new Set<string>([
 
 // ── 5. Main anti-bot middleware ───────────────────────────────────────────────
 export function antiBotMiddleware(req: Request, res: Response, next: NextFunction): void {
+  // Always allow health checks and API routes without bot filtering
+  if (req.path === "/api/health" || req.path.startsWith("/api/")) {
+    return next();
+  }
+
   const ip = (
     req.headers["x-forwarded-for"]?.toString().split(",")[0].trim() ||
     req.socket.remoteAddress ||
