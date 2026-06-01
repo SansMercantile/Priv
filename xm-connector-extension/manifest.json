@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "SANS PRIV XM Connector",
+  "version": "1.0.0",
+  "description": "Automatically synchronizes XM session tokens with the PRIV Core Execution Engine.",
+  "permissions": ["cookies", "storage", "tabs"],
+  "host_permissions": [
+    "https://my.xm.com/*",
+    "http://localhost:3000/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://my.xm.com/member/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "PRIV XM Connector"
+  }
+}

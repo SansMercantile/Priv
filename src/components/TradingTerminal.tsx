@@ -1350,6 +1350,22 @@ export default function TradingTerminal({
       runAutonomousTradeCycle();
     }, 2000);
 
+    // Poll for automatic authentication from the XM Connector extension
+    const authPollTimer = setInterval(async () => {
+      if (!isLogged) {
+        const activeId = localStorage.getItem("xm_account_id");
+        if (activeId) {
+          try {
+            const res = await fetch(`/api/brokers/registered/xm_user_account_${activeId}`);
+            const data = await res.json();
+            if (data.broker && data.broker.session_validated) {
+              setExecutionLogs(prev => [`[${new Date().toLocaleTimeString()}] ⚡ Automatic session detected via XM Connector. Ready to sync.`, ...prev]);
+            }
+          } catch (e) { /* silent poll */ }
+        }
+      }
+    }, 5000);
+
     // Run trade cycle periodically every 28 seconds
     const intervalTimer = setInterval(() => {
       runAutonomousTradeCycle();
