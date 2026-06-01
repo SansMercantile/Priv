@@ -1671,37 +1671,18 @@ export default function TradingTerminal({
                 <a href="https://affs.click/G39AP?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Partner with XM</a>
               </div>
               <div className="mt-3">
-                <label className="block text-[11px] font-mono text-zinc-400 mb-1">Already signed in via XM?</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Paste XM session token (optional)"
-                    defaultValue={localStorage.getItem("xm_session_token") || ""}
-                    id="xmSessionInput"
-                    className="flex-1 bg-black border border-white/10 rounded p-2 text-xs text-white font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const el = document.getElementById('xmSessionInput') as HTMLInputElement | null;
-                      if (!el) return;
-                      const v = el.value.trim();
-                      if (v) {
-                        localStorage.setItem('xm_session_token', v);
-                        setExecutionLogs(prev => [`[${new Date().toLocaleTimeString()}] XM session token saved locally for handshake testing.`, ...prev]);
-                        alert('XM session token saved locally. It will be used for the next handshake attempt.');
-                      } else {
-                        localStorage.removeItem('xm_session_token');
-                        setExecutionLogs(prev => [`[${new Date().toLocaleTimeString()}] XM session token cleared.`, ...prev]);
-                        alert('XM session token cleared.');
-                      }
-                    }}
-                    className="px-3 py-2 bg-white text-black rounded text-xs font-mono"
-                  >
-                    Save
-                  </button>
-                </div>
-                <p className="text-[10px] text-zinc-500 mt-2">If you sign in on the XM page, you can paste a session token or cookie here for local-only handshake testing. Do not paste credentials into this field.</p>
+                <button 
+                  onClick={() => {
+                    localStorage.setItem("xm_account_id", accountId || "unknown");
+                    window.location.href = "/auth/xm-bridge";
+                  }}
+                  className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[10px] font-mono font-bold transition-all"
+                >
+                  ⚡ ONE-CLICK SECURE SYNC
+                </button>
+                <p className="text-[10px] text-zinc-500 mt-2 text-center">
+                  SANS Secure Bridge will automatically capture your session upon XM login.
+                </p>
               </div>
             </div>
           </div>

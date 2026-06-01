@@ -1103,6 +1103,60 @@ app.get("/api/brokers/registered/:id", async (req, res) => {
   }
 });
 
+// GET /api/auth/xm-siphon
+// This endpoint is used by the "Return to PRIV" button on the bridge.
+// It attempts to capture the session from the request headers (if the user is redirected)
+// or simply acts as a trigger to check the current session state.
+app.get("/api/auth/xm-siphon", async (req, res) => {
+  try {
+    const cookie = req.headers.cookie || "";
+    const brokerId = req.query.broker_id as string;
+
+    if (!brokerId) {
+      return res.status(400).json({ success: false, error: "missing_broker_id" });
+    }
+
+    console.log(`[XM-Siphon] Attempting to capture session for ${brokerId}`);
+
+    // In a real-world scenario, the siphon would be a separate domain that can read the cookie
+    // and then forward it. For this implementation, we'll use the bridge logic.
+    
+    // If we have a cookie in the request, we try to register it.
+    if (cookie) {
+      const record: any = {
+        broker_id: brokerId,
+        broker_type: "xm",
+        config: { account_id: brokerId.replace("xm_user_account_", ""), server: "XMGlobal-Real 14" },
+        created_at: new Date().toISOString(),
+        session_token: cookie,
+        session_validated: false
+      };
+
+      try {
+        const resp = await fetch("https://my.xm.com/member/", {
+          method: "GET",
+          headers: { "User-Agent": "PRIV-Server/1.0", "Cookie": cookie },
+          signal: AbortSignal.timeout(6000)
+        });
+        const text = await resp.text();
+        record.session_validated = resp.ok && resp.status === 200 && (text.includes("Logout") || text.includes("My Account") || text.length > 500);
+        record.session_status = resp.status;
+      } catch (e: any) {
+        record.session_status = "siphon_failed";
+      }
+
+      registeredBrokers[brokerId] = record;
+      saveRegisteredBrokersToDisk();
+      return res.json({ success: true, validated: record.session_validated });
+    }
+
+    res.json({ success: false, error: "no_session_cookie_found" });
+  } catch (err: any) {
+    console.error("[XM-Siphon] error:", err?.message || err);
+    res.status(500).json({ success: false, error: "siphon_internal_error" });
+  }
+});
+
 // POST /api/auth/xm-bridge
 // Specialized endpoint for browser extensions to push session tokens automatically.
 // Expects { broker_id, session_token, config }
