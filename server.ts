@@ -20,6 +20,7 @@ try {
 }
 
 import express from "express";
+import fs from "fs";
 import path from "path";
 import { GoogleGenAI } from "@google/genai";
 // NOTE: vite imported dynamically inside the dev-only branch below
@@ -1616,7 +1617,11 @@ async function startServer() {
 
     // SPA fallback for client-side routing during development
     app.use(async (req, res, next) => {
-      if (req.method !== "GET" || req.path.startsWith("/api/")) {
+      if (
+        req.method !== "GET" ||
+        req.path.startsWith("/api/") ||
+        path.extname(req.path)
+      ) {
         return next();
       }
       try {
