@@ -1650,12 +1650,12 @@ export default function TradingTerminal({
                 <ArrowUpRight className="w-4 h-4 ml-2 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
               </a>
               <div className="mt-2 text-[11px] text-zinc-500 font-mono flex items-center gap-3">
-                <a href="https://affs.click/Eamrl?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Affiliate Homepage</a>
+                <a href="https://affs.click/Eamrl?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Homepage</a>
                 <a href="https://affs.click/Gwdle?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Mobile App</a>
-                <a href="https://affs.click/G39AP?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Become Sub-affiliate</a>
+                <a href="https://affs.click/G39AP?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Partner with XM</a>
               </div>
               <div className="mt-3">
-                <label className="block text-[11px] font-mono text-zinc-400 mb-1">Already signed in via affiliate?</label>
+                <label className="block text-[11px] font-mono text-zinc-400 mb-1">Already signed in via XM?</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -1766,7 +1766,7 @@ export default function TradingTerminal({
                 )}
               </button>
               <div className="mt-2 text-[11px] text-zinc-500 font-mono">
-                <a href="https://affs.click/Eamrl?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Sign in via XM (Affiliate Login)</a>
+                <a href="https://affs.click/Eamrl?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Sign in via XM</a>
               </div>
             </form>
           </div>

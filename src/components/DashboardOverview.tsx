@@ -419,9 +419,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
               <ArrowUpRight className="w-3.5 h-3.5" />
             </a>
             <div className="mt-2 text-[11px] text-zinc-500 font-mono flex items-center gap-3 justify-center">
-              <a href="https://affs.click/Eamrl?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Affiliate Homepage</a>
+              <a href="https://affs.click/Eamrl?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Homepage</a>
               <a href="https://affs.click/Gwdle?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Mobile App</a>
-              <a href="https://affs.click/G39AP?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Become Sub-affiliate</a>
+              <a href="https://affs.click/G39AP?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Partner with XM</a>
             </div>
             <button
               onClick={() => {
