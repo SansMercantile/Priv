@@ -321,6 +321,43 @@ const getDynamicIntel = (sym: string): InstrumentIntel => {
   };
 };
 
+// ── Error Boundary — prevents blank screen on any runtime crash ──────────────
+class TerminalErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: string }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: "" };
+  }
+  static getDerivedStateFromError(err: Error) {
+    return { hasError: true, error: err.message };
+  }
+  componentDidCatch(err: Error, info: React.ErrorInfo) {
+    console.error("[TradingTerminal]", err, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[400px] bg-zinc-950 rounded-xl border border-zinc-800 p-8 text-center">
+          <div className="w-12 h-12 rounded-full bg-rose-950/40 border border-rose-800/50 flex items-center justify-center mb-4">
+            <span className="text-rose-400 text-xl">⚠</span>
+          </div>
+          <p className="text-white font-mono text-sm font-bold mb-2">Terminal Error</p>
+          <p className="text-zinc-400 font-mono text-xs mb-4 max-w-md">{this.state.error}</p>
+          <button
+            onClick={() => { this.setState({ hasError: false, error: "" }); }}
+            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-mono text-xs rounded-lg border border-zinc-700 transition"
+          >
+            Reload Terminal
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function TradingTerminal({ 
   demoMode, 
   setDemoMode 
@@ -471,6 +508,56 @@ export default function TradingTerminal({
   const [accountType, setAccountType] = useState<"LIVE" | "DEMO">("DEMO");
 
   const [showLivePrompt, setShowLivePrompt] = useState<boolean>(false);
+
+  // ── Multi-account routing state ──────────────────────────────────────────
+  // These power the XM / Binance / Coinbase tab switcher.
+  // Missing declarations were the root cause of the blank-screen crash.
+  const [activeTradingAccount, setActiveTradingAccount] = useState<"XM" | "BINANCE" | "COINBASE">(() => {
+    return (localStorage.getItem("xm_active_account") as "XM" | "BINANCE" | "COINBASE") || "XM";
+  });
+  useEffect(() => {
+    localStorage.setItem("xm_active_account", activeTradingAccount);
+  }, [activeTradingAccount]);
+
+  // XM account state (mirrors the main positions/balance/history for XM tab)
+  const [xmPositions, setXmPositions] = useState<OpenPosition[]>(() => {
+    try { return JSON.parse(localStorage.getItem("xm_positions") || "[]"); } catch { return []; }
+  });
+  const [xmBalance, setXmBalance] = useState<number>(() =>
+    parseFloat(localStorage.getItem("xm_balance") || (demoMode ? "10000" : "0"))
+  );
+  const [xmHistory, setXmHistory] = useState<HistoricalTrade[]>([]);
+
+  // Binance account state
+  const [binancePositions, setBinancePositions] = useState<OpenPosition[]>(() => {
+    try { return JSON.parse(localStorage.getItem("binance_positions") || "[]"); } catch { return []; }
+  });
+  const [binanceBalance, setBinanceBalance] = useState<number>(() =>
+    parseFloat(localStorage.getItem("binance_balance") || "0")
+  );
+  const [binanceHistory, setBinanceHistory] = useState<HistoricalTrade[]>([]);
+
+  // Coinbase account state
+  const [coinbasePositions, setCoinbasePositions] = useState<OpenPosition[]>(() => {
+    try { return JSON.parse(localStorage.getItem("coinbase_positions") || "[]"); } catch { return []; }
+  });
+  const [coinbaseBalance, setCoinbaseBalance] = useState<number>(() =>
+    parseFloat(localStorage.getItem("coinbase_balance") || "0")
+  );
+  const [coinbaseHistory, setCoinbaseHistory] = useState<HistoricalTrade[]>([]);
+
+  // Keep XM state in sync with the main positions/balance (they share the same account)
+  useEffect(() => { setXmPositions(positions); }, [positions]);
+  useEffect(() => { setXmBalance(balance); }, [balance]);
+  useEffect(() => { setXmHistory(history); }, [history]);
+
+  // Persist Binance + Coinbase positions
+  useEffect(() => {
+    localStorage.setItem("binance_positions", JSON.stringify(binancePositions));
+  }, [binancePositions]);
+  useEffect(() => {
+    localStorage.setItem("coinbase_positions", JSON.stringify(coinbasePositions));
+  }, [coinbasePositions]);
 
   // Sync accountType form option with global demoMode changes
   useEffect(() => {
@@ -2787,6 +2874,7 @@ export default function TradingTerminal({
   };
 
   return (
+    <TerminalErrorBoundary>
     <div className="space-y-6">
       {/* Ticker Tape Top Bar */}
       <div className="w-full bg-neutral-950/80 backdrop-blur border border-white/5 rounded-lg overflow-hidden h-14 p-1">
@@ -2882,5 +2970,6 @@ export default function TradingTerminal({
         </div>
       )}
     </div>
+    </TerminalErrorBoundary>
   );
 }
