@@ -117,19 +117,27 @@ import crypto from "crypto";
 const BROKER_STORE_PATH = path.join(process.cwd(), "data", "brokers.store");
 const BROKER_STORE_KEY = process.env.BROKER_STORE_KEY || process.env.PRIV_BROKER_STORE_KEY || "";
 
+// Enforce presence of a strong broker store key. Plaintext fallback is unsafe.
+if (!BROKER_STORE_KEY || BROKER_STORE_KEY.trim() === "" || BROKER_STORE_KEY.length < 32) {
+  console.error("[Brokers] BROKER_STORE_KEY is missing or too short. Set BROKER_STORE_KEY (base64 or secret) and restart.");
+  // Fail fast to avoid accidentally persisting plaintext secrets.
+  process.exit(1);
+}
 function ensureDataDir() {
   const dir = path.dirname(BROKER_STORE_PATH);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
 function encryptBuffer(buf: Buffer): { iv: string; authTag?: string; data: string } {
-  if (!BROKER_STORE_KEY || BROKER_STORE_KEY.length < 32) {
-    // No strong key provided — fallback to plaintext storage (not recommended)
-    return { iv: "", data: buf.toString("utf8") };
-  }
-  const key = Buffer.from(BROKER_STORE_KEY, "base64").length === 32
-    ? Buffer.from(BROKER_STORE_KEY, "base64")
-    : crypto.createHash("sha256").update(BROKER_STORE_KEY).digest();
+  // By this point BROKER_STORE_KEY is enforced to exist and be non-trivial
+  const key = ((): Buffer => {
+    try {
+      const b = Buffer.from(BROKER_STORE_KEY, "base64");
+      return b.length === 32 ? b : crypto.createHash("sha256").update(BROKER_STORE_KEY).digest();
+    } catch (e) {
+      return crypto.createHash("sha256").update(BROKER_STORE_KEY).digest();
+    }
+  })();
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
   const encrypted = Buffer.concat([cipher.update(buf), cipher.final()]);
@@ -138,17 +146,22 @@ function encryptBuffer(buf: Buffer): { iv: string; authTag?: string; data: strin
 }
 
 function decryptObject(payload: { iv?: string; authTag?: string; data: string }): Buffer {
-  if (!BROKER_STORE_KEY || BROKER_STORE_KEY.length < 32 || !payload.iv) {
-    // Stored as plaintext
-    return Buffer.from(payload.data, "utf8");
+  // Do not accept plaintext stores anymore — require IV + authTag
+  if (!payload.iv || !payload.authTag) {
+    throw new Error("Encrypted broker store is missing IV/authTag — plaintext stores are no longer supported.");
   }
-  const key = Buffer.from(BROKER_STORE_KEY, "base64").length === 32
-    ? Buffer.from(BROKER_STORE_KEY, "base64")
-    : crypto.createHash("sha256").update(BROKER_STORE_KEY).digest();
+  const key = ((): Buffer => {
+    try {
+      const b = Buffer.from(BROKER_STORE_KEY, "base64");
+      return b.length === 32 ? b : crypto.createHash("sha256").update(BROKER_STORE_KEY).digest();
+    } catch (e) {
+      return crypto.createHash("sha256").update(BROKER_STORE_KEY).digest();
+    }
+  })();
   const iv = Buffer.from(payload.iv, "base64");
   const encrypted = Buffer.from(payload.data, "base64");
   const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
-  if (payload.authTag) decipher.setAuthTag(Buffer.from(payload.authTag, "base64"));
+  decipher.setAuthTag(Buffer.from(payload.authTag, "base64"));
   const out = Buffer.concat([decipher.update(encrypted), decipher.final()]);
   return out;
 }
@@ -1023,11 +1036,15 @@ app.post("/api/brokers/register", async (req, res) => {
           },
           signal: AbortSignal.timeout(6000)
         });
-
-        const valid = resp.ok && resp.status === 200;
+        const replyText = await resp.text();
+        // Heuristic validation: XM member pages include account UI when session is valid.
+        const validated = resp.ok && resp.status === 200 && (
+          replyText.includes("Logout") || replyText.includes("Sign out") || replyText.includes("My Account") || replyText.length > 500
+        );
         record.session_token = session_token; // stored in-memory for demo only
-        record.session_validated = valid;
+        record.session_validated = validated;
         record.session_status = resp.status;
+        record.session_probe_snippet = replyText.substring(0, 1024);
       } catch (err: any) {
         // Do not reveal token contents in logs
         console.warn("[Brokers] session_token validation request failed:", err?.message || err);
@@ -1043,6 +1060,97 @@ app.post("/api/brokers/register", async (req, res) => {
   } catch (err: any) {
     console.error("/api/brokers/register error:", err?.message || err);
     return res.status(500).json({ success: false, error: "internal_server_error" });
+  }
+});
+
+// GET /api/brokers/registered/:id
+// Returns stored broker record and performs optional server-side probes using stored session_token
+app.get("/api/brokers/registered/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const record = registeredBrokers[id];
+    if (!record) return res.status(404).json({ success: false, error: "not_found" });
+
+    const out: any = { broker: { ...record, session_token_present: !!record.session_token } };
+
+    if (record.session_token) {
+      try {
+        const acc = await fetch("https://my.xm.com/member/account", {
+          method: "GET",
+          headers: { "User-Agent": "PRIV-Server/1.0", "Accept": "text/html", "Cookie": record.session_token },
+          signal: AbortSignal.timeout(7000)
+        });
+        const accText = await acc.text();
+        out.xm_account = { status: acc.status, ok: acc.ok, snippet: accText.substring(0, 1024) };
+
+        const orders = await fetch("https://my.xm.com/member/orders", {
+          method: "GET",
+          headers: { "User-Agent": "PRIV-Server/1.0", "Accept": "text/html", "Cookie": record.session_token },
+          signal: AbortSignal.timeout(7000)
+        });
+        const ordersText = await orders.text();
+        out.xm_orders = { status: orders.status, ok: orders.ok, snippet: ordersText.substring(0, 1024) };
+      } catch (e: any) {
+        console.warn("[Brokers] xm probe failed for", id, e?.message || e);
+        out.xm_probe_error = String(e?.message || e);
+      }
+    }
+
+    res.json(out);
+  } catch (e: any) {
+    console.error("/api/brokers/registered/:id error", e?.message || e);
+    res.status(500).json({ success: false, error: "internal_error" });
+  }
+});
+
+// POST /api/brokers/registered/:id/token  — rotate/update session token
+app.post("/api/brokers/registered/:id/token", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { session_token } = req.body || {};
+    if (!session_token) return res.status(400).json({ success: false, error: "missing_session_token" });
+    const record = registeredBrokers[id];
+    if (!record) return res.status(404).json({ success: false, error: "not_found" });
+
+    // Validate new token before storing
+    try {
+      const resp = await fetch("https://my.xm.com/member/", {
+        method: "GET",
+        headers: { "User-Agent": "PRIV-Server/1.0", "Accept": "text/html", "Cookie": session_token },
+        signal: AbortSignal.timeout(6000)
+      });
+      const txt = await resp.text();
+      const validated = resp.ok && resp.status === 200 && (txt.includes("Logout") || txt.includes("My Account") || txt.length > 500);
+      record.session_token = session_token;
+      record.session_validated = validated;
+      record.session_status = resp.status;
+      record.session_probe_snippet = txt.substring(0, 1024);
+      saveRegisteredBrokersToDisk();
+      return res.json({ success: true, validated });
+    } catch (err: any) {
+      console.warn("[Brokers] session_token validation failed on rotate:", err?.message || err);
+      return res.status(502).json({ success: false, error: "validation_failed", detail: String(err?.message || err) });
+    }
+  } catch (err: any) {
+    console.error("/api/brokers/registered/:id/token error", err?.message || err);
+    res.status(500).json({ success: false, error: "internal_error" });
+  }
+});
+
+// DELETE /api/brokers/registered/:id/token  — remove stored session token
+app.delete("/api/brokers/registered/:id/token", (req, res) => {
+  try {
+    const id = req.params.id;
+    const record = registeredBrokers[id];
+    if (!record) return res.status(404).json({ success: false, error: "not_found" });
+    delete record.session_token;
+    record.session_validated = false;
+    record.session_status = "deleted";
+    try { saveRegisteredBrokersToDisk(); } catch (e) { console.warn("[Brokers] persist warning:", e?.message || e); }
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("DELETE /api/brokers/registered/:id/token error", err?.message || err);
+    res.status(500).json({ success: false, error: "internal_error" });
   }
 });
 
