@@ -2,20 +2,27 @@
   "manifest_version": 3,
   "name": "SANS PRIV XM Connector",
   "version": "1.0.0",
-  "description": "Automatically synchronizes XM session tokens with the PRIV Core Execution Engine.",
+  "description": "Official secure synchronization bridge for the SANS PRIV Core Execution Engine. Automatically links your XM Global trading session to your PRIV dashboard for real-time ledger synchronization.",
   "permissions": ["cookies", "storage", "tabs"],
   "host_permissions": [
     "https://my.xm.com/*",
-    "http://localhost:3000/*"
+    "http://localhost:3000/*",
+    "https://*.priv-core.io/*"
   ],
+  "action": {
+    "default_title": "SANS PRIV Connector",
+    "default_popup": "popup.html"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "content_scripts": [
     {
       "matches": ["https://my.xm.com/member/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
-  ],
-  "action": {
-    "default_title": "PRIV XM Connector"
-  }
+  ]
 }

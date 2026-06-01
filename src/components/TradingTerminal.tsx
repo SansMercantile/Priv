@@ -1670,16 +1670,26 @@ export default function TradingTerminal({
                 <a href="https://affs.click/Gwdle?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Mobile App</a>
                 <a href="https://affs.click/G39AP?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Partner with XM</a>
               </div>
-              <div className="mt-3">
-                <button 
-                  onClick={() => {
-                    localStorage.setItem("xm_account_id", accountId || "unknown");
-                    window.location.href = "/auth/xm-bridge";
-                  }}
-                  className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[10px] font-mono font-bold transition-all"
-                >
-                  SYNC Your XM account
-                </button>
+              <div className="mt-3 space-y-3">
+                <div className="p-3 bg-black/40 border border-white/10 rounded-lg space-y-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">SANS XM Connector</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 animate-pulse" />
+                      <span className="text-[9px] text-zinc-500 font-mono">Inactive</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      localStorage.setItem("xm_account_id", accountId || "unknown");
+                      window.location.href = "/auth/xm-bridge";
+                    }}
+                    className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[10px] font-mono font-bold transition-all flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    SYNC XM ACCOUNT
+                  </button>
+                </div>
                 <p className="text-[10px] text-zinc-500 mt-2 text-center">
                   SANS Secure Bridge will automatically capture your session upon XM login.
                 </p>
