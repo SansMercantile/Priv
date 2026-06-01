@@ -1613,6 +1613,22 @@ async function startServer() {
       appType: "spa",
     });
     app.use(vite.middlewares);
+
+    // SPA fallback for client-side routing during development
+    app.use(async (req, res, next) => {
+      if (req.method !== "GET" || req.path.startsWith("/api/")) {
+        return next();
+      }
+      try {
+        const html = fs.readFileSync(path.resolve(process.cwd(), "index.html"), "utf-8");
+        const transformed = await vite.transformIndexHtml(req.originalUrl, html);
+        res.status(200).set({ "Content-Type": "text/html" }).end(transformed);
+      } catch (err) {
+        vite.ssrFixStacktrace(err);
+        next(err);
+      }
+    });
+
     console.log("Vite development server mounted successfully.");
   } else {
     const distPath = path.join(process.cwd(), "dist");
