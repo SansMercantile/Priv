@@ -1387,20 +1387,27 @@ export default function TradingTerminal({
 
     const finalBrokerId = "xm_user_account_" + accountId;
 
+    // If a local XM session token was saved (for local-only testing), include it in the payload
+    const localSessionToken = localStorage.getItem('xm_session_token');
+    const registerPayload: any = {
+      broker_id: finalBrokerId,
+      broker_type: "xm",
+      config: {
+        account_id: accountId,
+        password: password,
+        server: server,
+        leverage: leverage,
+        is_live: !demoMode
+      }
+    };
+    if (localSessionToken) {
+      registerPayload.session_token = localSessionToken;
+    }
+
     fetch("/api/brokers/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        broker_id: finalBrokerId,
-        broker_type: "xm",
-        config: {
-          account_id: accountId,
-          password: password,
-          server: server,
-          leverage: leverage,
-          is_live: !demoMode
-        }
-      })
+      body: JSON.stringify(registerPayload)
     })
     .then(async res => {
       if (!res.ok) {
@@ -1634,7 +1641,7 @@ export default function TradingTerminal({
                 Register a real secure trading account via our official introducing broker link to obtain ultra-low spreads, XM leverage multipliers up to 1:1000, and integrated privileges.
               </p>
               <a
-                href="https://affs.click/Ddvn7"
+                href="https://affs.click/Ddvn7?partner=BHWVC"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-between w-full bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-white hover:to-white hover:text-black hover:border-white text-white font-mono font-bold text-xs py-3.5 px-4 rounded border border-white/10 transition-all duration-300 shadow group cursor-pointer"
@@ -1642,6 +1649,44 @@ export default function TradingTerminal({
                 <span>CREATE REAL XM ACCOUNT</span>
                 <ArrowUpRight className="w-4 h-4 ml-2 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
               </a>
+              <div className="mt-2 text-[11px] text-zinc-500 font-mono flex items-center gap-3">
+                <a href="https://affs.click/Eamrl?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Affiliate Homepage</a>
+                <a href="https://affs.click/Gwdle?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Mobile App</a>
+                <a href="https://affs.click/G39AP?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Become Sub-affiliate</a>
+              </div>
+              <div className="mt-3">
+                <label className="block text-[11px] font-mono text-zinc-400 mb-1">Already signed in via affiliate?</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Paste XM session token (optional)"
+                    defaultValue={localStorage.getItem("xm_session_token") || ""}
+                    id="xmSessionInput"
+                    className="flex-1 bg-black border border-white/10 rounded p-2 text-xs text-white font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = document.getElementById('xmSessionInput') as HTMLInputElement | null;
+                      if (!el) return;
+                      const v = el.value.trim();
+                      if (v) {
+                        localStorage.setItem('xm_session_token', v);
+                        setExecutionLogs(prev => [`[${new Date().toLocaleTimeString()}] XM session token saved locally for handshake testing.`, ...prev]);
+                        alert('XM session token saved locally. It will be used for the next handshake attempt.');
+                      } else {
+                        localStorage.removeItem('xm_session_token');
+                        setExecutionLogs(prev => [`[${new Date().toLocaleTimeString()}] XM session token cleared.`, ...prev]);
+                        alert('XM session token cleared.');
+                      }
+                    }}
+                    className="px-3 py-2 bg-white text-black rounded text-xs font-mono"
+                  >
+                    Save
+                  </button>
+                </div>
+                <p className="text-[10px] text-zinc-500 mt-2">If you sign in on the XM page, you can paste a session token or cookie here for local-only handshake testing. Do not paste credentials into this field.</p>
+              </div>
             </div>
           </div>
 
@@ -1720,6 +1765,9 @@ export default function TradingTerminal({
                   </>
                 )}
               </button>
+              <div className="mt-2 text-[11px] text-zinc-500 font-mono">
+                <a href="https://affs.click/Eamrl?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Sign in via XM (Affiliate Login)</a>
+              </div>
             </form>
           </div>
         </div>
@@ -1881,6 +1929,9 @@ export default function TradingTerminal({
                       </>
                     )}
                   </button>
+                    <div className="mt-2 text-[11px] text-zinc-500 font-mono">
+                      <a href="https://affs.click/Eamrl?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Sign in via XM (Affiliate Login)</a>
+                    </div>
                 </form>
               ) : (
                 /* Logged In Dashboard Core view */

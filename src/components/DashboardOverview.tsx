@@ -410,7 +410,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
 
           <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
             <a
-              href="https://affs.click/Ddvn7"
+              href="https://affs.click/Ddvn7?partner=BHWVC"
               target="_blank"
               rel="noopener noreferrer"
               className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-mono font-bold text-xs rounded border border-white/10 transition-all duration-300 flex items-center justify-center space-x-2 cursor-pointer"
@@ -418,6 +418,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
               <span>CREATE XM ACCOUNT</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
             </a>
+            <div className="mt-2 text-[11px] text-zinc-500 font-mono flex items-center gap-3 justify-center">
+              <a href="https://affs.click/Eamrl?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Affiliate Homepage</a>
+              <a href="https://affs.click/Gwdle?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Mobile App</a>
+              <a href="https://affs.click/G39AP?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Become Sub-affiliate</a>
+            </div>
             <button
               onClick={() => {
                 navigate("/dashboard/terminal");

@@ -108,6 +108,82 @@ app.get("/api/health", (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 const kycStore: Record<string, any> = {}; // keyed by email
 
+// In-memory registry of brokers for dev/testing. In production, persist securely.
+let registeredBrokers: Record<string, any> = {};
+
+// --- Persistence helpers for registered brokers (encrypted at rest) ---
+import crypto from "crypto";
+
+const BROKER_STORE_PATH = path.join(process.cwd(), "data", "brokers.store");
+const BROKER_STORE_KEY = process.env.BROKER_STORE_KEY || process.env.PRIV_BROKER_STORE_KEY || "";
+
+function ensureDataDir() {
+  const dir = path.dirname(BROKER_STORE_PATH);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
+
+function encryptBuffer(buf: Buffer): { iv: string; authTag?: string; data: string } {
+  if (!BROKER_STORE_KEY || BROKER_STORE_KEY.length < 32) {
+    // No strong key provided — fallback to plaintext storage (not recommended)
+    return { iv: "", data: buf.toString("utf8") };
+  }
+  const key = Buffer.from(BROKER_STORE_KEY, "base64").length === 32
+    ? Buffer.from(BROKER_STORE_KEY, "base64")
+    : crypto.createHash("sha256").update(BROKER_STORE_KEY).digest();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update(buf), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return { iv: iv.toString("base64"), authTag: authTag.toString("base64"), data: encrypted.toString("base64") };
+}
+
+function decryptObject(payload: { iv?: string; authTag?: string; data: string }): Buffer {
+  if (!BROKER_STORE_KEY || BROKER_STORE_KEY.length < 32 || !payload.iv) {
+    // Stored as plaintext
+    return Buffer.from(payload.data, "utf8");
+  }
+  const key = Buffer.from(BROKER_STORE_KEY, "base64").length === 32
+    ? Buffer.from(BROKER_STORE_KEY, "base64")
+    : crypto.createHash("sha256").update(BROKER_STORE_KEY).digest();
+  const iv = Buffer.from(payload.iv, "base64");
+  const encrypted = Buffer.from(payload.data, "base64");
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+  if (payload.authTag) decipher.setAuthTag(Buffer.from(payload.authTag, "base64"));
+  const out = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+  return out;
+}
+
+function saveRegisteredBrokersToDisk() {
+  try {
+    ensureDataDir();
+    const json = JSON.stringify(registeredBrokers, null, 2);
+    const payload = encryptBuffer(Buffer.from(json, "utf8"));
+    fs.writeFile(BROKER_STORE_PATH, JSON.stringify(payload), { encoding: "utf8" }, (err) => {
+      if (err) console.error("[Brokers] failed to persist store:", err);
+    });
+  } catch (e) {
+    console.error("[Brokers] save error:", e);
+  }
+}
+
+function loadRegisteredBrokersFromDisk() {
+  try {
+    if (!fs.existsSync(BROKER_STORE_PATH)) return;
+    const raw = fs.readFileSync(BROKER_STORE_PATH, { encoding: "utf8" });
+    const payload = JSON.parse(raw);
+    const buf = decryptObject(payload);
+    const obj = JSON.parse(buf.toString("utf8"));
+    registeredBrokers = obj || {};
+    console.log(`[Brokers] Loaded ${Object.keys(registeredBrokers).length} broker(s) from disk.`);
+  } catch (e) {
+    console.warn("[Brokers] failed to load persisted store, starting fresh:", e?.message || e);
+    registeredBrokers = {};
+  }
+}
+
+// attempt load at startup
+try { loadRegisteredBrokersFromDisk(); } catch (e) { /* already handled */ }
+
 function kycKey(req: any): string {
   // Prefer authenticated user id header; fall back to body email
   return req.headers["x-user-id"] || req.body?.contact?.email || "anonymous";
@@ -917,6 +993,59 @@ Your primary task is to receive active balance, news, and the user's specific cu
   }
 });
 
+// POST /api/brokers/register
+// Accepts optional `session_token` field (cookie string) which will be used
+// by the server for subsequent broker calls to the provider (best-effort).
+app.post("/api/brokers/register", async (req, res) => {
+  try {
+    const { broker_id, broker_type, config, session_token } = req.body || {};
+    if (!broker_id || !broker_type || !config) {
+      return res.status(400).json({ success: false, error: "Missing broker_id, broker_type or config in body." });
+    }
+
+    // Minimal validation - do not log sensitive tokens
+    const record: any = {
+      broker_id,
+      broker_type,
+      config: { ...config },
+      created_at: new Date().toISOString()
+    };
+
+    if (session_token) {
+      // Attempt a lightweight validation request to XM using provided cookie string.
+      try {
+        const resp = await fetch("https://my.xm.com/member/", {
+          method: "GET",
+          headers: {
+            "User-Agent": "PRIV-Server/1.0",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Cookie": session_token
+          },
+          signal: AbortSignal.timeout(6000)
+        });
+
+        const valid = resp.ok && resp.status === 200;
+        record.session_token = session_token; // stored in-memory for demo only
+        record.session_validated = valid;
+        record.session_status = resp.status;
+      } catch (err: any) {
+        // Do not reveal token contents in logs
+        console.warn("[Brokers] session_token validation request failed:", err?.message || err);
+        record.session_validated = false;
+        record.session_status = "fetch_failed";
+      }
+    }
+
+    registeredBrokers[broker_id] = record;
+    // persist to disk (best-effort)
+    try { saveRegisteredBrokersToDisk(); } catch (e) { console.warn("[Brokers] persist warning:", e?.message || e); }
+    return res.json({ success: true, registered: true, broker_id, session_validated: !!record.session_validated });
+  } catch (err: any) {
+    console.error("/api/brokers/register error:", err?.message || err);
+    return res.status(500).json({ success: false, error: "internal_server_error" });
+  }
+});
+
 // --- SANS SECURE KYC COMPLIANCE LEDGER BACKEND ENDPOINTS ---
 let userKycDraft: any = {};
 let kycApplications: any[] = [
@@ -1496,6 +1625,14 @@ app.all(["/api/v1/*", "/api/brokers/*", "/healthz", "/readyz", "/users"], async 
     }
 
     if (path.includes("/api/brokers/register")) {
+      const ids = Object.keys(registeredBrokers || {});
+      if (ids.length > 0) {
+        return res.status(200).json({
+          success: true,
+          message: "Registered brokers available.",
+          brokers: ids
+        });
+      }
       return res.status(200).json({
         success: true,
         message: "Unified broker successfully registered on sovereign gateway routing server."
