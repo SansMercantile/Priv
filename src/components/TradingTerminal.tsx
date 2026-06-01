@@ -546,11 +546,6 @@ export default function TradingTerminal({
   );
   const [coinbaseHistory, setCoinbaseHistory] = useState<HistoricalTrade[]>([]);
 
-  // Keep XM state in sync with the main positions/balance (they share the same account)
-  useEffect(() => { setXmPositions(positions); }, [positions]);
-  useEffect(() => { setXmBalance(balance); }, [balance]);
-  useEffect(() => { setXmHistory(history); }, [history]);
-
   // Persist Binance + Coinbase positions
   useEffect(() => {
     localStorage.setItem("binance_positions", JSON.stringify(binancePositions));
@@ -617,6 +612,10 @@ export default function TradingTerminal({
     }
   });
 
+  // Keep XM state in sync with the main positions/balance (they share the same account)
+  useEffect(() => { setXmPositions(positions); }, [positions]);
+  useEffect(() => { setXmBalance(balance); }, [balance]);
+
   // Sync positions to localStorage whenever they update
   useEffect(() => {
     localStorage.setItem("xm_positions", JSON.stringify(positions));
@@ -682,6 +681,7 @@ export default function TradingTerminal({
   }, [balance, positions, autoLogs]);
 
   const [history, setHistory] = useState<HistoricalTrade[]>([]);
+  useEffect(() => { setXmHistory(history); }, [history]);
   const [executionLogs, setExecutionLogs] = useState<string[]>([]);
 
   // Order placing sub-states
