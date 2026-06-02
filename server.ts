@@ -19,7 +19,7 @@ try {
   console.warn("[SANS Datadog] dd-trace not available — APM disabled:", err.message || err);
 }
 
-import express from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import fs from "fs";
 import path from "path";
 import { GoogleGenAI } from "@google/genai";
@@ -47,7 +47,7 @@ const ALLOWED_ORIGINS = [
   /^http:\/\/127\.0\.0\.1:\d+$/,
 ];
 
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin || "";
   const allowed = ALLOWED_ORIGINS.some(pattern => pattern.test(origin));
   if (allowed) {
@@ -1129,7 +1129,11 @@ app.post("/api/brokers/register", async (req, res) => {
 
     registeredBrokers[broker_id] = record;
     // persist to disk (best-effort)
-    try { saveRegisteredBrokersToDisk(); } catch (e) { console.warn("[Brokers] persist warning:", e?.message || e); }
+    try {
+      saveRegisteredBrokersToDisk();
+    } catch (e: unknown) {
+      console.warn("[Brokers] persist warning:", e instanceof Error ? e.message : e);
+    }
     return res.json({ success: true, registered: true, broker_id, session_validated: !!record.session_validated });
   } catch (err: any) {
     console.error("/api/brokers/register error:", err?.message || err);
@@ -2068,6 +2072,7 @@ async function startServer() {
 
   if (process.env.NODE_ENV !== "production") {
     initPyBackend();
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -2088,7 +2093,9 @@ async function startServer() {
         const transformed = await vite.transformIndexHtml(req.originalUrl, html);
         res.status(200).set({ "Content-Type": "text/html" }).end(transformed);
       } catch (err) {
-        vite.ssrFixStacktrace(err);
+        if (err instanceof Error) {
+          vite.ssrFixStacktrace(err);
+        }
         next(err);
       }
     });
