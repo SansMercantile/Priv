@@ -9,6 +9,9 @@
     "http://localhost:3000/*",
     "https://*.priv-core.io/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_title": "SANS PRIV Connector",
     "default_popup": "popup.html"

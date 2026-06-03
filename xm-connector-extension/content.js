@@ -1,50 +1,64 @@
-(async function() {
-  console.log("[PRIV-Connector] Monitoring XM session...");
+// content.js
+// SANS PRIV XM Connector - Content Script
 
-  // Function to extract cookies and push to PRIV server
-  async function syncSession() {
-    try {
-      // Get all cookies for the current domain
-      const cookies = await chrome.cookies.getAll({ domain: "my.xm.com" });
-      const cookieString = cookies.map(c => `${c.name}=${c.value}`).join("; ");
-      
-      if (!cookieString || !cookieString.includes("PHPSESSID")) {
-        console.log("[PRIV-Connector] No valid session found. User might not be logged in.");
-        return;
-      }
+(function() {
+  console.log("[PRIV-Connector] Content script injected on XM Global member area.");
 
-      // We need the account ID to identify the broker. 
-      // We can try to find it in the DOM or use a default if the user is already configured.
-      const accountIdMatch = document.body.innerText.match(/Account ID:\s*(\d+)/i);
-      const accountId = accountIdMatch ? accountIdMatch[1] : "unknown";
-      const brokerId = "xm_user_account_" + accountId;
-
-      console.log(`[PRIV-Connector] Syncing session for ${brokerId}...`);
-
-      const response = await fetch("http://localhost:3000/api/auth/xm-bridge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          broker_id: brokerId,
-          session_token: cookieString
-        })
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        console.log("[PRIV-Connector] Session successfully synchronized with PRIV Core.");
-        // Optionally notify the user via a small toast or alert
-      } else {
-        console.error("[PRIV-Connector] Sync failed:", result.error);
-      }
-    } catch (e) {
-      console.error("[PRIV-Connector] Error during sync:", e);
+  function getAccountId() {
+    // Try different selectors/patterns to find Account ID on XM Global member area page
+    const bodyText = document.body.innerText;
+    const accountIdMatch = bodyText.match(/Account ID:\s*(\d+)/i) || 
+                           bodyText.match(/ID:\s*(\d+)/i) ||
+                           bodyText.match(/MT[45]\s*ID:\s*(\d+)/i);
+    
+    if (accountIdMatch) {
+      return accountIdMatch[1];
     }
+    
+    // Fallback: look for typical XM DOM elements
+    const memberLoginElement = document.querySelector(".member-login-id, .account-id, [data-account-id]");
+    if (memberLoginElement) {
+      return memberLoginElement.textContent.trim().replace(/\D/g, "");
+    }
+    
+    return null;
   }
 
-  // Sync on load
-  syncSession();
+  function triggerSync() {
+    const accountId = getAccountId();
+    if (!accountId) {
+      console.log("[PRIV-Connector] Could not determine Account ID yet. User might not be logged in or page still loading.");
+      return;
+    }
 
-  // Also sync periodically or on specific events (like navigation)
-  setInterval(syncSession, 60000);
+    console.log(`[PRIV-Connector] Found Account ID: ${accountId}. Sending sync request to background worker...`);
+    chrome.storage.local.set({ lastKnownAccount: accountId });
+    chrome.runtime.sendMessage({
+      action: "sync_session",
+      accountId: accountId
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error("[PRIV-Connector] Error communicating with background service worker:", chrome.runtime.lastError.message);
+        return;
+      }
+      if (response && response.success) {
+        console.log(`[PRIV-Connector] Session sync successful! Time: ${response.timestamp}`);
+      } else {
+        console.warn(`[PRIV-Connector] Session sync failed or pending: ${response ? response.error : 'No response'}`);
+      }
+    });
+  }
+
+  // Run on page load
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    // Small delay to allow dynamic JS to load the account ID
+    setTimeout(triggerSync, 2000);
+  } else {
+    window.addEventListener("DOMContentLoaded", () => {
+      setTimeout(triggerSync, 2000);
+    });
+  }
+
+  // Periodically check/sync every 5 minutes in case the session gets renewed or page states change
+  setInterval(triggerSync, 300000);
 })();
