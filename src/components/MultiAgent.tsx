@@ -534,11 +534,46 @@ export const MultiAgent: React.FC<{ demoMode?: boolean }> = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [adkAgents, setAdkAgents] = useState<any[]>([]);
+  const [swarmRunning, setSwarmRunning] = useState(false);
+  const [swarmResult, setSwarmResult] = useState<any>(null);
 
   const [escalateTopic, setEscalateTopic] = useState("Corporate Strategy");
   const [escalateLog, setEscalateLog] = useState<string>("");
   const [escalating, setEscalating] = useState(false);
   const [peerLogs, setPeerLogs] = useState<ArbLog[]>([]);
+
+  // Fetch Google ADK agents from backend
+  useEffect(() => {
+    fetch("/api/v1/agents/google-adk")
+      .then(r => r.json())
+      .then(d => { if (d.success) setAdkAgents(d.agents); })
+      .catch(() => {});
+  }, []);
+
+  // Dispatch full ADK swarm analysis
+  const runSwarmAnalysis = async () => {
+    setSwarmRunning(true);
+    setSwarmResult(null);
+    try {
+      const r = await fetch("/api/v1/agents/swarm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: "XAUUSD", price: 3320, balance: 50000,
+          news: [{ title: "Fed holds rates, gold surges on risk-off sentiment" }],
+          riskAppetite: "Aggressive", tradingGoal: "Capital Expansion",
+          leverage: 20,
+        }),
+      });
+      const data = await r.json();
+      setSwarmResult(data);
+    } catch (e) {
+      console.warn("Swarm dispatch failed:", e);
+    } finally {
+      setSwarmRunning(false);
+    }
+  };
 
   // Fetch true multi-agent statuses from our FastAPI backend co-located endpoints
   useEffect(() => {
@@ -932,6 +967,74 @@ Subject: SARS / GRA Tax clearance.
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Google ADK Agent Swarm Panel */}
+        <div className="bg-gradient-to-b from-neutral-900/20 to-neutral-950/40 border border-white/10 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/5">
+            <h3 className="text-base font-serif italic text-white flex items-center font-normal">
+              <Cpu className="w-4 h-4 mr-2 text-emerald-400" />
+              Google ADK Agent Swarm
+            </h3>
+            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/30 px-2 py-0.5 rounded border border-emerald-500/20">
+              {adkAgents.length > 0 ? `${adkAgents.length} AGENTS LOADED` : "LOADING..."}
+            </span>
+          </div>
+
+          {/* ADK Agent cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+            {adkAgents.map(a => (
+              <div key={a.id} className="bg-black/30 border border-white/10 rounded p-2 text-[10px] font-mono">
+                <p className="text-emerald-400 font-bold truncate">{a.name}</p>
+                <p className="text-zinc-500 uppercase tracking-wide">{a.category}</p>
+                <p className="text-zinc-400 mt-1 leading-snug truncate" title={a.capability}>{a.capability.slice(0,45)}...</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Swarm dispatch button */}
+          <button
+            onClick={runSwarmAnalysis}
+            disabled={swarmRunning}
+            className="w-full py-2.5 bg-emerald-900/40 hover:bg-emerald-800/50 border border-emerald-500/30 hover:border-emerald-400/50 text-emerald-300 font-mono text-xs rounded-lg transition disabled:opacity-40 flex items-center justify-center gap-2 mb-4"
+          >
+            {swarmRunning ? (
+              <><span className="animate-spin">⟳</span> Running Swarm Analysis...</>
+            ) : (
+              <><Cpu className="w-3.5 h-3.5" /> Dispatch Full ADK Swarm Analysis</>
+            )}
+          </button>
+
+          {/* Swarm result */}
+          {swarmResult && (
+            <div className="bg-black/40 border border-emerald-500/20 rounded-lg p-4 font-mono text-xs space-y-2">
+              <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                <span className="text-emerald-400 font-bold">SWARM SYNTHESIS</span>
+                <span className="text-zinc-500">{swarmResult.successful_agents}/{swarmResult.swarm_size} agents · {swarmResult.execution_time_ms}ms</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-white/5 rounded p-2">
+                  <p className="text-zinc-500">Final Action</p>
+                  <p className={`font-bold text-sm ${swarmResult.synthesis?.final_action === 'BUY' ? 'text-emerald-400' : swarmResult.synthesis?.final_action === 'SELL' ? 'text-rose-400' : 'text-amber-400'}`}>
+                    {swarmResult.synthesis?.final_action || 'HOLD'}
+                  </p>
+                </div>
+                <div className="bg-white/5 rounded p-2">
+                  <p className="text-zinc-500">Confidence</p>
+                  <p className="font-bold text-white">{swarmResult.synthesis?.confidence || 0}%</p>
+                </div>
+                <div className="bg-white/5 rounded p-2">
+                  <p className="text-zinc-500">Consensus</p>
+                  <p className="font-bold text-sky-400 capitalize">{swarmResult.synthesis?.consensus_strength || 'weak'}</p>
+                </div>
+              </div>
+              {swarmResult.synthesis?.execution_recommendation && (
+                <p className="text-zinc-300 bg-white/5 rounded p-2 leading-relaxed">
+                  {swarmResult.synthesis.execution_recommendation}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Boardroom Escalations */}
