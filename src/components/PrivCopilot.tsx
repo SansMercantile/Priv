@@ -172,7 +172,7 @@ export const PrivCopilot: React.FC = () => {
 
   const checkApiStatus = async () => {
     try {
-      const res = await fetch("/api/gemini/status");
+      const res = await fetch("/api/ai/status");
       if (res.ok) {
         const data = await res.json();
         setApiStatus(data.status);
@@ -611,7 +611,7 @@ export const PrivCopilot: React.FC = () => {
       return;
     }
 
-    // 2. Proxy request server-side to secure Gemini AI integration API node
+    // 2. Proxy request server-side to secure AI integration API node
     setIsTyping(true);
     try {
       const res = await fetch("/api/chat", {

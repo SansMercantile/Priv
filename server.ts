@@ -55,6 +55,10 @@ function getActiveProviderName(): string {
   return bedrockConfigured ? "AWS Bedrock" : "Google Gemini";
 }
 
+function getDefaultModel(): string {
+  return bedrockConfigured ? bedrockModel : "gemini-2.0-flash";
+}
+
 function buildPromptFromContents(contents: any): string {
   if (typeof contents === "string") {
     return contents;
@@ -420,13 +424,13 @@ app.post("/api/v1/agents/dispatch", async (req, res) => {
     return res.json({
       agent_id: agentId, agent_name: agent.name,
       status: "simulation",
-      result: { note: `${agent.name} running in simulation mode — Gemini not configured` }
+      result: { note: `${agent.name} running in simulation mode — AI provider not configured` }
     });
   }
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: getDefaultModel(),
       contents: [{ role: "user", parts: [{ text: agent.prompt(context || {}) }] }],
     });
     const raw = response.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
@@ -457,7 +461,7 @@ app.post("/api/v1/agents/swarm", async (req, res) => {
       }
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-2.0-flash",
+          model: getDefaultModel(),
           contents: [{ role: "user", parts: [{ text: agent.prompt(context) }] }],
         });
         const raw = response.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
@@ -487,7 +491,7 @@ Respond as JSON: {"final_action": "BUY|SELL|HOLD", "confidence": 0-100,
   if (ai) {
     try {
       const synthResp = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: getDefaultModel(),
         contents: [{ role: "user", parts: [{ text: synthesisPrompt }] }],
       });
       const raw = synthResp.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
@@ -681,9 +685,9 @@ app.post("/api/kyc/submit", async (req, res) => {
   kycStore[key] = submission;
 
   // Attempt AI verification via configured provider
-  const gemini = getAIClient();
+  const ai = getAIClient();
   let verificationResult: any = { status: "pending", note: "AI verification queued" };
-  if (gemini) {
+  if (ai) {
     try {
       const prompt = `You are an AML/KYC compliance officer. Review this KYC submission and flag any risks:
 Name: ${submission.fullName}
@@ -697,8 +701,8 @@ Tax residency: ${submission.tax?.tax_residency_country}
 US Person (FATCA): ${submission.tax?.us_person_fatca}
 Respond with JSON: { "risk_level": "low|medium|high", "flags": [], "recommendation": "approve|review|reject" }`;
 
-      const response = await gemini.models.generateContent({
-        model: "gemini-2.0-flash",
+      const response = await ai.models.generateContent({
+        model: getDefaultModel(),
         contents: [{ role: "user", parts: [{ text: prompt }] }],
       });
       const raw = response.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
@@ -720,12 +724,12 @@ Respond with JSON: { "risk_level": "low|medium|high", "flags": [], "recommendati
 // POST /api/kyc/verify-document — AI document verification against form data
 app.post("/api/kyc/verify-document", async (req, res) => {
   const { documentBase64, mimeType, formData } = req.body;
-  const gemini = getAIClient();
-  if (!gemini) return res.json({ verified: false, note: "AI client not configured" });
+  const ai = getAIClient();
+  if (!ai) return res.json({ verified: false, note: "AI client not configured" });
 
   try {
-    const response = await gemini.models.generateContent({
-      model: "gemini-2.0-flash",
+    const response = await ai.models.generateContent({
+      model: getDefaultModel(),
       contents: [{
         role: "user",
         parts: [
@@ -765,12 +769,12 @@ Respond ONLY with JSON (no markdown):
 // POST /api/kyc/verify-face — AI face verification (selfie vs document)
 app.post("/api/kyc/verify-face", async (req, res) => {
   const { selfieBase64, documentBase64, mimeType } = req.body;
-  const gemini = getAIClient();
-  if (!gemini) return res.json({ match: false, note: "AI client not configured" });
+  const ai = getAIClient();
+  if (!ai) return res.json({ match: false, note: "AI client not configured" });
 
   try {
-    const response = await gemini.models.generateContent({
-      model: "gemini-2.0-flash",
+    const response = await ai.models.generateContent({
+      model: getDefaultModel(),
       contents: [{
         role: "user",
         parts: [
@@ -830,7 +834,7 @@ function isQuotaOrBillingError(error: any): boolean {
 }
 
 // Endpoint to verify AI provider connection status and billing/quota eligibility
-app.get("/api/gemini/status", async (req, res) => {
+app.get("/api/ai/status", async (req, res) => {
   const ai = getAIClient();
   if (!ai) {
     return res.json({ status: "missing", error: "No AI provider configured. Set AWS Bedrock credentials or GEMINI_API_KEY/Google GenAI ADC." });
@@ -839,7 +843,7 @@ app.get("/api/gemini/status", async (req, res) => {
   try {
     // Fast verification ping to verify API provider connectivity
     await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: getDefaultModel(),
       contents: "ping",
     });
     res.json({ status: "active", provider: getActiveProviderName(), info: `${getActiveProviderName()} connection fully operational.` });
@@ -863,7 +867,7 @@ app.get("/api/gemini/status", async (req, res) => {
 });
 
 // Resilient localized backup response engine for Priv Support with timezone and weekend awareness
-function getOfflineFallbackResponse(prompt: string, provider: string = "Google Gemini", errorDetail?: string): string {
+function getOfflineFallbackResponse(prompt: string, provider: string = "AI provider", errorDetail?: string): string {
   const promptLower = (prompt || "").trim().toLowerCase();
   
   // Dynamic day/weekend awareness calculation
@@ -1161,7 +1165,7 @@ CRITICAL REAL-TIME MARKET CONTEXT & RULES:
 - STRICT REQUIREMENT: Do NOT output any robot emoticons or emoji disclaimers. Do NOT include any disclaimers or notes about local backups, sandboxes, or local syncing.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: getDefaultModel(),
       contents: prompt,
       config: { systemInstruction }
     });
@@ -2126,7 +2130,7 @@ app.get("/api/v1/economic-calendar", async (req, res) => {
   try {
     const todayStr = new Date().toLocaleDateString();
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: getDefaultModel(),
       contents: `Search web search for the latest major real economic calendar indicators and events currently occurring or scheduled for this week (or around today's date ${todayStr}). 
 Provide 8-10 major economic events (e.g. CPI, retail sales, employment, central bank rate decisions) across key regions (USA, Europe, GBR, JPN, AUS, CAN, NZD, CHE). 
 Your output must be returned as a valid JSON array of objects following exactly this TypeScript schema structure:
@@ -2212,7 +2216,7 @@ Output a valid JSON matching this schema exactly:
       const systemInstruction = `You are the PRIV Fundamental Analysis Engine of Sans Mercantile. Analyze the provided news with deep macro awareness. Return ONLY raw JSON matching the schema.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: getDefaultModel(),
         contents: prompt,
         config: {
           systemInstruction,
