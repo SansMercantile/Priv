@@ -22,6 +22,7 @@ try {
 import express, { type NextFunction, type Request, type Response } from "express";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 // NOTE: vite imported dynamically inside the dev-only branch below
 import { antiBotMiddleware, securityHeadersMiddleware } from "./src/middleware/antiBot.js";
@@ -30,9 +31,220 @@ const app = express();
 // Azure App Service injects PORT=8080; fall back to 3000 for local dev
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
-// ── Bot & scraper protection (runs before all routes) ──────────────────────
-app.use(securityHeadersMiddleware);
-app.use(antiBotMiddleware);
+function parseBedrockRegion(endpoint: string | undefined) {
+  if (!endpoint) return undefined;
+  try {
+    const host = new URL(endpoint).hostname;
+    const match = host.match(/bedrock\.([^.]+)\.amazonaws\.com$/);
+    return match?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
+const awsAccessKeyId = process.env.AWS_ACCESS_KEY_ID || process.env.AWS_API_KEY;
+const awsSecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || process.env.AWS_API_SECRET || process.env.AWS_API_SECRET_KEY;
+const awsSessionToken = process.env.AWS_SESSION_TOKEN;
+const explicitRegion = process.env.AWS_REGION || process.env.BEDROCK_REGION;
+const awsRegion = explicitRegion || parseBedrockRegion(process.env.BEDROCK_ENDPOINT);
+const bedrockModel = process.env.BEDROCK_MODEL || process.env.BEDROCK_MODEL_ID || "gpt-3.1-mini";
+const bedrockEndpoint = process.env.BEDROCK_ENDPOINT || (awsRegion ? `https://bedrock.${awsRegion}.amazonaws.com` : undefined);
+const bedrockConfigured = Boolean(bedrockEndpoint && bedrockModel && awsAccessKeyId && awsSecretAccessKey && awsRegion);
+
+function getActiveProviderName(): string {
+  return bedrockConfigured ? "AWS Bedrock" : "Google Gemini";
+}
+
+function buildPromptFromContents(contents: any): string {
+  if (typeof contents === "string") {
+    return contents;
+  }
+  if (Array.isArray(contents)) {
+    return contents
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (item?.parts) {
+          return item.parts
+            .map((part: any) => (typeof part === "string" ? part : part.text ?? ""))
+            .join("");
+        }
+        if (typeof item?.text === "string") return item.text;
+        return JSON.stringify(item);
+      })
+      .join("\n");
+  }
+  if (contents && typeof contents === "object") {
+    if (typeof contents.prompt === "string") return contents.prompt;
+    if (typeof contents.inputText === "string") return contents.inputText;
+    if (typeof contents.text === "string") return contents.text;
+    return JSON.stringify(contents);
+  }
+  return String(contents ?? "");
+}
+
+function hashSha256(value: string) {
+  return crypto.createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function hmacSha256(key: Buffer, value: string) {
+  return crypto.createHmac("sha256", key).update(value, "utf8").digest();
+}
+
+function getSigningKey(secret: string, dateStamp: string, regionName: string, serviceName: string) {
+  const kDate = hmacSha256(Buffer.from(`AWS4${secret}`, "utf8"), dateStamp);
+  const kRegion = hmacSha256(kDate, regionName);
+  const kService = hmacSha256(kRegion, serviceName);
+  return hmacSha256(kService, "aws4_request");
+}
+
+async function bedrockGenerateContent(request: any) {
+  if (!bedrockEndpoint || !awsRegion) {
+    throw new Error("Bedrock endpoint is not configured. Set BEDROCK_REGION or BEDROCK_ENDPOINT and AWS credentials.");
+  }
+
+  const prompt = buildPromptFromContents(request?.contents ?? request?.prompt ?? request);
+  const url = `${bedrockEndpoint}/model/${encodeURIComponent(bedrockModel)}/invoke`;
+  const payload = JSON.stringify({
+    inputText: prompt,
+    maxTokensToSample: Number(process.env.BEDROCK_MAX_TOKENS ?? 512),
+    temperature: Number(process.env.BEDROCK_TEMPERATURE ?? 0.7),
+  });
+
+  const { host, pathname } = new URL(url);
+  const amzDate = new Date().toISOString().replace(/[:-]|\.\d{3}/g, "") + "Z";
+  const dateStamp = amzDate.slice(0, 8);
+  const payloadHash = hashSha256(payload);
+
+  const signedHeaders = ["content-type", "host", "x-amz-content-sha256", "x-amz-date"];
+  const canonicalHeaders = [
+    `content-type:application/json`,
+    `host:${host}`,
+    `x-amz-content-sha256:${payloadHash}`,
+    `x-amz-date:${amzDate}`,
+  ];
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "X-Amz-Date": amzDate,
+    "X-Amz-Content-Sha256": payloadHash,
+  };
+
+  if (awsSessionToken) {
+    signedHeaders.push("x-amz-security-token");
+    canonicalHeaders.push(`x-amz-security-token:${awsSessionToken}`);
+    headers["X-Amz-Security-Token"] = awsSessionToken;
+  }
+
+  const canonicalRequest = [
+    "POST",
+    pathname,
+    "",
+    `${canonicalHeaders.join("\n")}\n`,
+    signedHeaders.join(";"),
+    payloadHash,
+  ].join("\n");
+
+  const canonicalRequestHash = hashSha256(canonicalRequest);
+  const credentialScope = `${dateStamp}/${awsRegion}/bedrock/aws4_request`;
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    amzDate,
+    credentialScope,
+    canonicalRequestHash,
+  ].join("\n");
+
+  if (!awsAccessKeyId || !awsSecretAccessKey) {
+    throw new Error("AWS credentials are required to sign Bedrock requests. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.");
+  }
+
+  const signingKey = getSigningKey(awsSecretAccessKey, dateStamp, awsRegion, "bedrock");
+  const signature = hmacSha256(signingKey, stringToSign).toString("hex");
+  headers.Authorization = `AWS4-HMAC-SHA256 Credential=${awsAccessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders.join(";")}, Signature=${signature}`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers,
+    body: payload,
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(`Bedrock request failed: ${response.status} ${response.statusText} - ${JSON.stringify(data)}`);
+  }
+
+  let text = "";
+  if (typeof data === "string") {
+    text = data;
+  } else if (data?.outputText && typeof data.outputText === "string") {
+    text = data.outputText;
+  } else if (data?.body) {
+    text = typeof data.body === "string" ? data.body : JSON.stringify(data.body);
+  } else {
+    text = JSON.stringify(data);
+  }
+
+  return {
+    candidates: [
+      {
+        content: {
+          parts: [{ text }],
+        },
+      },
+    ],
+  };
+}
+
+let aiClient: any = null;
+function getAIClient(): any | null {
+  if (aiClient) return aiClient;
+
+  if (bedrockConfigured) {
+    aiClient = {
+      models: {
+        generateContent: bedrockGenerateContent,
+      },
+    };
+    console.log(`[SANS AI] Bedrock client initialized using model ${bedrockModel} in region ${awsRegion}`);
+    return aiClient;
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  // Mode 1: API key (standard)
+  if (apiKey && !isPlaceholderKey(apiKey)) {
+    aiClient = new GoogleGenAI({ apiKey });
+    console.log("[SANS AI] Gemini client initialized via API key");
+    return aiClient;
+  }
+
+  // Mode 2: ADC / Application Default Credentials (org policy — no API keys allowed)
+  const useVertexAI = process.env.GOOGLE_GENAI_USE_VERTEXAI === "true";
+  const gcpProject = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
+  if (useVertexAI && gcpProject) {
+    try {
+      aiClient = new GoogleGenAI({ vertexai: true, project: gcpProject, location: "us-central1" });
+      console.log(`[SANS AI] Gemini client initialized via Vertex AI ADC (project: ${gcpProject})`);
+      return aiClient;
+    } catch (e) {
+      console.warn("[SANS AI] Vertex AI ADC init failed:", e);
+    }
+  }
+
+  // Mode 3: GOOGLE_APPLICATION_CREDENTIALS JSON file (service account key)
+  const credFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (credFile && gcpProject) {
+    try {
+      aiClient = new GoogleGenAI({ vertexai: true, project: gcpProject, location: "us-central1" });
+      console.log(`[SANS AI] Gemini client initialized via service account credentials`);
+      return aiClient;
+    } catch (e) {
+      console.warn("[SANS AI] Service account credentials init failed:", e);
+    }
+  }
+
+  console.warn("[SANS AI] No Gemini credentials available — running in simulation mode. Set GEMINI_API_KEY or configure Vertex AI ADC.");
+  return null;
+}
 
 app.use(express.json());
 
@@ -77,58 +289,14 @@ function isPlaceholderKey(key: string | undefined): boolean {
   );
 }
 
-// Initialize Gemini client lazily — supports both API key and ADC (org policy)
-let aiClient: GoogleGenAI | null = null;
-function getGeminiClient(): GoogleGenAI | null {
-  if (aiClient) return aiClient;
-
-  const apiKey = process.env.GEMINI_API_KEY;
-
-  // Mode 1: API key (standard)
-  if (apiKey && !isPlaceholderKey(apiKey)) {
-    aiClient = new GoogleGenAI({ apiKey });
-    console.log("[SANS AI] Gemini client initialized via API key");
-    return aiClient;
-  }
-
-  // Mode 2: ADC / Application Default Credentials (org policy — no API keys allowed)
-  // When running on Azure with Workload Identity Federation, GOOGLE_APPLICATION_CREDENTIALS
-  // or GOOGLE_GENAI_USE_VERTEXAI=true + GOOGLE_CLOUD_PROJECT env vars enable ADC.
-  const useVertexAI = process.env.GOOGLE_GENAI_USE_VERTEXAI === "true";
-  const gcpProject  = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
-  if (useVertexAI && gcpProject) {
-    try {
-      aiClient = new GoogleGenAI({ vertexai: true, project: gcpProject, location: "us-central1" });
-      console.log(`[SANS AI] Gemini client initialized via Vertex AI ADC (project: ${gcpProject})`);
-      return aiClient;
-    } catch (e) {
-      console.warn("[SANS AI] Vertex AI ADC init failed:", e);
-    }
-  }
-
-  // Mode 3: GOOGLE_APPLICATION_CREDENTIALS JSON file (service account key)
-  const credFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  if (credFile && gcpProject) {
-    try {
-      aiClient = new GoogleGenAI({ vertexai: true, project: gcpProject, location: "us-central1" });
-      console.log(`[SANS AI] Gemini client initialized via service account credentials`);
-      return aiClient;
-    } catch (e) {
-      console.warn("[SANS AI] Service account credentials init failed:", e);
-    }
-  }
-
-  console.warn("[SANS AI] No Gemini credentials available — running in simulation mode. Set GEMINI_API_KEY or configure Vertex AI ADC.");
-  return null;
-}
-
 // REST API for general health checks
 app.get("/api/health", (req, res) => {
-  const geminiReady = !!getGeminiClient();
+  const aiReady = !!getAIClient();
   res.json({
     status: "ok",
     mode: process.env.NODE_ENV || "development",
-    gemini: geminiReady ? "ready" : "simulation",
+    provider: getActiveProviderName(),
+    ai: aiReady ? "ready" : "simulation",
     uptime: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
   });
@@ -247,7 +415,7 @@ app.post("/api/v1/agents/dispatch", async (req, res) => {
     return res.status(404).json({ error: `Agent '${agentId}' not found` });
   }
 
-  const ai = getGeminiClient();
+  const ai = getAIClient();
   if (!ai) {
     return res.json({
       agent_id: agentId, agent_name: agent.name,
@@ -276,7 +444,7 @@ app.post("/api/v1/agents/dispatch", async (req, res) => {
 // POST /api/v1/agents/swarm — run ALL active agents in parallel (full swarm analysis)
 app.post("/api/v1/agents/swarm", async (req, res) => {
   const context = req.body;
-  const ai = getGeminiClient();
+  const ai = getAIClient();
 
   const activeAgents = Object.values(ADK_AGENTS).filter(a => a.active);
   const startTime = Date.now();
@@ -372,7 +540,8 @@ app.get("/api/v1/agents/status_with_reputation", (req, res) => {
       total: agents.length,
       active: agents.filter(a => a.status === "active").length,
       system_health: "optimal",
-      gemini_status: getGeminiClient() ? "live" : "simulation",
+      ai_status: getAIClient() ? "live" : "simulation",
+      provider: getActiveProviderName(),
       live_prices_active: true,
       timestamp: new Date().toISOString(),
     }
@@ -389,7 +558,6 @@ const kycStore: Record<string, any> = {}; // keyed by email
 let registeredBrokers: Record<string, any> = {};
 
 // --- Persistence helpers for registered brokers (encrypted at rest) ---
-import crypto from "crypto";
 
 const BROKER_STORE_PATH = path.join(process.cwd(), "data", "brokers.store");
 const BROKER_STORE_KEY = process.env.BROKER_STORE_KEY || process.env.PRIV_BROKER_STORE_KEY || "";
@@ -512,8 +680,8 @@ app.post("/api/kyc/submit", async (req, res) => {
   const submission = { ...req.body, _submitted: true, _submittedAt: new Date().toISOString() };
   kycStore[key] = submission;
 
-  // Attempt AI verification via Gemini
-  const gemini = getGeminiClient();
+  // Attempt AI verification via configured provider
+  const gemini = getAIClient();
   let verificationResult: any = { status: "pending", note: "AI verification queued" };
   if (gemini) {
     try {
@@ -552,7 +720,7 @@ Respond with JSON: { "risk_level": "low|medium|high", "flags": [], "recommendati
 // POST /api/kyc/verify-document — AI document verification against form data
 app.post("/api/kyc/verify-document", async (req, res) => {
   const { documentBase64, mimeType, formData } = req.body;
-  const gemini = getGeminiClient();
+  const gemini = getAIClient();
   if (!gemini) return res.json({ verified: false, note: "AI client not configured" });
 
   try {
@@ -597,7 +765,7 @@ Respond ONLY with JSON (no markdown):
 // POST /api/kyc/verify-face — AI face verification (selfie vs document)
 app.post("/api/kyc/verify-face", async (req, res) => {
   const { selfieBase64, documentBase64, mimeType } = req.body;
-  const gemini = getGeminiClient();
+  const gemini = getAIClient();
   if (!gemini) return res.json({ match: false, note: "AI client not configured" });
 
   try {
@@ -661,37 +829,34 @@ function isQuotaOrBillingError(error: any): boolean {
   );
 }
 
-// Endpoint to verify Gemini key connection status and billing quota eligibility
+// Endpoint to verify AI provider connection status and billing/quota eligibility
 app.get("/api/gemini/status", async (req, res) => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return res.json({ status: "missing", error: "No API Key found. Offline simulation active." });
-  }
-
-  const ai = getGeminiClient();
+  const ai = getAIClient();
   if (!ai) {
-    return res.json({ status: "missing", error: "Could not initialize API client." });
+    return res.json({ status: "missing", error: "No AI provider configured. Set AWS Bedrock credentials or GEMINI_API_KEY/Google GenAI ADC." });
   }
 
   try {
-    // Fast verification ping to verify API key validity
+    // Fast verification ping to verify API provider connectivity
     await ai.models.generateContent({
       model: "gemini-2.0-flash",
       contents: "ping",
     });
-    res.json({ status: "active", info: "Gemini connection fully operational." });
+    res.json({ status: "active", provider: getActiveProviderName(), info: `${getActiveProviderName()} connection fully operational.` });
   } catch (error: any) {
     if (isQuotaOrBillingError(error)) {
-      console.warn("Gemini system connection limits active (prepayment credits exhausted / 429). Offline simulation routed.");
+      console.warn(`${getActiveProviderName()} system connection limits active (prepayment credits exhausted / 429). Offline simulation routed.`);
       return res.json({
         status: "exhausted",
+        provider: getActiveProviderName(),
         error: "Prepayment credits depleted. Go to Settings > Secrets or launch Paid Model workflow to sync a new key."
       });
     }
 
-    console.error("Gemini system connection diagnostic failed:", error);
+    console.error(`${getActiveProviderName()} system connection diagnostic failed:`, error);
     res.json({
       status: "error",
+      provider: getActiveProviderName(),
       error: error.message || "Unknown server-side core response exception"
     });
   }
@@ -970,7 +1135,7 @@ app.post("/api/chat", async (req, res) => {
   }
 
   // Fallback to preloaded system admin key if no custom userApiKey is active
-  const ai = activeAi || getGeminiClient();
+  const ai = activeAi || getAIClient();
 
   if (!ai) {
     // Engaging localized backup response engine synced to select provider 
@@ -1153,7 +1318,7 @@ function getSimulatedTrade(
 // REST route for live/simulated Autonomous Market Analysis utilizing frontend context
 app.post("/api/autonomous/analyze", async (req, res) => {
   const { symbol, price, balance, news, technicalIndicators, riskAppetite, tradingGoal, leverage, userIdentity } = req.body;
-  const ai = getGeminiClient();
+  const ai = getAIClient();
 
   if (!ai) {
     const responseData = getSimulatedAnalysis(symbol, price, balance, news, riskAppetite, tradingGoal, leverage, userIdentity);
@@ -1211,7 +1376,7 @@ Your task is to analyze market parameters and news based on the user's risk tole
 // REST route for live/simulated Autonomous Trading Execution utilizing frontend news and balance bounds
 app.post("/api/autonomous/trade", async (req, res) => {
   const { symbol, price, balance, news, existingPositions, riskAppetite, tradingGoal, leverage, userIdentity } = req.body;
-  const ai = getGeminiClient();
+  const ai = getAIClient();
 
   const cleanSym = (symbol || "").replace("XM:", "").replace("BINANCE:", "").replace("FX:", "").replace("OANDA:", "");
   const hasExisting = existingPositions && existingPositions.some((p: any) => p.symbol === cleanSym);
@@ -1836,7 +2001,7 @@ function getDynamicDateString(dayIndex: number): string {
 
 // GET route for fetching real-time/live economic calendar data using search-grounded Gemini or dynamic current week fallback
 app.get("/api/v1/economic-calendar", async (req, res) => {
-  const ai = getGeminiClient();
+  const ai = getAIClient();
 
   // Create robust fallback events list for the current week dynamically
   const fallbackEvents = [
@@ -2025,7 +2190,7 @@ Do not return any explanation or other text. Just return a raw valid JSON array.
 // POST route for live automated fundamental tactical briefing impact analysis (using Gemini SDK with fail-safe local sovereign analysis)
 app.post("/api/v1/news/analyze-impact", async (req, res) => {
   const { title, summary, source, sentiment } = req.body;
-  const ai = getGeminiClient();
+  const ai = getAIClient();
 
   if (ai) {
     try {
