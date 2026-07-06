@@ -15,6 +15,7 @@ import {
   Minus
 } from "lucide-react";
 import { ChatMessage, StockAlert } from "../types";
+import { buildFallbackChatResponse } from "../utils/privChatResponse";
 import chatAvatar from "../assets/images/chat_avatar_1779278082106.png";
 
 // Interactive 30-day Simulated Stock Chart SVG (Equivalent to IN in target)
