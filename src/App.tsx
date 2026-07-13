@@ -171,7 +171,7 @@ function App({ initialDevice = "desktop" }: AppProps) {
                 <Routes>
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<Dashboard demoMode={demoMode} />} />
-                  <Route path="/dashboard/terminal" element={<TradingTerminal demoMode={demoMode} setDemoMode={setDemoMode} />} />
+                  <Route path="/dashboard/terminal" element={<TradingTerminal />} />
                   <Route path="/dashboard/agi-core" element={<AGICore demoMode={demoMode} />} />
                   <Route path="/dashboard/multi-agent" element={<MultiAgent demoMode={demoMode} />} />
                   <Route path="/dashboard/data-ingestion" element={<DataIngestion demoMode={demoMode} />} />
