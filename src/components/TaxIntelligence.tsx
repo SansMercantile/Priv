@@ -1,254 +1,210 @@
 import React, { useState, useEffect } from "react";
-import { 
-  Landmark, 
-  TrendingUp, 
-  HelpCircle, 
-  CheckCircle, 
-  DollarSign, 
-  AlertTriangle,
-  Play,
-  RotateCw,
-  Sliders,
-  Award,
-  BookOpen
-} from "lucide-react";
+import { Landmark, DollarSign, FileText, RefreshCw, CheckCircle, AlertTriangle } from "lucide-react";
+
+interface CountryOption {
+  code: string;
+  name?: string;
+}
+
+const TAX_TYPES = [
+  { value: "capital_gains", label: "Capital Gains" },
+  { value: "income_tax", label: "Income Tax" },
+  { value: "dividend_tax", label: "Dividend Tax" },
+  { value: "interest_tax", label: "Interest Tax" },
+  { value: "transaction_tax", label: "Transaction Tax" },
+  { value: "withholding_tax", label: "Withholding Tax" },
+  { value: "stamp_duty", label: "Stamp Duty" },
+  { value: "vat_gst", label: "VAT / GST" },
+  { value: "corporate_tax", label: "Corporate Tax" },
+];
 
 export const TaxIntelligence: React.FC = () => {
-  const [revenue, setRevenue] = useState(14.7);
-  const [gaps, setGaps] = useState(12843);
-  
-  // Simulated Simulation Outcomes details
-  const [activeSimulation, setActiveSimulation] = useState<string | null>(null);
-  const [simulating, setSimulating] = useState(false);
-  const [simLogs, setSimLogs] = useState<string[]>([]);
+  const [countries, setCountries] = useState<CountryOption[]>([]);
+  const [loadingCountries, setLoadingCountries] = useState(true);
+  const [residency, setResidency] = useState("ZA");
+  const [taxType, setTaxType] = useState("capital_gains");
+  const [amount, setAmount] = useState<number>(1000);
+  const [taxYear, setTaxYear] = useState<number>(new Date().getFullYear());
 
-  // Simulation parameters
-  const [taxRate, setTaxRate] = useState(28); // South Africa Corporate Tax 27% to 28%
-  const [miningRoyalty, setMiningRoyalty] = useState(5.5);
+  const [calculating, setCalculating] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      // Periodic fluctuations
-      setRevenue(r => r + (Math.random() - 0.5) * 0.12);
-      setGaps(g => g + Math.floor((Math.random() * 8) - 4));
-    }, 5000);
-
-    return () => clearInterval(timer);
+    const loadCountries = async () => {
+      try {
+        const res = await fetch("/api/v1/tax/supported_countries");
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          const opts = data.data.map((c: any) =>
+            typeof c === "string" ? { code: c } : { code: c.code || c.value || c, name: c.name || c.label }
+          );
+          setCountries(opts);
+          if (opts.length > 0) setResidency(opts[0].code);
+        }
+      } catch {
+        setError("Could not load supported tax jurisdictions from the backend.");
+      } finally {
+        setLoadingCountries(false);
+      }
+    };
+    loadCountries();
   }, []);
 
-  const triggerSimulation = (policyType: string) => {
-    setSimulating(true);
-    setActiveSimulation(policyType);
-    setSimLogs(["Deploying CPPN Evolver algorithms...", "Contacting GRA & SARS sovereign boundary databases..."]);
-
-    setTimeout(() => {
-      setSimLogs(prev => [...prev, "Ingesting local mining output yields...", "Parsing transfer pricing spreads..."]);
-    }, 1000);
-
-    setTimeout(() => {
-      let outcome = "";
-      if (policyType === "corporate") {
-        const yieldDiff = (taxRate - 27) * 0.42;
-        outcome = `SIMULATION COMPLETE: CORPORATE TAX POLICY SHIFT
-Base rate: ${taxRate}% (Shift from 27% base)
-Sovereign Sentiment Stance: Moderate (84.2%)
-Predicted Fiscal Yield Impact: ${yieldDiff > 0 ? "+" : ""}${yieldDiff.toFixed(2)} Billion ZAR / GHS
-Compliance Gap Index: Reduced by 1.2% due to neuro-symbolic anti-evasion matching.`;
-      } else if (policyType === "mining") {
-        const royaltyYield = (miningRoyalty - 5) * 0.12;
-        outcome = `SIMULATION COMPLETE: EXTRACTIVE MINING PENALTIES
-Ad-valorem Royalty Rate: ${miningRoyalty}% (Shift from 5.0% base)
-Local Community Sentiment: Bullish (91.4%)
-Expected Mineral Export Revenue Delta: ${royaltyYield > 0 ? "+" : ""}${royaltyYield.toFixed(2)} Billion ZAR
-Multinational Slippage Risk: Low-to-Moderate. Anti-shifting filters stabilized.`;
+  const handleCalculate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCalculating(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await fetch("/api/v1/tax/calculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tax_residency: residency,
+          tax_type: taxType,
+          amount,
+          tax_year: taxYear,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setResult(data.data);
       } else {
-        outcome = `SIMULATION COMPLETE: CITIZEN ENGAGEMENT FILING SCHEMAS
-Introduction of sovereign instant-filing interfaces.
-Compliance Index Projection: Shifts to 98.4% (+3.2% rise)
-Auditing Resource Latency: Retracted by 420 hrs / mo.
-SARS compliance declarations automated successfully.`;
+        setError(data.detail || "Tax calculation failed.");
       }
-
-      setSimLogs(prev => [...prev, outcome]);
-      setSimulating(false);
-    }, 2800);
+    } catch (err: any) {
+      setError(err.message || "Tax calculation failed.");
+    } finally {
+      setCalculating(false);
+    }
   };
 
   return (
     <div className="space-y-6">
-      {/* Head */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-serif italic text-white font-normal">Tax Intelligence Engine</h1>
-          <p className="text-white/40 text-xs mt-1 font-light font-sans">Sovereign revenue forecasting and automated compliance bridging for governments (SARS & GRA)</p>
+          <h1 className="text-3xl font-serif italic text-white font-normal">Tax Intelligence</h1>
+          <p className="text-white/40 text-xs mt-1 font-light font-sans">
+            Estimate the tax liability on your trading activity across supported jurisdictions.
+          </p>
         </div>
         <div className="flex items-center space-x-2 px-3 py-1.5 bg-white/5 rounded border border-white/10 font-mono text-xs">
           <Landmark className="w-3.5 h-3.5 text-white/50" />
-          <span className="text-white/60 font-medium font-sans uppercase">Gov-Tech Services Active</span>
+          <span className="text-white/60 font-medium font-sans uppercase">
+            {loadingCountries ? "Loading Jurisdictions..." : `${countries.length} Jurisdictions Supported`}
+          </span>
         </div>
       </div>
 
-      {/* Stats Cards displays */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        <div className="metric-card rounded p-5 border-white/10">
-          <div className="flex items-center space-x-3 mb-2">
-            <DollarSign className="text-white/60 w-4 h-4" />
-            <h4 className="text-[9px] font-mono text-gray-400 tracking-wider">PREDICTED SOVEREIGN REVENUE</h4>
-          </div>
-          <div className="text-3xl font-light text-white">${revenue.toFixed(2)}B</div>
-          <div className="text-[9px] font-mono text-white/40 mt-1 uppercase">YIELD ESTIMATION: OPTIMAL</div>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="metric-card rounded p-6 border-white/10">
+          <h3 className="text-base font-serif italic text-white mb-4 flex items-center font-normal">
+            <DollarSign className="w-4 h-4 mr-2 text-white/55" />
+            Calculate Liability
+          </h3>
+          <form onSubmit={handleCalculate} className="space-y-4">
+            <div className="space-y-1">
+              <label className="block text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Tax Residency</label>
+              <select
+                value={residency}
+                onChange={(e) => setResidency(e.target.value)}
+                disabled={loadingCountries}
+                className="w-full bg-neutral-950 border border-white/10 rounded p-2.5 text-xs text-white font-mono"
+              >
+                {countries.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.name || c.code}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <div className="metric-card rounded p-5 border-white/10">
-          <div className="flex items-center space-x-3 mb-2">
-            <AlertTriangle className="text-white/60 w-4 h-4" />
-            <h4 className="text-[9px] font-mono text-gray-400 tracking-wider">IDENTIFIED COMPLIANCE GAPS</h4>
-          </div>
-          <div className="text-3xl font-light text-white">{gaps.toLocaleString()}</div>
-          <div className="text-[9px] font-mono text-white/40 mt-1 uppercase">Bridging: active</div>
-        </div>
+            <div className="space-y-1">
+              <label className="block text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Tax Type</label>
+              <select
+                value={taxType}
+                onChange={(e) => setTaxType(e.target.value)}
+                className="w-full bg-neutral-950 border border-white/10 rounded p-2.5 text-xs text-white font-mono"
+              >
+                {TAX_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <div className="metric-card rounded p-5 border-white/10">
-          <div className="flex items-center space-x-3 mb-2">
-            <Award className="text-white/60 w-4 h-4" />
-            <h4 className="text-[9px] font-mono text-gray-400 tracking-wider">SIMULATION STABILITY ACCURACY</h4>
-          </div>
-          <div className="text-3xl font-light text-white">97.3%</div>
-          <div className="text-[9px] font-mono text-white/40 mt-1 uppercase">MODEL COUPLING: RESOLUTE</div>
-        </div>
-
-        <div className="metric-card rounded p-5 border-white/10">
-          <div className="flex items-center space-x-3 mb-2">
-            <TrendingUp className="text-white/60 w-4 h-4" />
-            <h4 className="text-[9px] font-mono text-gray-400 tracking-wider">CITIZEN TRUST COEFFICIENT</h4>
-          </div>
-          <div className="text-3xl font-light text-white">88.9%</div>
-          <div className="text-[9px] font-mono text-white/40 mt-1 uppercase">Cognitive compliance metrics</div>
-        </div>
-
-      </div>
-
-      {/* Main interactive grid splitting columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Simulators and outcomes parameters */}
-        <div className="lg:col-span-2 space-y-6">
-          
-          {/* Policy simulator sandbox */}
-          <div className="metric-card rounded p-6 border-white/10">
-            <h3 className="text-base font-serif italic text-white mb-4 flex items-center font-normal">
-              <BookOpen className="w-4 h-4 mr-2 text-white/55" />
-              Sovereign Policy Sandbox Simulators
-            </h3>
-            <p className="text-xs text-stone-400 mb-6 font-sans leading-relaxed">
-              Model regulatory taxation outcomes prior to e-filing. Simulating corporate bracket margins and resource royalty margins under alternative pricing schemas.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Corporate bracket */}
-              <div className="p-4 bg-neutral-900/40 border border-white/5 rounded space-y-4">
-                <h4 className="text-[10px] font-mono text-stone-400 uppercase tracking-widest">corporate bracket adjustment</h4>
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-mono text-gray-300">
-                    <span>Base Corp Tax Rate</span>
-                    <span className="text-white font-bold">{taxRate}%</span>
-                  </div>
-                  <input 
-                    type="range"
-                    min="20"
-                    max="40"
-                    step="1"
-                    value={taxRate}
-                    onChange={(e) => setTaxRate(Number(e.target.value))}
-                    className="w-full accent-white bg-neutral-900 rounded appearance-none h-1 cursor-pointer"
-                  />
-                  <div className="flex justify-between text-[9px] text-gray-500 font-mono">
-                    <span>20% (LOW)</span>
-                    <span>40% (HIGH)</span>
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <button 
-                    onClick={() => triggerSimulation("corporate")}
-                    disabled={simulating}
-                    className="w-full bg-white hover:bg-neutral-200 text-neutral-950 font-medium text-xs p-2.5 rounded transition duration-200 flex items-center justify-center space-x-1 border border-white cursor-pointer"
-                  >
-                    <Play className="w-3 h-3 fill-neutral-950 text-neutral-950 inline" />
-                    <span>{simulating && activeSimulation === "corporate" ? "MODELING BRACKETS..." : "RUN BRACKET SIMULATION"}</span>
-                  </button>
-                </div>
+            <div className="grid grid-cols-2 gap-3.5">
+              <div className="space-y-1">
+                <label className="block text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Amount</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={amount}
+                  onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
+                  className="w-full bg-neutral-950 border border-white/10 rounded p-2.5 text-xs text-white font-mono"
+                />
               </div>
-
-              {/* Mining royalty */}
-              <div className="p-4 bg-neutral-900/40 border border-white/5 rounded space-y-4">
-                <h4 className="text-[10px] font-mono text-stone-400 uppercase tracking-widest">Mineral Extraction royalty</h4>
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-mono text-gray-300">
-                    <span>Export Royalty Rate</span>
-                    <span className="text-white font-bold">{miningRoyalty}%</span>
-                  </div>
-                  <input 
-                    type="range"
-                    min="2"
-                    max="10"
-                    step="0.5"
-                    value={miningRoyalty}
-                    onChange={(e) => setMiningRoyalty(Number(e.target.value))}
-                    className="w-full accent-white bg-neutral-900 rounded appearance-none h-1 cursor-pointer"
-                  />
-                  <div className="flex justify-between text-[9px] text-gray-500 font-mono">
-                    <span>2.0% (EXPORT INC)</span>
-                    <span>10.0% (HIGH YIELD)</span>
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <button 
-                    onClick={() => triggerSimulation("mining")}
-                    disabled={simulating}
-                    className="w-full bg-white hover:bg-neutral-200 text-neutral-950 font-medium text-xs p-2.5 rounded transition duration-200 flex items-center justify-center space-x-1 border border-white cursor-pointer"
-                  >
-                    <Play className="w-3 h-3 fill-neutral-950 text-neutral-950 inline" />
-                    <span>{simulating && activeSimulation === "mining" ? "PREDICTING ROYALTIES..." : "RUN MINERAL SIMULATION"}</span>
-                  </button>
-                </div>
+              <div className="space-y-1">
+                <label className="block text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Tax Year</label>
+                <input
+                  type="number"
+                  value={taxYear}
+                  onChange={(e) => setTaxYear(parseInt(e.target.value) || new Date().getFullYear())}
+                  className="w-full bg-neutral-950 border border-white/10 rounded p-2.5 text-xs text-white font-mono"
+                />
               </div>
             </div>
-          </div>
+
+            <button
+              type="submit"
+              disabled={calculating || loadingCountries}
+              className="w-full bg-white hover:bg-neutral-200 text-neutral-950 font-bold text-xs py-3 rounded flex items-center justify-center gap-2"
+            >
+              {calculating ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" /> CALCULATING...
+                </>
+              ) : (
+                "CALCULATE"
+              )}
+            </button>
+          </form>
         </div>
 
-        {/* Results logs */}
-        <div className="metric-card rounded p-6 flex flex-col justify-between border-white/10">
-          <div>
-            <h3 className="text-base font-serif italic text-white mb-4 font-normal">
-              Simulation Sandbox Results
-            </h3>
-            <p className="text-xs text-stone-400 mb-4 font-sans leading-relaxed">
-              Consensus simulation outcomes generated by the CPPN neural evolver and SARS transfer-pricing audit scripts.
-            </p>
-          </div>
-
-          <div className="p-3 bg-neutral-950 border border-white/5 rounded flex-1 min-h-[180px] text-xs font-mono text-gray-400 space-y-2 overflow-y-auto">
-            {simLogs.length === 0 ? (
-              <div className="text-gray-650 italic">Clear. Initiate a policy simulation parameters slider to inspect sovereign outcomes in real-time.</div>
-            ) : (
-              simLogs.map((log, idx) => (
-                <div key={idx} className={`${idx === simLogs.length - 1 && log.startsWith("SIMULATION") ? "text-white/90 border border-white/10 p-2.5 rounded bg-white/5 leading-relaxed" : "text-gray-400 font-light"}`}>
-                  {log}
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="border-t border-white/10 mt-5 pt-4 text-[11px] font-mono text-gray-500 flex justify-between">
-            <span>GOV CONNECTOR STATS:</span>
-            <span className="text-white/60 font-medium font-sans uppercase">Secure (100%)</span>
-          </div>
+        <div className="metric-card rounded p-6 border-white/10">
+          <h3 className="text-base font-serif italic text-white mb-4 flex items-center font-normal">
+            <FileText className="w-4 h-4 mr-2 text-white/55" />
+            Result
+          </h3>
+          {error && (
+            <div className="p-4 rounded border border-red-500/20 bg-red-500/5 text-red-400 text-xs font-mono flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              {error}
+            </div>
+          )}
+          {!error && !result && (
+            <div className="py-12 text-center font-mono text-[11px] text-zinc-600">
+              Run a calculation to see the real result from Priv's tax engine.
+            </div>
+          )}
+          {result && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-emerald-400 text-xs font-mono mb-2">
+                <CheckCircle className="w-4 h-4" /> Calculation complete
+              </div>
+              <pre className="p-4 bg-neutral-950 border border-white/5 rounded text-[11px] font-mono text-zinc-300 overflow-x-auto whitespace-pre-wrap">
+                {JSON.stringify(result, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
-
       </div>
+
+      <p className="text-[10px] text-zinc-600 font-mono">
+        Estimates only, generated by Priv's tax engine - not a substitute for professional tax advice.
+      </p>
     </div>
   );
 };

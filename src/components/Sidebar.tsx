@@ -339,14 +339,6 @@ export default function Sidebar({
           <div className="border-t border-white/5 pt-3 text-[9px] text-zinc-600 font-semibold space-y-0.5 text-center">
             <div>SANS MERCANTILE CO.</div>
             <div className="tracking-wider text-zinc-700">REIMAGINE &bull; REBUILD &bull; TRANSCEND</div>
-            <div className="pt-1 select-none opacity-25 hover:opacity-100 transition-opacity duration-300">
-              <NavLink 
-                to="/dashboard/admin/kyc" 
-                className="text-[7.5px] font-mono tracking-widest text-zinc-500 hover:text-rose-500 uppercase"
-              >
-                [Compliance Gate]
-              </NavLink>
-            </div>
           </div>
         )}
       </div>
