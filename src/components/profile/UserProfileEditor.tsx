@@ -364,7 +364,7 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
             <div className="xl:col-span-2 space-y-6">
               <form onSubmit={handleSaveProfile} className="bg-zinc-900/20 border border-zinc-800/60 p-5 rounded-xl space-y-5">
                 <h2 className="text-xs font-mono uppercase tracking-widest font-extrabold text-[#e11d48] border-b border-zinc-900 pb-2 flex items-center justify-between">
-                  <span>1. Core Profile Handshakes</span>
+                  <span>1. Profile</span>
                   <span className="text-[9px] text-zinc-500 lowercase font-medium">Node 04 sync limits verified</span>
                 </h2>
 
@@ -860,7 +860,7 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
           <div className="space-y-3">
             <h3 className="text-xs font-mono uppercase tracking-widest font-extrabold text-white flex items-center justify-between">
               <span>Sovereign Ledger Billing Entries</span>
-              <span className="text-[9px] font-extralight text-zinc-500 capitalize font-sans">Handshake hash #948294</span>
+              <span className="text-[9px] font-extralight text-zinc-500 capitalize font-sans">Hash #948294</span>
             </h3>
             
             <div className="overflow-x-auto border border-zinc-900 rounded-xl bg-zinc-950/20">
