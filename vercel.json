@@ -1,8 +1,10 @@
 {
   "version": 2,
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "http://54.80.228.144:8000/api/:path*" }
+  ],
   "routes": [
     { "handle": "filesystem" },
-    { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
