@@ -121,6 +121,44 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
 
   const [activeGateway, setActiveGateway] = useState("Rest API Gate");
 
+  // Institutional-tier gate — Cluster/Gateway/AI-sync infrastructure UI is
+  // reserved for the Sovereign node tier. Reads the same xm_node_tier key
+  // UserProfileEditor writes, polling to stay in sync without a reload.
+  const [nodeTier, setNodeTier] = useState<string>(() => {
+    return localStorage.getItem("xm_node_tier") || "obsidian";
+  });
+  useEffect(() => {
+    const syncTier = () => setNodeTier(localStorage.getItem("xm_node_tier") || "obsidian");
+    const interval = setInterval(syncTier, 900);
+    return () => clearInterval(interval);
+  }, []);
+  const isInstitutional = nodeTier === "sovereign";
+
+  if (!isInstitutional) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[420px] space-y-5 text-center px-6">
+        <div className="p-4 rounded-full bg-teal-500/10 border border-teal-500/30">
+          <ShieldCheck className="w-10 h-10 text-teal-400" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-serif italic text-white">Cluster Node Interconnections</h1>
+          <p className="text-white/40 text-sm mt-2 max-w-md">
+            Direct infrastructure control — cluster topology, gateway routing, and
+            sovereign AI synchronization — is available on the Sovereign node tier.
+          </p>
+        </div>
+        <button
+          onClick={() => navigate("/dashboard/profile")}
+          className="flex items-center space-x-2 px-5 py-2.5 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/40 rounded text-teal-300 text-sm font-medium transition-colors"
+        >
+          <Sparkles className="w-4 h-4" />
+          <span>Upgrade to Sovereign</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}

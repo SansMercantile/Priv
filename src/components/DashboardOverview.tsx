@@ -249,138 +249,36 @@ export const ActiveConsoleLog: React.FC = () => {
 
 
 export const AdvisorInteractiveInterface: React.FC = () => {
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [step, setStep] = useState("");
-  const [outcome, setOutcome] = useState<{
-    allocation: string;
-    expectedReturn: string;
-    taxExemptions: string;
-    arbitrageFocus: string;
-    verdict: string;
-    stanceName: string;
-  } | null>(null);
-
-  const triggerAdvice = () => {
-    const selector = document.getElementById("advisorStanceSelect") as HTMLSelectElement | null;
-    const currentStance = selector?.value || "balanced";
-
-    setIsAnalyzing(true);
-    setOutcome(null);
-    setStep("Gathering SANS front-end telemetry details & active ledger nodes...");
-
-    setTimeout(() => {
-      setStep("Reading connected HMRC, IRS, & SARS tax portals for compliance bounds...");
-      
-      setTimeout(() => {
-        setStep("Analyzing active portfolio lots (Binance WebSocket & Coinbase API)...");
-        
-        setTimeout(() => {
-          setStep("Synthesizing neural-symbolic macro yield outcomes...");
-          
-          setTimeout(() => {
-            setIsAnalyzing(false);
-            setStep("");
-
-            if (currentStance === "conservative") {
-              setOutcome({
-                stanceName: "CONSERVATIVE (Capital Protection Mode)",
-                allocation: "75% Sovereign Gold Vaults, 20% Basel-IV Premium Corporate Notes, 5% Spot BTC Lots",
-                expectedReturn: "+12.4% Annualized Return (Ultra-Low Volatility)",
-                taxExemptions: "Utilize UK HMRC SADC Section 4 exemption limits to isolate capital transfers, avoiding standard CGT.",
-                arbitrageFocus: "Risk-free basis spread arbitrage and subatomic commodity yield lines.",
-                verdict: "Engage the Tax-Shield node to isolate 100% of underlying physical asset placements and lock in absolute low-risk index trends."
-              });
-            } else if (currentStance === "aggressive") {
-              setOutcome({
-                stanceName: "SOVEREIGN ARBITRAGE (Maximum Leverage & Arbitrage Multipliers)",
-                allocation: "60% Leveraged High-Frequency Futures, 30% Volatile Swap Spreads, 10% Alternative Liquidity",
-                expectedReturn: "+48.2% Annualized Projected Compound Growth Rate",
-                taxExemptions: "Route lot executions through Guernsey Trust accounts and SARS clearance exemptions to legally secure 0% effective tax rates.",
-                arbitrageFocus: "Low-latency sub-millisecond triangular arbitrage on Binance, Coinbase, and OKX API streams simultaneously.",
-                verdict: "Axiomatic opportunity detected. Trigger the Quant-Alpha cluster instantly, scale live futures batch sizes to 2.5x, and let PRIV trade autonomously."
-              });
-            } else {
-              setOutcome({
-                stanceName: "DYNAMIC GROWTH (Balanced Wealth Engine)",
-                allocation: "40% Sovereign Precious Metals, 35% Stable Margin Arbitrage, 25% High-Cap Crypto Futures",
-                expectedReturn: "+24.8% Projected Annualized Growth Yield",
-                taxExemptions: "Execute SARS Capital Gains clearances via South African trade haven avenues to eliminate double-reporting exposure.",
-                arbitrageFocus: "USD/ZAR fiat spread matching coupled with Gibraltar premium staking nodes.",
-                verdict: "Execute structural portfolio rebalancing. Direct PRIV multi-broker agents to scale mid-frequency trading lots by +15% immediately."
-              });
-            }
-          }, 800);
-        }, 800);
-      }, 800);
-    }, 800);
-  };
-
+  // NOTE: This panel previously fabricated specific tax-avoidance instructions
+  // (e.g. routing funds through offshore trusts to claim "0% effective tax")
+  // and invented annualized-return figures with no real calculation behind
+  // them. That content has been removed because real users can reach this
+  // page — it was materially misleading about money and tax exposure.
+  // Replace this placeholder once a real advisory backend exists; until then
+  // it should not present canned output as if it were computed advice.
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between p-4 bg-black/40 border border-white/5 rounded-lg">
         <div className="text-xs text-stone-350 leading-relaxed font-sans max-w-xl">
-          Let SANS examine active client assets and eTax environments. Our high-fidelity neural clusters will configure deep-yield pipelines to secure your strategic financial future.
+          Portfolio and tax guidance isn't available yet — this feature is still being built and does not
+          currently perform any real analysis. Nothing shown here is financial, investment, or tax advice.
         </div>
         <button
-          onClick={triggerAdvice}
-          disabled={isAnalyzing}
-          className={`px-5 py-2.5 bg-white text-black font-mono font-bold text-xs rounded hover:bg-zinc-200 transition whitespace-nowrap select-none cursor-pointer flex items-center justify-center gap-2 ${
-            isAnalyzing ? "opacity-55 cursor-not-allowed" : ""
-          }`}
+          disabled
+          className="px-5 py-2.5 bg-white/10 text-white/40 font-mono font-bold text-xs rounded cursor-not-allowed whitespace-nowrap flex items-center justify-center gap-2"
         >
-          {isAnalyzing ? "DETERMINING BEST OUTCOME..." : "DETERMINE OPTIMAL WEALTH OUTCOME"}
+          COMING SOON
         </button>
       </div>
 
-      {isAnalyzing && (
-        <div className="p-4 bg-orange-500/5 border border-orange-500/20 rounded-lg text-xs font-mono text-orange-400 animate-pulse flex items-center gap-2.5">
-          <span className="w-2 h-2 rounded-full bg-orange-400 animate-ping" />
-          <span>⌛ {step}</span>
-        </div>
-      )}
-
-      {outcome && (
-        <div className="p-5 bg-white/[0.02] border border-white/10 rounded-lg space-y-4 font-mono select-text">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-2">
-            <span className="text-xs uppercase font-bold tracking-widest text-[#FF6B35]">
-              OPTIMAL WEALTH ADVISORY PLAN
-            </span>
-            <span className="text-[10px] text-zinc-550">
-              STANCE: {outcome.stanceName}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            <div className="p-3 bg-black/50 border border-white/5 rounded">
-              <span className="text-[9px] text-[#FF6B35] font-bold block mb-1 uppercase tracking-wider">Strategic Portfolio Allocation</span>
-              <p className="text-white leading-relaxed font-serif italic text-sm">{outcome.allocation}</p>
-            </div>
-
-            <div className="p-3 bg-black/50 border border-white/5 rounded">
-              <span className="text-[9px] text-sky-400 font-bold block mb-1 uppercase tracking-wider">Projected Annual Return</span>
-              <p className="text-white leading-relaxed text-sm font-bold">{outcome.expectedReturn}</p>
-            </div>
-
-            <div className="p-3 bg-black/50 border border-white/5 rounded">
-              <span className="text-[9px] text-amber-500 font-bold block mb-1 uppercase tracking-wider">Sovereign Tax Exemption strategy</span>
-              <p className="text-stone-300 leading-relaxed font-sans">{outcome.taxExemptions}</p>
-            </div>
-
-            <div className="p-3 bg-black/50 border border-white/5 rounded">
-              <span className="text-[9px] text-purple-450 font-bold block mb-1 uppercase tracking-wider">Arbitrage Focus Zone</span>
-              <p className="text-stone-300 leading-relaxed font-sans">{outcome.arbitrageFocus}</p>
-            </div>
-          </div>
-
-          <div className="p-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded text-xs text-stone-200 font-sans leading-relaxed">
-            <strong className="text-white font-serif italic block mb-1">PRIV Tactical Verdict & Execution Authorization:</strong>
-            {outcome.verdict}
-          </div>
-        </div>
-      )}
+      <div className="p-4 bg-white/[0.02] border border-white/10 rounded-lg text-xs font-mono text-zinc-400 leading-relaxed">
+        When this is built, any allocation, return, or tax-strategy output will need to come from a real backend
+        calculation reviewed for accuracy — not a hardcoded response to a dropdown selection.
+      </div>
     </div>
   );
 };
+
 
 
 // Main Dashboard Tab View
@@ -404,24 +302,20 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
           <div className="space-y-2">
             <h2 className="text-2xl font-serif italic text-white font-normal">Live Dashboard Locked</h2>
             <p className="text-zinc-400 text-xs max-w-md mx-auto leading-relaxed">
-              Because you have disabled the Demo Environment, standard simulated stats (like fake $2.8M margins and randomized charts) are removed. You must establish a verified XM Global broker connection to link your genuine live data.
+              Because you have disabled the Demo Environment, standard simulated stats (like fake $2.8M margins and randomized charts) are removed. You must connect a verified Deriv account to link your genuine live data.
             </p>
           </div>
 
           <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
             <a
-              href="https://affs.click/Ddvn7?partner=BHWVC"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/api/v1/auth/deriv/login?account_type=live"
               className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-mono font-bold text-xs rounded border border-white/10 transition-all duration-300 flex items-center justify-center space-x-2 cursor-pointer"
             >
-              <span>CREATE XM ACCOUNT</span>
+              <span>CONNECT DERIV ACCOUNT</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
             </a>
             <div className="mt-2 text-[11px] text-zinc-500 font-mono flex items-center gap-3 justify-center">
-              <a href="https://affs.click/Eamrl?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Homepage</a>
-              <a href="https://affs.click/Gwdle?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Mobile App</a>
-              <a href="https://affs.click/G39AP?partner=BHWVC" target="_blank" rel="noopener noreferrer" className="underline">Partner with XM</a>
+              <a href="https://deriv.com/signup" target="_blank" rel="noopener noreferrer" className="underline">Don't have an account? Sign up</a>
             </div>
             <button
               onClick={() => {
@@ -430,7 +324,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
               className="px-5 py-2.5 bg-white hover:bg-zinc-200 text-black font-mono font-bold text-xs rounded transition flex items-center justify-center space-x-2 cursor-pointer border border-white"
             >
               <Coins className="w-3.5 h-3.5" />
-              <span>LINK XM BROKER</span>
+              <span>LINK DERIV BROKER</span>
             </button>
           </div>
         </div>
@@ -611,25 +505,26 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
       .catch(err => console.error("Error pulling live agent stats:", err));
 
     // 2. Live account balance if live & connected
+    // Previously called /api/brokers/account/xm_user_account_{id}, a route
+    // that doesn't exist on the backend — this silently failed every time.
+    // Now pulls the real Deriv balance from connections_api, and no longer
+    // adds the hardcoded $148,251.52 / $92,410.88 fake exchange balances.
     const isLive = localStorage.getItem("demoMode") === "false";
     if (isLive && isLogged) {
-      const activeAcctId = localStorage.getItem("xm_account_id") || "xm_user_account";
-      fetch(`/api/brokers/account/xm_user_account_${activeAcctId}`)
+      fetch(`/api/v1/connections/brokers/priv_deriv`)
         .then(res => res.json())
-        .then(accountData => {
-          if (accountData && accountData.balance !== undefined) {
-            localStorage.setItem("xm_balance", accountData.balance.toString());
-            const binanceBal = localStorage.getItem("ex_conn_binance") === "true" ? 148251.52 : 0.0;
-            const coinbaseBal = localStorage.getItem("ex_conn_coinbase") === "true" ? 92410.88 : 0.0;
-            const liveTotalVal = accountData.balance + binanceBal + coinbaseBal;
+        .then(brokerData => {
+          const balance = brokerData?.account?.balance;
+          if (typeof balance === "number") {
+            localStorage.setItem("xm_balance", balance.toString());
             setStats(prev => ({
               ...prev,
-              totalProfit: liveTotalVal,
-              dailyReturn: 0.42
+              totalProfit: balance,
+              dailyReturn: 0.0
             }));
           }
         })
-        .catch(err => console.error("Error drawing live dashboard balance indicators:", err));
+        .catch(err => console.error("Error fetching live Deriv account balance:", err));
     }
   }, [demoMode, isLogged]);
 
@@ -679,7 +574,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         </div>
       </div>
 
-      {/* SANS Autonomous Execution Daemon Monitor (Ensures users know system mechanics & mockdata background running, identical execution outcome) */}
+      {/* Demo/Simulation disclosure panel — rewritten so it no longer claims demo
+          performance predicts live results. Real users can reach this page. */}
       <div className="p-5 border border-white/5 bg-gradient-to-br from-neutral-950/25 via-[#0d0708]/5 to-black rounded-lg space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-white/5">
           <div className="flex items-center space-x-2.5">
@@ -687,30 +583,32 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="font-serif italic text-white text-md tracking-wide">Continuous SANS Autonomous Daemon Active</span>
+            <span className="font-serif italic text-white text-md tracking-wide">Demo Mode Notice</span>
           </div>
           <span className="font-mono text-[9px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded uppercase font-extrabold tracking-widest animate-pulse">
-            DAEMON STATUS: RUNNING (DEMO ARBITRAGE MODE)
+            DEMO ARBITRAGE MODE
           </span>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs font-mono">
           <div className="p-3 bg-white/[0.01] border border-white/5 rounded-lg space-y-1">
-            <span className="text-[9.5px] font-bold text-rose-500 uppercase tracking-wider block">Continuous Background Execution</span>
+            <span className="text-[9.5px] font-bold text-rose-500 uppercase tracking-wider block">Simulated Data</span>
             <p className="text-zinc-400 font-sans text-[11px] leading-relaxed font-light">
-              Even when the interface is toggled to <strong className="text-white text-[11px]">Real Mode</strong>, the SANS server daemon continues to trade utilizing the emulated demo mockdata buffer. This ensures our AI model logs zero interruption and keeps testing risk rules.
+              Figures shown in Demo Mode are simulated for demonstration purposes and do not reflect real market
+              activity or a real account balance.
             </p>
           </div>
           <div className="p-3 bg-white/[0.01] border border-white/5 rounded-lg space-y-1">
-            <span className="text-[9.5px] font-bold text-rose-500 uppercase tracking-wider block">Sovereign Mechanics Match</span>
+            <span className="text-[9.5px] font-bold text-rose-500 uppercase tracking-wider block">Live Mode Is Separate</span>
             <p className="text-zinc-400 font-sans text-[11px] leading-relaxed font-light">
-              This sandbox mechanism maps the exact micro-second volatility indices and spread metrics. Users see precisely how structural multi-agents operate on emulated capital without risking genuine liquidity during setup.
+              Real Mode uses your connected broker's live data. It runs independently of the demo simulation above.
             </p>
           </div>
           <div className="p-3 bg-white/[0.01] border border-white/5 rounded-lg space-y-1">
-            <span className="text-[9.5px] font-bold text-[#FF6B35] uppercase tracking-wider block">Twin-Engine Return Expectation</span>
+            <span className="text-[9.5px] font-bold text-[#FF6B35] uppercase tracking-wider block">No Performance Guarantee</span>
             <p className="text-zinc-400 font-sans text-[11px] leading-relaxed font-light font-normal text-zinc-350">
-              Because the background server utilizes identical trading strategies, indicators, and execution pipes, you will secure matching or highly similar results when transitioning authorized API keys and account lots to the live ledger.
+              Demo Mode results do not predict or guarantee how a live, funded account will perform. Past or
+              simulated performance is not indicative of future results.
             </p>
           </div>
         </div>
@@ -854,14 +752,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
           </div>
 
           <div className="space-y-3.5">
-            {/* XM Global Broker Row */}
+            {/* Deriv Broker Row */}
             <div className="flex items-center justify-between p-3 rounded bg-neutral-950 border border-white/5 hover:border-white/15 transition-colors">
               <div className="flex items-center gap-3">
                 <div className={`w-2 h-2 rounded-full ${isLogged ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
                 <div>
-                  <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">XM Global Account Linked</h4>
+                  <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">Deriv Account Linked</h4>
                   <p className="text-[10px] font-mono text-zinc-500 mt-0.5 uppercase">
-                    {isLogged ? `ID: ${xmId} • SERVER: ${xmServer}` : "Node Handshake Missing"}
+                    {isLogged ? `ID: ${xmId}` : "Node Handshake Missing"}
                   </p>
                 </div>
               </div>
@@ -888,7 +786,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
               </div>
               <div className="text-right">
                 <span className={`text-sm font-mono font-bold block ${isBinanceConnected ? "text-white" : "text-zinc-650"}`}>
-                  {isBinanceConnected ? "$148,251.52" : "$0.00"}
+                  {isBinanceConnected ? "Not yet wired" : "$0.00"}
                 </span>
                 <span className={`text-[9px] font-mono uppercase block ${isBinanceConnected ? "text-emerald-500" : "text-zinc-500"}`}>
                   {isBinanceConnected ? "Active Sync" : "Not Linked"}
@@ -909,7 +807,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
               </div>
               <div className="text-right">
                 <span className={`text-sm font-mono font-bold block ${isCoinbaseConnected ? "text-white" : "text-zinc-650"}`}>
-                  {isCoinbaseConnected ? "$92,410.88" : "$0.00"}
+                  {isCoinbaseConnected ? "Not yet wired" : "$0.00"}
                 </span>
                 <span className={`text-[9px] font-mono uppercase block ${isCoinbaseConnected ? "text-emerald-500" : "text-zinc-500"}`}>
                   {isCoinbaseConnected ? "Active Sync" : "Not Linked"}
@@ -917,23 +815,27 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
               </div>
             </div>
 
-            {/* HMRC Exemption Bridge */}
+            {/* Tax feature placeholder — previously showed a "Guernsey Tax-Shield"
+                claiming an active 0% effective tax rate. No real tax
+                calculation was wired to this; removed since real users can
+                reach this page. A real /api/v1/tax/calculate endpoint exists
+                on the backend and should back this if it's rebuilt. */}
             <div className="flex items-center justify-between p-3 rounded bg-neutral-950/30 border border-white/5 border-dashed">
               <div className="flex items-center gap-3">
-                <div className={`w-2 h-2 rounded-full ${isHmrcConnected ? "bg-sky-400 animate-pulse" : "bg-zinc-600"}`} />
+                <div className="w-2 h-2 rounded-full bg-zinc-600" />
                 <div>
-                  <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">Guernsey Tax-Shield Integration</h4>
+                  <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">Tax Reporting</h4>
                   <p className="text-[10px] font-mono text-zinc-500 mt-0.5 uppercase">
-                    {isHmrcConnected ? "HMRC Exemption Route Node" : "HMRC Tunnel Standby"}
+                    Not yet available
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <span className={`text-sm font-mono font-bold block ${isHmrcConnected ? "text-sky-450" : "text-zinc-650"}`}>
-                  {isHmrcConnected ? "0% EFF TAX" : "TAX N/A"}
+                <span className="text-sm font-mono font-bold block text-zinc-650">
+                  N/A
                 </span>
-                <span className={`text-[9.5px] font-mono uppercase block ${isHmrcConnected ? "text-zinc-500" : "text-zinc-600"}`}>
-                  {isHmrcConnected ? "Sovereign Active" : "No Channel"}
+                <span className="text-[9.5px] font-mono uppercase block text-zinc-600">
+                  Coming Soon
                 </span>
               </div>
             </div>
