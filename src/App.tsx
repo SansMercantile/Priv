@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 import { Toaster } from "./components/ui/toaster";
 import Sidebar from "./components/Sidebar";
 import Dashboard from "./components/dashboard/RealTimeDashboard";
@@ -193,6 +194,7 @@ function App({ initialDevice = "desktop" }: AppProps) {
         
         <UnifiedAssistant isVisible={true} />
         <Toaster />
+        <VercelAnalytics />
       </div>
     </>
   );
