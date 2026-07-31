@@ -307,6 +307,41 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// Proxy /api/v1 routes to Python backend on port 8000
+app.use("/api/v1", async (req, res) => {
+  // Skip proxy for routes already defined in Express
+  const skipRoutes = ['/api/v1/agents', '/api/v1/market', '/api/v1/portfolio'];
+  if (skipRoutes.some(route => req.path.startsWith(route.replace('/api/v1', '')))) {
+    return res.status(404).json({ error: "Endpoint not found in Express server" });
+  }
+  
+  try {
+    const pythonBackendUrl = `http://localhost:8000/api/v1${req.path}`;
+    console.log(`Proxying ${req.method} ${req.path} to Python backend: ${pythonBackendUrl}`);
+    
+    const response = await fetch(pythonBackendUrl, {
+      method: req.method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...Object.fromEntries(Object.entries(req.headers).filter(([k]) => !k.startsWith('x-forwarded')))
+      },
+      body: req.method !== 'GET' && req.method !== 'HEAD' ? JSON.stringify(req.body) : undefined
+    });
+    
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } else {
+      const text = await response.text();
+      res.status(response.status).send(text);
+    }
+  } catch (error) {
+    console.error("Error proxying to Python backend:", error);
+    res.status(500).json({ error: "Failed to connect to Python backend" });
+  }
+});
+
 // ── Google ADK Agent Registry + Enhanced Multi-Agent System ─────────────────
 // Integrates Google's ADK agents alongside PRIV's native autonomous agents.
 // Each ADK agent maps to a specialized capability that augments the core trading AI.
