@@ -26,7 +26,7 @@
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "react-helmet": "^6.1.0",
-    "react-router-dom": "^7.15.1",
+    "react-router-dom": "^7.11.0",
     "vite": "^6.2.3"
   },
   "devDependencies": {
