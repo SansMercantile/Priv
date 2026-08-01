@@ -11,3 +11,5 @@ coverage/
 /backend/
 /shared_resources/
 /priv/
+
+.vercel
