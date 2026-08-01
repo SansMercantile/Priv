@@ -34,10 +34,18 @@ function LoginScreen() {
 
           <button
             disabled
-            title="Microsoft sign-in is being configured"
+            title="Microsoft sign-in needs a real Azure AD app registration (Auth0's dev keys don't cover this provider)"
             className="w-full flex items-center justify-center gap-3 rounded-lg bg-[#2f2f2f]/40 text-white/40 font-medium py-2.5 px-4 cursor-not-allowed"
           >
             Continue with Microsoft (coming soon)
+          </button>
+
+          <button
+            onClick={() => handleLogin("apple")}
+            disabled={isLoading}
+            className="w-full flex items-center justify-center gap-3 rounded-lg bg-white text-black font-medium py-2.5 px-4 hover:bg-white/90 transition disabled:opacity-50"
+          >
+            Continue with Apple
           </button>
 
           <div className="flex items-center gap-3 py-2">
