@@ -12,6 +12,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@auth0/auth0-react": "^2.22.1",
     "@datadog/browser-rum": "^7.1.0",
     "@google/genai": "^1.29.0",
     "@tailwindcss/vite": "^4.1.14",

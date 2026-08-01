@@ -20,6 +20,7 @@ import ProfilePage from "./components/profile/ProfilePage";
 import KycAdminReviewPage from "./components/profile/KycAdminReviewPage";
 import UnifiedAssistant from "./ui/UnifiedAssistant";
 import GuidedWalkthrough from "./components/GuidedWalkthrough";
+import LoginGate from "./components/auth/LoginGate";
 import { initDatadog } from "./lib/datadog";
 
 interface AppProps {
@@ -98,7 +99,7 @@ function App({ initialDevice = "desktop" }: AppProps) {
   };
 
   return (
-    <>
+    <LoginGate>
       <div className={`min-h-screen bg-black neural-grid matrix-bg device-${device}`}>
         {isWalkthroughActive && <GuidedWalkthrough onEnd={handleEndWalkthrough} />}
         
@@ -196,7 +197,7 @@ function App({ initialDevice = "desktop" }: AppProps) {
         <Toaster />
         <VercelAnalytics />
       </div>
-    </>
+    </LoginGate>
   );
 }
 

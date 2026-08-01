@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
+import { useAuth0 } from "@auth0/auth0-react";
+import { LogOut } from "lucide-react";
 import { 
   LayoutDashboard, 
   Brain, 
@@ -180,6 +182,10 @@ export default function Sidebar({
   isDemoLocked = false
 }: SidebarProps) {
   const isMobile = device === "mobile";
+  const { user, logout } = useAuth0();
+  const handleLogout = () => {
+    logout({ logoutParams: { returnTo: window.location.origin } });
+  };
 
   // Mobile Top Bar
   if (isMobile) {
@@ -333,6 +339,19 @@ export default function Sidebar({
               <Smartphone className="w-3.5 h-3.5" />
             </button>
           </div>
+        </div>
+
+        <div className="border-t border-white/5 pt-3">
+          <button
+            onClick={handleLogout}
+            title={user?.email || "Sign out"}
+            className={`w-full flex items-center gap-2 text-[10px] font-semibold text-zinc-500 hover:text-rose-300 transition py-1.5 px-1 rounded ${
+              isMinimized ? "justify-center" : ""
+            }`}
+          >
+            <LogOut className="w-3.5 h-3.5 flex-shrink-0" />
+            {!isMinimized && <span className="truncate">{user?.email || "Sign out"}</span>}
+          </button>
         </div>
 
         {!isMinimized && (
