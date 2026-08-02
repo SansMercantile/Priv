@@ -1,55 +1,46 @@
 import React, { useEffect, useState } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
-import apiClient from "../../api/apiClient";
+import {
+  initiateDerivLogin,
+  isDerivCallback,
+  handleDerivCallback,
+  fetchDerivAccounts,
+  getAuthInfo as getDerivAuthInfo,
+  getDerivAccounts,
+  DerivOAuthError,
+} from "../../lib/derivAuth";
 
 interface LoginGateProps {
   children: React.ReactNode;
 }
 
-const DERIV_SESSION_KEY = "priv_deriv_connected";
-
-function isOAuthCallbackPath() {
-  return window.location.pathname === "/oauth/callback";
+/** True if we have a real, non-expired Deriv session already (from a
+ * previous visit). This is the source of truth for "logged in via Deriv" -
+ * no separate flag needed, getAuthInfo() already checks expiry. */
+function hasDerivSession(): boolean {
+  return !!getDerivAuthInfo();
 }
 
-/** Processes ?broker=deriv&status=success|error redirects from the backend
- * OAuth callback, then cleans the URL. Returns while still processing. */
-function useOAuthCallbackHandler(onDone: (result: { success: boolean; message?: string }) => void) {
-  const [processing, setProcessing] = useState(isOAuthCallbackPath());
+function useDerivCallbackHandler(onDone: (result: { success: boolean; message?: string }) => void) {
+  const [processing, setProcessing] = useState(isDerivCallback());
 
   useEffect(() => {
-    if (!isOAuthCallbackPath()) return;
-    const params = new URLSearchParams(window.location.search);
-    const broker = params.get("broker");
-    const status = params.get("status");
-    const message = params.get("message") || undefined;
-
-    if (broker === "deriv" && status === "success") {
+    if (!isDerivCallback()) return;
+    (async () => {
       try {
-        window.localStorage.setItem(DERIV_SESSION_KEY, "1");
-      } catch {
-        // ignore storage failures, session check will just re-verify via API
+        const authInfo = await handleDerivCallback();
+        await fetchDerivAccounts(authInfo);
+        onDone({ success: true });
+      } catch (err) {
+        const message = err instanceof DerivOAuthError ? err.message : "unknown_error";
+        onDone({ success: false, message });
+      } finally {
+        setProcessing(false);
       }
-      onDone({ success: true });
-    } else {
-      onDone({ success: false, message: message || status || "unknown_error" });
-    }
-    window.history.replaceState({}, document.title, "/dashboard");
-    setProcessing(false);
+    })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return processing;
-}
-
-/** True if we previously saw a successful Deriv connect. This is optimistic
- * (persisted locally); the real source of truth is the backend's
- * /api/v1/auth/connections list, which the app re-checks after landing. */
-function hasLocalDerivSession(): boolean {
-  try {
-    return window.localStorage.getItem(DERIV_SESSION_KEY) === "1";
-  } catch {
-    return false;
-  }
 }
 
 function LoginScreen({ derivError }: { derivError?: string | null }) {
@@ -63,13 +54,9 @@ function LoginScreen({ derivError }: { derivError?: string | null }) {
     });
   };
 
-  const handleDerivLogin = () => {
+  const handleDerivLogin = async () => {
     setDerivLoading(true);
-    // Relative path - goes through the Vercel proxy straight to the backend,
-    // which redirects to Deriv's own login/signup page (Deriv handles new
-    // account creation itself; every new account gets a demo/virtual
-    // account automatically).
-    window.location.href = "/api/v1/auth/deriv/login?account_type=demo";
+    await initiateDerivLogin();
   };
 
   return (
@@ -150,52 +137,18 @@ function LoginScreen({ derivError }: { derivError?: string | null }) {
 
 export default function LoginGate({ children }: LoginGateProps) {
   const { isAuthenticated, isLoading, error } = useAuth0();
-  const [derivChecked, setDerivChecked] = useState(false);
-  const [derivConnected, setDerivConnected] = useState(hasLocalDerivSession());
+  const [derivConnected, setDerivConnected] = useState(hasDerivSession());
   const [derivError, setDerivError] = useState<string | null>(null);
 
-  const oauthProcessing = useOAuthCallbackHandler(({ success, message }) => {
+  const derivProcessing = useDerivCallbackHandler(({ success, message }) => {
     if (success) {
       setDerivConnected(true);
     } else {
       setDerivError(message || "connection_failed");
-      try {
-        window.localStorage.removeItem(DERIV_SESSION_KEY);
-      } catch {
-        /* ignore */
-      }
     }
   });
 
-  // Re-verify against the backend (source of truth) once, on load, so a
-  // stale/cleared localStorage flag doesn't wrongly gate someone out, and a
-  // revoked connection doesn't wrongly leave someone in.
-  useEffect(() => {
-    let cancelled = false;
-    apiClient
-      .getBrokerConnections()
-      .then(({ data }) => {
-        if (cancelled) return;
-        const hasDeriv = (data?.data?.connections || []).some((c: any) => c.broker === "deriv");
-        setDerivConnected(hasDeriv);
-        try {
-          if (hasDeriv) window.localStorage.setItem(DERIV_SESSION_KEY, "1");
-          else window.localStorage.removeItem(DERIV_SESSION_KEY);
-        } catch {
-          /* ignore */
-        }
-      })
-      .catch(() => {
-        // Backend unreachable - fall back to whatever we had locally rather
-        // than locking the user out.
-      })
-      .finally(() => !cancelled && setDerivChecked(true));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (isLoading || oauthProcessing || !derivChecked) {
+  if (isLoading || derivProcessing) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-white/40 text-sm font-mono">Loading…</div>
