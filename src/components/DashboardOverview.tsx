@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBrokerConnections } from "../lib/useBrokerConnections";
+import { initiateDerivLogin } from "../lib/derivAuth";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -507,13 +508,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
           </div>
 
           <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
-            <a
-              href="/api/v1/auth/deriv/login?account_type=live"
+            <button
+              onClick={() => initiateDerivLogin()}
               className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-mono font-bold text-xs rounded border border-white/10 transition-all duration-300 flex items-center justify-center space-x-2 cursor-pointer"
             >
               <span>CONNECT DERIV ACCOUNT</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
-            </a>
+            </button>
             <div className="mt-2 text-[11px] text-zinc-500 font-mono flex items-center gap-3 justify-center">
               <a href="https://deriv.com/signup" target="_blank" rel="noopener noreferrer" className="underline">Don't have an account? Sign up</a>
             </div>

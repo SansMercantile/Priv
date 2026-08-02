@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import apiClient from "../api/apiClient";
+import { getDerivAccounts } from "./derivAuth";
 
 export interface BrokerConnection {
   broker: string;
@@ -17,9 +18,11 @@ export interface BrokerConnectionsState {
 }
 
 /** Single source of truth for "does this user actually have a real/demo
- * Deriv account connected", backed by the real backend record rather than
- * any localStorage flag. Used to gate the demo/real toggle and the
- * "Live Dashboard Locked" screen consistently. */
+ * Deriv account connected". Deriv itself is checked via the real
+ * client-side PKCE OAuth session (src/lib/derivAuth) - that's the account
+ * data Deriv's own API returned, not a localStorage flag we invented.
+ * Other brokers (Alpaca, etc.) still go through the backend connections
+ * endpoint. */
 export function useBrokerConnections(): BrokerConnectionsState {
   const [connections, setConnections] = useState<BrokerConnection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,16 +33,30 @@ export function useBrokerConnections(): BrokerConnectionsState {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+
+    // Deriv: real account data from the client-side OAuth session.
+    const derivAccounts = getDerivAccounts() || [];
+    const derivConns: BrokerConnection[] = derivAccounts.map((a) => ({
+      broker: "deriv",
+      account_type: a.account_type === "demo" ? "demo" : "live",
+      status: "connected",
+    }));
+
+    // Other brokers (Alpaca, etc.): still via the backend.
     apiClient
       .getBrokerConnections()
       .then(({ data }) => {
         if (cancelled) return;
-        setConnections(data?.data?.connections || []);
+        const backendConns: BrokerConnection[] = (data?.data?.connections || []).filter(
+          (c: BrokerConnection) => c.broker !== "deriv" // Deriv comes from derivAuth now
+        );
+        setConnections([...derivConns, ...backendConns]);
       })
       .catch(() => {
-        if (!cancelled) setConnections([]);
+        if (!cancelled) setConnections(derivConns);
       })
       .finally(() => !cancelled && setLoading(false));
+
     return () => {
       cancelled = true;
     };
