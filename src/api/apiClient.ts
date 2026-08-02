@@ -1,10 +1,15 @@
 // High-integrity API Client for SANS PRIV Core KYC, Profile, and billing services
+import { getAppUserId } from "../lib/appUserId";
 
 const BASE = (import.meta as any).env?.VITE_API_BASE_URL || "";
 
+function withUserHeader(headers?: HeadersInit): HeadersInit {
+  return { ...(headers || {}), "X-User-Id": getAppUserId() };
+}
+
 async function safeFetch(url: string, options?: RequestInit) {
   const fullUrl = `${BASE}${url}`;
-  const response = await fetch(fullUrl, options);
+  const response = await fetch(fullUrl, { ...options, headers: withUserHeader(options?.headers) });
   const contentType = response.headers.get("content-type") || "";
   // Guard: if server returns HTML (404 page, error page) instead of JSON,
   // throw a human-readable error instead of "Unexpected token 'T'..."
@@ -79,6 +84,12 @@ export const apiClient = {
       status: "uploaded",
     },
   }),
+
+  // Broker OAuth / connections (Deriv, Alpaca, etc.)
+  getBrokerConnections: () => safeFetch("/api/v1/auth/connections"),
+  getBrokerCatalog: () => safeFetch("/api/v1/auth/brokers"),
+  disconnectBroker: (broker: string, accountType: string = "live") =>
+    safeFetch(`/api/v1/auth/connections/${broker}?account_type=${accountType}`, { method: "DELETE" }),
 };
 
 export default apiClient;
