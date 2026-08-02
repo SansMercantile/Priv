@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useBrokerConnections } from "../lib/useBrokerConnections";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -289,9 +290,9 @@ interface DashboardOverviewProps {
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, setActiveSection }) => {
   const navigate = useNavigate();
-  const isLogged = localStorage.getItem("xm_is_logged") === "true" || localStorage.getItem("demoMode") !== "false";
+  const { hasRealDeriv, loading: brokerLoading } = useBrokerConnections();
 
-  if (!demoMode && !isLogged) {
+  if (!demoMode && !brokerLoading && !hasRealDeriv) {
     return (
       <div className="space-y-6 max-w-3xl mx-auto py-12 animate-fadeIn">
         <div className="text-center p-8 bg-[#0a0a0a] border border-white/10 rounded-xl space-y-6 shadow-[0_12px_45px_0_rgba(0,0,0,0.8)]">
@@ -317,15 +318,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
             <div className="mt-2 text-[11px] text-zinc-500 font-mono flex items-center gap-3 justify-center">
               <a href="https://deriv.com/signup" target="_blank" rel="noopener noreferrer" className="underline">Don't have an account? Sign up</a>
             </div>
-            <button
-              onClick={() => {
-                navigate("/dashboard/terminal");
-              }}
-              className="px-5 py-2.5 bg-white hover:bg-zinc-200 text-black font-mono font-bold text-xs rounded transition flex items-center justify-center space-x-2 cursor-pointer border border-white"
-            >
-              <Coins className="w-3.5 h-3.5" />
-              <span>LINK DERIV BROKER</span>
-            </button>
           </div>
         </div>
       </div>

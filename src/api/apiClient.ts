@@ -29,6 +29,31 @@ async function safeFetch(url: string, options?: RequestInit) {
   return data;
 }
 
+// The EC2 Priv Core backend (trading engine, broker OAuth, agents) is a
+// DIFFERENT service from whatever VITE_API_BASE_URL points at (currently
+// the Azure KYC/profile/billing service). Broker/OAuth calls must always
+// use a relative path so they go through vercel.json's /api/* proxy to
+// EC2, never prefixed with BASE - otherwise they get sent cross-origin to
+// Azure, which doesn't have these routes and doesn't allow our origin.
+async function safeFetchRelative(url: string, options?: RequestInit) {
+  const response = await fetch(url, { ...options, headers: withUserHeader(options?.headers) });
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    const text = await response.text();
+    throw new Error(
+      `Server returned non-JSON (HTTP ${response.status}): ${text.slice(0, 120)}`
+    );
+  }
+  const data = await response.json();
+  if (!response.ok) {
+    throw Object.assign(
+      new Error(data?.detail || data?.error || `HTTP ${response.status}`),
+      { response: { data, status: response.status } }
+    );
+  }
+  return data;
+}
+
 export const apiClient = {
   get: async (url: string) => {
     const data = await safeFetch(url);
@@ -85,11 +110,12 @@ export const apiClient = {
     },
   }),
 
-  // Broker OAuth / connections (Deriv, Alpaca, etc.)
-  getBrokerConnections: () => safeFetch("/api/v1/auth/connections"),
-  getBrokerCatalog: () => safeFetch("/api/v1/auth/brokers"),
+  // Broker OAuth / connections (Deriv, Alpaca, etc.) - always relative,
+  // always hits the EC2 backend via the /api/* proxy, never the Azure BASE.
+  getBrokerConnections: () => safeFetchRelative("/api/v1/auth/connections"),
+  getBrokerCatalog: () => safeFetchRelative("/api/v1/auth/brokers"),
   disconnectBroker: (broker: string, accountType: string = "live") =>
-    safeFetch(`/api/v1/auth/connections/${broker}?account_type=${accountType}`, { method: "DELETE" }),
+    safeFetchRelative(`/api/v1/auth/connections/${broker}?account_type=${accountType}`, { method: "DELETE" }),
 };
 
 export default apiClient;
