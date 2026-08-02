@@ -292,38 +292,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
   const navigate = useNavigate();
   const { hasRealDeriv, loading: brokerLoading } = useBrokerConnections();
 
-  if (!demoMode && !brokerLoading && !hasRealDeriv) {
-    return (
-      <div className="space-y-6 max-w-3xl mx-auto py-12 animate-fadeIn">
-        <div className="text-center p-8 bg-[#0a0a0a] border border-white/10 rounded-xl space-y-6 shadow-[0_12px_45px_0_rgba(0,0,0,0.8)]">
-          <div className="mx-auto w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20 text-red-500">
-            <Lock className="w-5 h-5 animate-pulse" />
-          </div>
-          
-          <div className="space-y-2">
-            <h2 className="text-2xl font-serif italic text-white font-normal">Live Dashboard Locked</h2>
-            <p className="text-zinc-400 text-xs max-w-md mx-auto leading-relaxed">
-              Because you have disabled the Demo Environment, standard simulated stats (like fake $2.8M margins and randomized charts) are removed. You must connect a verified Deriv account to link your genuine live data.
-            </p>
-          </div>
-
-          <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
-            <a
-              href="/api/v1/auth/deriv/login?account_type=live"
-              className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-mono font-bold text-xs rounded border border-white/10 transition-all duration-300 flex items-center justify-center space-x-2 cursor-pointer"
-            >
-              <span>CONNECT DERIV ACCOUNT</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </a>
-            <div className="mt-2 text-[11px] text-zinc-500 font-mono flex items-center gap-3 justify-center">
-              <a href="https://deriv.com/signup" target="_blank" rel="noopener noreferrer" className="underline">Don't have an account? Sign up</a>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const isLiveMode = localStorage.getItem("demoMode") === "false";
   const isBinanceConnected = !isLiveMode || localStorage.getItem("ex_conn_binance") === "true";
   const isCoinbaseConnected = !isLiveMode || localStorage.getItem("ex_conn_coinbase") === "true";
@@ -496,17 +464,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
       })
       .catch(err => console.error("Error pulling live agent stats:", err));
 
-    // 2. Live account balance if live & connected
-    // Previously called /api/brokers/account/xm_user_account_{id}, a route
-    // that doesn't exist on the backend — this silently failed every time.
-    // Now pulls the real Deriv balance from connections_api, and no longer
-    // adds the hardcoded $148,251.52 / $92,410.88 fake exchange balances.
-    const isLive = localStorage.getItem("demoMode") === "false";
-    if (isLive && isLogged) {
-      fetch(`/api/v1/connections/brokers/priv_deriv`)
+    if (isLive && hasRealDeriv) {
+      fetch(`/api/v1/auth/connections`)
         .then(res => res.json())
-        .then(brokerData => {
-          const balance = brokerData?.account?.balance;
+        .then(result => {
+          const derivConn = (result?.data?.connections || []).find((c: any) => c.broker === "deriv" && c.account_type === "live");
+          const balance = derivConn?.token_meta?.balance;
           if (typeof balance === "number") {
             localStorage.setItem("xm_balance", balance.toString());
             setStats(prev => ({
@@ -518,7 +481,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         })
         .catch(err => console.error("Error fetching live Deriv account balance:", err));
     }
-  }, [demoMode, isLogged]);
+  }, [demoMode, hasRealDeriv]);
 
   const getSovereignGrade = () => {
     if (riskAppetite === "Conservative") return { g: "AAA GRADE", desc: "Capital Shielded", color: "text-emerald-400 border-emerald-900/50 bg-emerald-950/30" };
@@ -527,6 +490,38 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
     return { g: "CCC+ LEVERAGED", desc: "High-Yield HFT", color: "text-amber-500 border-amber-900/50 bg-amber-950/30" };
   };
   const gradeInfo = getSovereignGrade();
+
+  if (!demoMode && !brokerLoading && !hasRealDeriv) {
+    return (
+      <div className="space-y-6 max-w-3xl mx-auto py-12 animate-fadeIn">
+        <div className="text-center p-8 bg-[#0a0a0a] border border-white/10 rounded-xl space-y-6 shadow-[0_12px_45px_0_rgba(0,0,0,0.8)]">
+          <div className="mx-auto w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20 text-red-500">
+            <Lock className="w-5 h-5 animate-pulse" />
+          </div>
+          
+          <div className="space-y-2">
+            <h2 className="text-2xl font-serif italic text-white font-normal">Live Dashboard Locked</h2>
+            <p className="text-zinc-400 text-xs max-w-md mx-auto leading-relaxed">
+              Because you have disabled the Demo Environment, standard simulated stats (like fake $2.8M margins and randomized charts) are removed. You must connect a verified Deriv account to link your genuine live data.
+            </p>
+          </div>
+
+          <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
+            <a
+              href="/api/v1/auth/deriv/login?account_type=live"
+              className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-mono font-bold text-xs rounded border border-white/10 transition-all duration-300 flex items-center justify-center space-x-2 cursor-pointer"
+            >
+              <span>CONNECT DERIV ACCOUNT</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </a>
+            <div className="mt-2 text-[11px] text-zinc-500 font-mono flex items-center gap-3 justify-center">
+              <a href="https://deriv.com/signup" target="_blank" rel="noopener noreferrer" className="underline">Don't have an account? Sign up</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
