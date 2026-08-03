@@ -16,8 +16,9 @@ import {
   DerivAuthInfo,
 } from "./storage";
 
-const DERIV_APP_ID = "3402xb7xTddMu1ZexwZgS"; // PrivCore_lite - registered redirect: https://priv.sansmercantile.com
+const DERIV_APP_ID = "340CMkSyVrWLSlXnzSaIP"; // PRIVCore - real OAuth-type app, registered redirect: https://priv.sansmercantile.com/success
 const AUTH_BASE = "https://auth.deriv.com/oauth2";
+const REDIRECT_URI = window.location.origin + "/success";
 
 export class DerivOAuthError extends Error {
   constructor(message: string) {
@@ -46,7 +47,7 @@ async function buildPkceParams(): Promise<URLSearchParams> {
     scope: "trade account_manage",
     response_type: "code",
     client_id: DERIV_APP_ID,
-    redirect_uri: window.location.origin,
+    redirect_uri: REDIRECT_URI,
     state: csrfToken,
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
@@ -116,7 +117,7 @@ async function exchangeCodeForTokens(code: string, codeVerifier: string): Promis
     grant_type: "authorization_code",
     code,
     client_id: DERIV_APP_ID,
-    redirect_uri: window.location.origin,
+    redirect_uri: REDIRECT_URI,
     code_verifier: codeVerifier,
   });
 
