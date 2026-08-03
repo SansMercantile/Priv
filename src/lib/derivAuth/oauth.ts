@@ -44,7 +44,7 @@ async function buildPkceParams(): Promise<URLSearchParams> {
   storeCodeVerifier(codeVerifier);
 
   return new URLSearchParams({
-    scope: "trade account_manage",
+    scope: "read trade payments admin",
     response_type: "code",
     client_id: DERIV_APP_ID,
     redirect_uri: REDIRECT_URI,
