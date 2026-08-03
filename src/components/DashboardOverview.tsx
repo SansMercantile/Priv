@@ -470,7 +470,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
       })
       .catch(err => console.error("Error pulling live agent stats:", err));
 
-    if (isLive && hasRealDeriv) {
+    if (isLiveMode && hasRealDeriv) {
       fetch(`/api/v1/auth/connections`)
         .then(res => res.json())
         .then(result => {
