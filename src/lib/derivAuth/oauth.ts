@@ -16,9 +16,9 @@ import {
   DerivAuthInfo,
 } from "./storage";
 
-const DERIV_APP_ID = "340CMkSyVrWLSlXnzSaIP"; // PRIVCore - real OAuth-type app, registered redirect: https://priv.sansmercantile.com/success
+const DERIV_APP_ID = "340CMkSyVrWLSlXnzSaIP"; // PRIVCore - real OAuth-type app, registered redirect: https://priv.sansmercantile.com
 const AUTH_BASE = "https://auth.deriv.com/oauth2";
-const REDIRECT_URI = window.location.origin + "/success";
+const REDIRECT_URI = window.location.origin;
 
 export class DerivOAuthError extends Error {
   constructor(message: string) {

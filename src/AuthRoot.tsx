@@ -21,6 +21,15 @@ export default function AuthRoot() {
     );
   }
 
+  // Auth0's SDK auto-detects ?code&state on ANY route within this provider
+  // and tries to process it as ITS OWN callback -- which collides with the
+  // separate Deriv OAuth flow (also client-side, also lands with ?code&state
+  // on the app's root/success path). Only let Auth0 actually process a
+  // callback on its own dedicated /callback route (matching redirect_uri
+  // below); skip it everywhere else so Deriv's callback isn't misread as an
+  // Auth0 one and rejected with a false "Invalid state" error.
+  const skipRedirectCallback = window.location.pathname !== "/callback";
+
   return (
     <Auth0Provider
       domain={domain}
@@ -31,6 +40,7 @@ export default function AuthRoot() {
       onRedirectCallback={onRedirectCallback}
       cacheLocation="localstorage"
       useRefreshTokens={true}
+      skipRedirectCallback={skipRedirectCallback}
     >
       <BrowserRouter>
         <App />
