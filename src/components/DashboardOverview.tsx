@@ -291,7 +291,7 @@ interface DashboardOverviewProps {
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, setActiveSection }) => {
   const navigate = useNavigate();
-  const { hasRealDeriv, loading: brokerLoading } = useBrokerConnections();
+  const { hasRealDeriv, hasDemoDeriv, loading: brokerLoading } = useBrokerConnections();
 
   const isLiveMode = localStorage.getItem("demoMode") === "false";
   const isBinanceConnected = !isLiveMode || localStorage.getItem("ex_conn_binance") === "true";
