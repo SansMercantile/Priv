@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBrokerConnections } from "../lib/useBrokerConnections";
-import { initiateDerivLogin } from "../lib/derivAuth";
+import { initiateDerivLogin, getDerivAccounts, getActiveLoginId } from "../lib/derivAuth";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -358,11 +358,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         setLivePositions([]);
       }
       
-      setXmId(localStorage.getItem("xm_account_id") || "XM-48194");
-      setXmServer(localStorage.getItem("xm_server") || "XMGlobal-Demo 1");
-      
-      const savedXmBal = parseFloat(localStorage.getItem("xm_balance") || "0");
-      setXmBalance(savedXmBal > 0 ? savedXmBal : 5000.00);
+      // Real Deriv account info (from the client-side OAuth session), not
+      // a fake XM Global fallback. Live balance isn't fetched here - that
+      // needs a real-time call to Deriv's API, not yet built - so we show
+      // the real account ID/currency and are honest that balance is
+      // unavailable rather than displaying a fabricated number.
+      const derivAccounts = getDerivAccounts() || [];
+      const activeId = getActiveLoginId();
+      const activeAccount = derivAccounts.find((a) => a.account_id === activeId) || derivAccounts[0];
+      setXmId(activeAccount?.account_id || "");
+      setXmServer(activeAccount?.currency || "");
     };
 
     syncDynamicData();
@@ -743,20 +748,20 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
             {/* Deriv Broker Row */}
             <div className="flex items-center justify-between p-3 rounded bg-neutral-950 border border-white/5 hover:border-white/15 transition-colors">
               <div className="flex items-center gap-3">
-                <div className={`w-2 h-2 rounded-full ${isLogged ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
+                <div className={`w-2 h-2 rounded-full ${(hasRealDeriv || hasDemoDeriv) ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
                 <div>
                   <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">Deriv Account Linked</h4>
                   <p className="text-[10px] font-mono text-zinc-500 mt-0.5 uppercase">
-                    {isLogged ? `ID: ${xmId}` : "Node Handshake Missing"}
+                    {(hasRealDeriv || hasDemoDeriv) ? `ID: ${xmId}` : "Node Handshake Missing"}
                   </p>
                 </div>
               </div>
               <div className="text-right">
                 <span className="text-sm font-mono text-white font-bold block">
-                  {isLogged ? `$${xmBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "N/A"}
+                  {(hasRealDeriv || hasDemoDeriv) ? (xmServer || "—") : "N/A"}
                 </span>
                 <span className="text-[9px] font-mono text-zinc-500 uppercase">
-                  {isLogged ? "Active Liquidity" : "Auth Standby"}
+                  {(hasRealDeriv || hasDemoDeriv) ? (hasRealDeriv ? "Real Account" : "Demo Account") : "Auth Standby"}
                 </span>
               </div>
             </div>
