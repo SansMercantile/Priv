@@ -18,7 +18,7 @@ import {
 
 const DERIV_APP_ID = "340CMkSyVrWLSlXnzSaIP"; // PRIVCore - real OAuth-type app, registered redirect: https://priv.sansmercantile.com
 const AUTH_BASE = "https://auth.deriv.com/oauth2";
-const REDIRECT_URI = window.location.origin;
+const REDIRECT_URI = window.location.origin + "/"; // must exactly match Deriv's registered Redirect URL, trailing slash included
 
 export class DerivOAuthError extends Error {
   constructor(message: string) {
@@ -44,7 +44,12 @@ async function buildPkceParams(): Promise<URLSearchParams> {
   storeCodeVerifier(codeVerifier);
 
   return new URLSearchParams({
-    scope: "read trade payments admin",
+    // Only 'trade' is currently authorized by Deriv for this app_id, despite
+    // Payments/Account management/Application insights showing checked in
+    // the Deriv dashboard UI - confirmed by direct testing against
+    // auth.deriv.com, which returns invalid_scope for all of those right
+    // now. If Deriv's UI selection propagates/gets re-saved, widen this.
+    scope: "trade",
     response_type: "code",
     client_id: DERIV_APP_ID,
     redirect_uri: REDIRECT_URI,
