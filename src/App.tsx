@@ -22,6 +22,7 @@ import UnifiedAssistant from "./ui/UnifiedAssistant";
 import GuidedWalkthrough from "./components/GuidedWalkthrough";
 import LoginGate from "./components/auth/LoginGate";
 import { useBrokerConnections } from "./lib/useBrokerConnections";
+import { initiateDerivLogin } from "./lib/derivAuth";
 import { initDatadog } from "./lib/datadog";
 
 interface AppProps {
@@ -92,13 +93,14 @@ function App({ initialDevice = "desktop" }: AppProps) {
     setSidebarMinimized(!isSidebarMinimized);
   };
 
-  const handleToggleDemoMode = () => {
+  const handleToggleDemoMode = async () => {
     setDevice(prev => prev); // keep state intact
     // Only demo -> real is gated. If no real Deriv account is connected,
-    // send them straight into the Deriv OAuth flow (create or link) rather
-    // than flipping into a real-mode view with nothing behind it.
+    // send them straight into the real client-side Deriv OAuth flow
+    // (create or link) rather than flipping into a real-mode view with
+    // nothing behind it.
     if (demoMode && !hasRealDeriv) {
-      window.location.href = "/api/v1/auth/deriv/login?account_type=live";
+      await initiateDerivLogin();
       return;
     }
     setDemoMode(!demoMode);
