@@ -14,6 +14,7 @@ export interface DerivAccount {
   account_id: string;
   account_type: "demo" | "real" | string;
   currency?: string;
+  balance?: string; // real balance, returned directly by Deriv's /accounts endpoint
   [key: string]: unknown;
 }
 

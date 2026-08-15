@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBrokerConnections } from "../lib/useBrokerConnections";
-import { initiateDerivLogin, getDerivAccounts, getActiveLoginId } from "../lib/derivAuth";
+import { initiateDerivLogin, getDerivAccounts, getActiveLoginId, getAuthInfo, fetchDerivAccounts } from "../lib/derivAuth";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -408,6 +408,57 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
     };
   });
 
+  // Denominator for the Active Agents card in live mode - real total from
+  // the backend's agent registry, not a hardcoded guess.
+  const [liveTotalAgents, setLiveTotalAgents] = useState<number | null>(null);
+
+  // Live-mode real data: actual Deriv balance (re-fetched from Deriv's own
+  // API, not just the cached value from login) and actual backend agent
+  // counts. Runs only when in real mode with a real Deriv account, polls
+  // periodically so numbers stay current rather than going stale.
+  useEffect(() => {
+    if (demoMode || !hasRealDeriv) return;
+    let cancelled = false;
+
+    const refreshRealData = async () => {
+      // Real agent status from the backend's actual agent registry.
+      try {
+        const res = await fetch("/api/v1/agents/status_with_reputation");
+        const json = await res.json();
+        if (!cancelled && json?.data?.summary) {
+          setStats(prev => ({ ...prev, activeAgents: json.data.summary.active_agents }));
+          setLiveTotalAgents(json.data.summary.total_agents);
+        }
+      } catch {
+        // leave as-is (null/stale) rather than fabricate a number
+      }
+
+      // Real Deriv balance - re-fetch from Deriv directly, not the
+      // possibly-stale cached value from initial login.
+      try {
+        const authInfo = getAuthInfo();
+        if (authInfo) {
+          const accounts = await fetchDerivAccounts(authInfo);
+          const activeId = getActiveLoginId();
+          const realAccount = accounts.find(a => a.account_id === activeId && a.account_type === "real")
+            || accounts.find(a => a.account_type === "real");
+          if (!cancelled && realAccount?.balance !== undefined) {
+            setStats(prev => ({ ...prev, totalProfit: parseFloat(realAccount.balance as string) }));
+          }
+        }
+      } catch {
+        // leave as-is rather than fabricate a number
+      }
+    };
+
+    refreshRealData();
+    const interval = setInterval(refreshRealData, 20000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [demoMode, hasRealDeriv]);
+
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
 
   useEffect(() => {
@@ -631,7 +682,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         />
         <MetricCard
           title="Active Agents"
-          value={stats.activeAgents === null ? "—" : `${stats.activeAgents}/12`}
+          value={stats.activeAgents === null ? "—" : `${stats.activeAgents}/${liveTotalAgents ?? 12}`}
           change="Execution cluster"
           icon={Users}
           trend="stable"
