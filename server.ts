@@ -1873,7 +1873,6 @@ app.get("/api/v1/live-prices", async (req, res) => {
     live_count: source === "tradingview_live" ? Object.keys(prices).length : 0,
     total: Object.keys(prices).length,
     timestamp: new Date().toISOString(),
-    total: assets.length,
   });
 });
 

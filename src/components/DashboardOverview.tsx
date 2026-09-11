@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBrokerConnections } from "../lib/useBrokerConnections";
-import { initiateDerivLogin, getDerivAccounts, getActiveLoginId } from "../lib/derivAuth";
+import { initiateDerivLogin, getDerivAccounts, getActiveLoginId, getAuthInfo, fetchDerivAccounts } from "../lib/derivAuth";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -377,23 +377,87 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
 
   const [stats, setStats] = useState(() => {
     const isLive = localStorage.getItem("demoMode") === "false";
-    const savedBal = parseFloat(localStorage.getItem("xm_balance") || "0");
-    const baseBal = savedBal > 0 ? savedBal : (isLive ? 75000.0 : 10000.0);
-    
-    // In live mode, only accumulate connected balances
-    const binanceBal = !isLive || localStorage.getItem("ex_conn_binance") === "true" ? 148251.52 : 0.0;
-    const coinbaseBal = !isLive || localStorage.getItem("ex_conn_coinbase") === "true" ? 92410.88 : 0.0;
-    
+
+    if (isLive) {
+      // No real-time balance/risk/agent-count endpoints exist yet for live
+      // accounts. Showing fabricated numbers here would mislead a real
+      // trader into thinking they have real P&L/risk data. Be honest
+      // instead: null means "not available yet", rendered as such below,
+      // not randomized like the clearly-labeled demo simulation is.
+      return {
+        totalProfit: null as number | null,
+        dailyReturn: null as number | null,
+        activeAgents: null as number | null,
+        dataPoints: null as number | null,
+        riskScore: null as number | null,
+        executionSpeed: null as number | null,
+      };
+    }
+
+    const baseBal = 10000.0;
+    const binanceBal = localStorage.getItem("ex_conn_binance") === "true" ? 148251.52 : 0.0;
+    const coinbaseBal = localStorage.getItem("ex_conn_coinbase") === "true" ? 92410.88 : 0.0;
     const combinedVal = baseBal + binanceBal + coinbaseBal;
     return {
       totalProfit: combinedVal,
-      dailyReturn: isLive ? 0.42 : 12.34,
-      activeAgents: isLive ? 18 : 12,
-      dataPoints: isLive ? 418042 : 847392,
-      riskScore: isLive ? 15.2 : 23.5,
-      executionSpeed: isLive ? 0.001 : 0.003
+      dailyReturn: 12.34,
+      activeAgents: 12,
+      dataPoints: 847392,
+      riskScore: 23.5,
+      executionSpeed: 0.003
     };
   });
+
+  // Denominator for the Active Agents card in live mode - real total from
+  // the backend's agent registry, not a hardcoded guess.
+  const [liveTotalAgents, setLiveTotalAgents] = useState<number | null>(null);
+
+  // Live-mode real data: actual Deriv balance (re-fetched from Deriv's own
+  // API, not just the cached value from login) and actual backend agent
+  // counts. Runs only when in real mode with a real Deriv account, polls
+  // periodically so numbers stay current rather than going stale.
+  useEffect(() => {
+    if (demoMode || !hasRealDeriv) return;
+    let cancelled = false;
+
+    const refreshRealData = async () => {
+      // Real agent status from the backend's actual agent registry.
+      try {
+        const res = await fetch("/api/v1/agents/status_with_reputation");
+        const json = await res.json();
+        if (!cancelled && json?.data?.summary) {
+          setStats(prev => ({ ...prev, activeAgents: json.data.summary.active_agents }));
+          setLiveTotalAgents(json.data.summary.total_agents);
+        }
+      } catch {
+        // leave as-is (null/stale) rather than fabricate a number
+      }
+
+      // Real Deriv balance - re-fetch from Deriv directly, not the
+      // possibly-stale cached value from initial login.
+      try {
+        const authInfo = getAuthInfo();
+        if (authInfo) {
+          const accounts = await fetchDerivAccounts(authInfo);
+          const activeId = getActiveLoginId();
+          const realAccount = accounts.find(a => a.account_id === activeId && a.account_type === "real")
+            || accounts.find(a => a.account_type === "real");
+          if (!cancelled && realAccount?.balance !== undefined) {
+            setStats(prev => ({ ...prev, totalProfit: parseFloat(realAccount.balance as string) }));
+          }
+        }
+      } catch {
+        // leave as-is rather than fabricate a number
+      }
+    };
+
+    refreshRealData();
+    const interval = setInterval(refreshRealData, 20000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [demoMode, hasRealDeriv]);
 
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
 
@@ -407,36 +471,27 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
     }));
     setChartData(initialData);
 
-    // Dynamic metrics generation loop
+    // Dynamic metrics generation loop - demo mode ONLY. Live mode's numbers
+    // stay null (see above) until real backend endpoints for balance/risk/
+    // agent-count exist; randomizing fake data for a real account would be
+    // actively misleading, not just a cosmetic placeholder.
     const interval = setInterval(() => {
       setStats(prev => {
         const isLive = localStorage.getItem("demoMode") === "false";
-        const currentXmBal = parseFloat(localStorage.getItem("xm_balance") || "0") || (isLive ? 75000.0 : 10000.0);
-        
-        // Dynamic balance increments matching connection status
-        const binanceBal = !isLive || localStorage.getItem("ex_conn_binance") === "true" ? 148251.52 : 0.0;
-        const coinbaseBal = !isLive || localStorage.getItem("ex_conn_coinbase") === "true" ? 92410.88 : 0.0;
-        
-        const dynamicTotal = currentXmBal + binanceBal + coinbaseBal;
         if (isLive) {
-          return {
-            ...prev,
-            totalProfit: dynamicTotal,
-            dailyReturn: prev.dailyReturn + (Math.random() - 0.5) * 0.01,
-            dataPoints: prev.dataPoints + Math.floor(Math.random() * 5),
-            riskScore: Math.max(0, Math.min(100, prev.riskScore + (Math.random() - 0.5) * 0.05)),
-            executionSpeed: 0.0008 + Math.random() * 0.0004
-          };
-        } else {
-          return {
-            ...prev,
-            totalProfit: dynamicTotal,
-            dailyReturn: prev.dailyReturn + (Math.random() - 0.5) * 0.15,
-            dataPoints: prev.dataPoints + Math.floor(Math.random() * 20),
-            riskScore: Math.max(0, Math.min(100, prev.riskScore + (Math.random() - 0.5) * 0.2)),
-            executionSpeed: 0.001 + Math.random() * 0.004
-          };
+          return prev;
         }
+        const binanceBal = localStorage.getItem("ex_conn_binance") === "true" ? 148251.52 : 0.0;
+        const coinbaseBal = localStorage.getItem("ex_conn_coinbase") === "true" ? 92410.88 : 0.0;
+        const dynamicTotal = 10000.0 + binanceBal + coinbaseBal;
+        return {
+          ...prev,
+          totalProfit: dynamicTotal,
+          dailyReturn: (prev.dailyReturn ?? 12.34) + (Math.random() - 0.5) * 0.15,
+          dataPoints: (prev.dataPoints ?? 847392) + Math.floor(Math.random() * 20),
+          riskScore: Math.max(0, Math.min(100, (prev.riskScore ?? 23.5) + (Math.random() - 0.5) * 0.2)),
+          executionSpeed: 0.001 + Math.random() * 0.004
+        };
       });
 
       setChartData(prev => {
@@ -611,23 +666,23 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <MetricCard
           title="Total Profit"
-          value={`$${stats.totalProfit.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          change={stats.dailyReturn > 0 ? `+${stats.dailyReturn.toFixed(2)}%` : `${stats.dailyReturn.toFixed(2)}%`}
+          value={stats.totalProfit === null ? "—" : `$${stats.totalProfit.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          change={stats.dailyReturn === null ? "Live data pending" : (stats.dailyReturn > 0 ? `+${stats.dailyReturn.toFixed(2)}%` : `${stats.dailyReturn.toFixed(2)}%`)}
           icon={DollarSign}
-          trend={stats.dailyReturn > 0 ? "up" : "down"}
+          trend={stats.dailyReturn === null ? "stable" : (stats.dailyReturn > 0 ? "up" : "down")}
           color="green"
         />
         <MetricCard
           title="Daily Return"
-          value={`${stats.dailyReturn.toFixed(2)}%`}
+          value={stats.dailyReturn === null ? "—" : `${stats.dailyReturn.toFixed(2)}%`}
           change="vs yesterday"
-          icon={stats.dailyReturn > 0 ? TrendingUp : TrendingDown}
-          trend={stats.dailyReturn > 0 ? "up" : "down"}
-          color={stats.dailyReturn > 0 ? "green" : "red"}
+          icon={stats.dailyReturn === null || stats.dailyReturn > 0 ? TrendingUp : TrendingDown}
+          trend={stats.dailyReturn === null ? "stable" : (stats.dailyReturn > 0 ? "up" : "down")}
+          color={stats.dailyReturn === null ? "blue" : (stats.dailyReturn > 0 ? "green" : "red")}
         />
         <MetricCard
           title="Active Agents"
-          value={`${stats.activeAgents}/12`}
+          value={stats.activeAgents === null ? "—" : `${stats.activeAgents}/${liveTotalAgents ?? 12}`}
           change="Execution cluster"
           icon={Users}
           trend="stable"
@@ -636,7 +691,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         />
         <MetricCard
           title="Data Points"
-          value={stats.dataPoints.toLocaleString()}
+          value={stats.dataPoints === null ? "—" : stats.dataPoints.toLocaleString()}
           change="+2.3K / min"
           icon={Activity}
           trend="up"
@@ -678,7 +733,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         />
         <MetricCard
           title="Execution Spd"
-          value={`${stats.executionSpeed.toFixed(3)}s`}
+          value={stats.executionSpeed === null ? "—" : `${stats.executionSpeed.toFixed(3)}s`}
           change="Average latency"
           icon={Zap}
           trend="stable"
