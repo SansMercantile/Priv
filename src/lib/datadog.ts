@@ -6,7 +6,7 @@ import { datadogRum } from "@datadog/browser-rum";
  */
 export function initDatadog(): { RUM_STATUS: string; isReal: boolean } {
   const metaEnv = (import.meta as any).env || {};
-  const appId = metaEnv.VITE_DD_APPLICATION_ID;
+  const appId = metaEnv.VITE_DD_APPLICATION_ID || metaEnv.VITE_DD_APP_ID;
   const clientToken = metaEnv.VITE_DD_CLIENT_TOKEN;
   const site = metaEnv.VITE_DD_SITE || "datadoghq.com";
   const service = metaEnv.VITE_DD_SERVICE || "sans-priv-core";
