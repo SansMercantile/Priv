@@ -5,6 +5,11 @@ import App from "./App.tsx";
 
 const domain = (import.meta as any).env?.VITE_AUTH0_DOMAIN;
 const clientId = (import.meta as any).env?.VITE_AUTH0_CLIENT_ID;
+// Without an audience, Auth0 issues an opaque access token meant only for
+// the userinfo endpoint -- not a JWT, and not something the backend can
+// verify. The backend (backend/config/settings.py AUTH0_AUDIENCE) expects
+// this to match; both must point at the same registered Auth0 API.
+const audience = (import.meta as any).env?.VITE_AUTH0_AUDIENCE;
 
 const onRedirectCallback = (appState?: AppState) => {
   window.history.replaceState(
@@ -36,6 +41,7 @@ export default function AuthRoot() {
       clientId={clientId}
       authorizationParams={{
         redirect_uri: window.location.origin + "/callback",
+        ...(audience ? { audience } : {}),
       }}
       onRedirectCallback={onRedirectCallback}
       cacheLocation="localstorage"
