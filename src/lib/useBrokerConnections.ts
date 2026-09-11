@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import apiClient from "../api/apiClient";
-import { getDerivAccounts } from "./derivAuth";
 
 export interface BrokerConnection {
   broker: string;
@@ -17,12 +16,15 @@ export interface BrokerConnectionsState {
   refresh: () => void;
 }
 
-/** Single source of truth for "does this user actually have a real/demo
- * Deriv account connected". Deriv itself is checked via the real
- * client-side PKCE OAuth session (src/lib/derivAuth) - that's the account
- * data Deriv's own API returned, not a localStorage flag we invented.
- * Other brokers (Alpaca, etc.) still go through the backend connections
- * endpoint. */
+/**
+ * Single source of truth for broker connections, including Deriv.
+ *
+ * Previously Deriv was a special case, read from the client-side PKCE
+ * OAuth session (src/lib/derivAuth) and explicitly excluded from this
+ * backend list. That flow is retired -- Deriv now connects through the
+ * same backend endpoint as every other broker (see oauth_api.py), so it
+ * no longer needs separate handling here.
+ */
 export function useBrokerConnections(): BrokerConnectionsState {
   const [connections, setConnections] = useState<BrokerConnection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,26 +36,14 @@ export function useBrokerConnections(): BrokerConnectionsState {
     let cancelled = false;
     setLoading(true);
 
-    // Deriv: real account data from the client-side OAuth session.
-    const derivAccounts = getDerivAccounts() || [];
-    const derivConns: BrokerConnection[] = derivAccounts.map((a) => ({
-      broker: "deriv",
-      account_type: a.account_type === "demo" ? "demo" : "live",
-      status: "connected",
-    }));
-
-    // Other brokers (Alpaca, etc.): still via the backend.
     apiClient
       .getBrokerConnections()
       .then(({ data }) => {
         if (cancelled) return;
-        const backendConns: BrokerConnection[] = (data?.data?.connections || []).filter(
-          (c: BrokerConnection) => c.broker !== "deriv" // Deriv comes from derivAuth now
-        );
-        setConnections([...derivConns, ...backendConns]);
+        setConnections(data?.data?.connections || []);
       })
       .catch(() => {
-        if (!cancelled) setConnections(derivConns);
+        if (!cancelled) setConnections([]);
       })
       .finally(() => !cancelled && setLoading(false));
 

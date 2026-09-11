@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBrokerConnections } from "../lib/useBrokerConnections";
-import { initiateDerivLogin, getDerivAccounts, getActiveLoginId, getAuthInfo, fetchDerivAccounts } from "../lib/derivAuth";
+import { getAppUserId } from "../lib/appUserId";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -291,7 +291,7 @@ interface DashboardOverviewProps {
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, setActiveSection }) => {
   const navigate = useNavigate();
-  const { hasRealDeriv, hasDemoDeriv, loading: brokerLoading } = useBrokerConnections();
+  const { hasRealDeriv, hasDemoDeriv, connections: brokerConnections, loading: brokerLoading } = useBrokerConnections();
 
   const isLiveMode = localStorage.getItem("demoMode") === "false";
   const isBinanceConnected = !isLiveMode || localStorage.getItem("ex_conn_binance") === "true";
@@ -357,23 +357,25 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
       } catch (e) {
         setLivePositions([]);
       }
-      
-      // Real Deriv account info (from the client-side OAuth session), not
-      // a fake XM Global fallback. Live balance isn't fetched here - that
-      // needs a real-time call to Deriv's API, not yet built - so we show
-      // the real account ID/currency and are honest that balance is
-      // unavailable rather than displaying a fabricated number.
-      const derivAccounts = getDerivAccounts() || [];
-      const activeId = getActiveLoginId();
-      const activeAccount = derivAccounts.find((a) => a.account_id === activeId) || derivAccounts[0];
-      setXmId(activeAccount?.account_id || "");
-      setXmServer(activeAccount?.currency || "");
     };
 
     syncDynamicData();
     const t = setInterval(syncDynamicData, 1500);
     return () => clearInterval(t);
   }, []);
+
+  // Real Deriv account info, from the backend connections list (see
+  // oauth_api.py _list_user_connections) rather than the retired
+  // client-side OAuth session. Live balance isn't fetched here -- that
+  // needs a real-time call to Deriv's API, not yet built -- so we show
+  // the real account ID/currency and are honest that balance is
+  // unavailable rather than displaying a fabricated number.
+  useEffect(() => {
+    const derivConn = brokerConnections.find((c) => c.broker === "deriv") as
+      (typeof brokerConnections[number] & { account_id?: string; currency?: string }) | undefined;
+    setXmId(derivConn?.account_id || "");
+    setXmServer(derivConn?.currency || "");
+  }, [brokerConnections]);
 
   const [stats, setStats] = useState(() => {
     const isLive = localStorage.getItem("demoMode") === "false";
@@ -433,22 +435,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         // leave as-is (null/stale) rather than fabricate a number
       }
 
-      // Real Deriv balance - re-fetch from Deriv directly, not the
-      // possibly-stale cached value from initial login.
-      try {
-        const authInfo = getAuthInfo();
-        if (authInfo) {
-          const accounts = await fetchDerivAccounts(authInfo);
-          const activeId = getActiveLoginId();
-          const realAccount = accounts.find(a => a.account_id === activeId && a.account_type === "real")
-            || accounts.find(a => a.account_type === "real");
-          if (!cancelled && realAccount?.balance !== undefined) {
-            setStats(prev => ({ ...prev, totalProfit: parseFloat(realAccount.balance as string) }));
-          }
-        }
-      } catch {
-        // leave as-is rather than fabricate a number
-      }
+      // Real Deriv balance would go here. Previously fetched directly
+      // from Deriv's REST API using the client-side OAuth token; that
+      // token no longer reaches the browser (see LoginGate.tsx), so this
+      // needs a new backend endpoint (DerivAPIAdapter.get_account_info()
+      // already exists and is real -- it just isn't exposed over HTTP
+      // yet). Left as a known gap rather than built here: leaving
+      // totalProfit unavailable is consistent with this file's own
+      // stated approach elsewhere ("leave as-is rather than fabricate a
+      // number") until that endpoint exists.
     };
 
     refreshRealData();
@@ -569,7 +564,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
 
           <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
             <button
-              onClick={() => initiateDerivLogin()}
+              onClick={() => {
+                const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || "";
+                const userId = getAppUserId();
+                window.location.href = `${API_BASE}/api/v1/auth/deriv/login?user_id=${encodeURIComponent(userId)}&account_type=live`;
+              }}
               className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-mono font-bold text-xs rounded border border-white/10 transition-all duration-300 flex items-center justify-center space-x-2 cursor-pointer"
             >
               <span>CONNECT DERIV ACCOUNT</span>
