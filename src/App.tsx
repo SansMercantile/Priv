@@ -22,7 +22,7 @@ import UnifiedAssistant from "./ui/UnifiedAssistant";
 import GuidedWalkthrough from "./components/GuidedWalkthrough";
 import LoginGate from "./components/auth/LoginGate";
 import { useBrokerConnections } from "./lib/useBrokerConnections";
-import { initiateDerivLogin } from "./lib/derivAuth";
+import { getAppUserId } from "./lib/appUserId";
 import { initDatadog } from "./lib/datadog";
 
 interface AppProps {
@@ -96,11 +96,14 @@ function App({ initialDevice = "desktop" }: AppProps) {
   const handleToggleDemoMode = async () => {
     setDevice(prev => prev); // keep state intact
     // Only demo -> real is gated. If no real Deriv account is connected,
-    // send them straight into the real client-side Deriv OAuth flow
-    // (create or link) rather than flipping into a real-mode view with
-    // nothing behind it.
+    // send them to the backend's Deriv login (see oauth_api.py) rather
+    // than flipping into a real-mode view with nothing behind it. This
+    // goes through the backend now (not the retired client-side PKCE
+    // flow) since backend execution needs the token server-side.
     if (demoMode && !hasRealDeriv) {
-      await initiateDerivLogin();
+      const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || "";
+      const userId = getAppUserId();
+      window.location.href = `${API_BASE}/api/v1/auth/deriv/login?user_id=${encodeURIComponent(userId)}&account_type=live`;
       return;
     }
     setDemoMode(!demoMode);

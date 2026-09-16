@@ -1,15 +1,25 @@
 // High-integrity API Client for SANS PRIV Core KYC, Profile, and billing services
 import { getAppUserId } from "../lib/appUserId";
+import { getAuthToken } from "../lib/authToken";
 
 const BASE = (import.meta as any).env?.VITE_API_BASE_URL || "";
 
-function withUserHeader(headers?: HeadersInit): HeadersInit {
-  return { ...(headers || {}), "X-User-Id": getAppUserId() };
+// X-User-Id is always sent (it's what the pre-login Deriv-connect flow
+// relies on), but when a verified Auth0 session exists we also send the
+// access token. The backend (oauth_api.py _resolve_user_id) always
+// prefers the verified Bearer token over X-User-Id when both are
+// present, so a signed-in user's identity can't be overridden by
+// tampering with the anonymous header.
+async function withUserHeader(headers?: HeadersInit): Promise<HeadersInit> {
+  const merged: Record<string, string> = { ...(headers as Record<string, string> || {}), "X-User-Id": getAppUserId() };
+  const token = await getAuthToken();
+  if (token) merged["Authorization"] = `Bearer ${token}`;
+  return merged;
 }
 
 async function safeFetch(url: string, options?: RequestInit) {
   const fullUrl = `${BASE}${url}`;
-  const response = await fetch(fullUrl, { ...options, headers: withUserHeader(options?.headers) });
+  const response = await fetch(fullUrl, { ...options, headers: await withUserHeader(options?.headers) });
   const contentType = response.headers.get("content-type") || "";
   // Guard: if server returns HTML (404 page, error page) instead of JSON,
   // throw a human-readable error instead of "Unexpected token 'T'..."
@@ -36,7 +46,7 @@ async function safeFetch(url: string, options?: RequestInit) {
 // EC2, never prefixed with BASE - otherwise they get sent cross-origin to
 // Azure, which doesn't have these routes and doesn't allow our origin.
 async function safeFetchRelative(url: string, options?: RequestInit) {
-  const response = await fetch(url, { ...options, headers: withUserHeader(options?.headers) });
+  const response = await fetch(url, { ...options, headers: await withUserHeader(options?.headers) });
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.includes("application/json")) {
     const text = await response.text();
@@ -116,6 +126,16 @@ export const apiClient = {
   getBrokerCatalog: () => safeFetchRelative("/api/v1/auth/brokers"),
   disconnectBroker: (broker: string, accountType: string = "live") =>
     safeFetchRelative(`/api/v1/auth/connections/${broker}?account_type=${accountType}`, { method: "DELETE" }),
+
+  // Claims any broker connections made before login (anonymous, keyed by
+  // getAppUserId()) onto the now-verified Auth0 identity. Call once per
+  // session right after isAuthenticated becomes true (see LoginGate.tsx).
+  linkAnonymousConnections: () =>
+    safeFetchRelative("/api/v1/auth/link-anonymous", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ anonymous_id: getAppUserId() }),
+    }),
 };
 
 export default apiClient;
