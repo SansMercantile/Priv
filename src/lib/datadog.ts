@@ -31,6 +31,13 @@ export function initDatadog(): { RUM_STATUS: string; isReal: boolean } {
   }
 
   try {
+    // Session Replay uploads hit intake hard and 403 (with console spam)
+    // when the Datadog app hasn't allowlisted this origin. Keep RUM always
+    // on; gate replay behind VITE_DD_SESSION_REPLAY=true (set it in Vercel
+    // env + redeploy after allowlisting https://priv.sansmercantile.com/*
+    // in RUM Application Settings).
+    const replayEnabled =
+      String(metaEnv.VITE_DD_SESSION_REPLAY || "").toLowerCase() === "true";
     datadogRum.init({
       applicationId: appId,
       clientToken: clientToken,
@@ -39,15 +46,17 @@ export function initDatadog(): { RUM_STATUS: string; isReal: boolean } {
       env: env,
       version: "1.0.0",
       sessionSampleRate: 100,
-      sessionReplaySampleRate: 20,
+      sessionReplaySampleRate: replayEnabled ? 20 : 0,
       trackUserInteractions: true,
       trackResources: true,
       trackLongTasks: true,
       defaultPrivacyLevel: "mask-user-input",
     });
 
-    datadogRum.startSessionReplayRecording();
-    console.log(`[SANS Datadog] Client RUM and Session Replay initiated on site: ${site}. Service: ${service}`);
+    if (replayEnabled) {
+      datadogRum.startSessionReplayRecording();
+    }
+    console.log(`[SANS Datadog] Client RUM initiated on site: ${site}. Service: ${service}. Replay: ${replayEnabled ? "on" : "off"}.`);
     return { RUM_STATUS: "active (live)", isReal: true };
   } catch (error: any) {
     console.warn("[SANS Datadog] RUM initialization encountered custom exception:", error.message || error);
