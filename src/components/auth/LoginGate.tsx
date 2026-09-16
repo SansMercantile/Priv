@@ -1,62 +1,73 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
-import {
-  initiateDerivLogin,
-  isDerivCallback,
-  handleDerivCallback,
-  fetchDerivAccounts,
-  getAuthInfo as getDerivAuthInfo,
-  getDerivAccounts,
-  DerivOAuthError,
-} from "../../lib/derivAuth";
+import { getAppUserId } from "../../lib/appUserId";
+import { setAuthTokenGetter } from "../../lib/authToken";
+import apiClient from "../../api/apiClient";
 
 interface LoginGateProps {
   children: React.ReactNode;
 }
 
-/** True if we have a real, non-expired Deriv session already (from a
- * previous visit). This is the source of truth for "logged in via Deriv" -
- * no separate flag needed, getAuthInfo() already checks expiry. */
-function hasDerivSession(): boolean {
-  return !!getDerivAuthInfo();
+const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || "";
+
+/**
+ * Deriv connection now goes entirely through the backend's legacy
+ * app_id OAuth flow (backend/trading_engine/oauth_api.py), which is the
+ * only flow that lets the backend actually execute trades -- the
+ * previous client-side PKCE flow (src/lib/derivAuth) kept the token in
+ * the browser only, with no route to the backend, and is retired from
+ * this login screen. Deriv is now purely a BROKER connection made via
+ * getAppUserId() (the same anonymous per-browser id already used to
+ * scope broker connections independent of Auth0 -- see appUserId.ts),
+ * not an app-identity/login method the way it briefly was.
+ */
+async function checkDerivConnected(): Promise<boolean> {
+  try {
+    const { data } = await apiClient.getBrokerConnections();
+    const connections = data?.data?.connections || [];
+    return connections.some((c: { broker: string }) => c.broker === "deriv");
+  } catch {
+    return false;
+  }
 }
 
-function useDerivCallbackHandler(onDone: (result: { success: boolean; message?: string }) => void) {
-  const [processing, setProcessing] = useState(isDerivCallback());
+/** Detects the backend's generic OAuth redirect (?broker=...&status=...),
+ * used by Deriv and Alpaca alike (see oauth_api.py _redirect_frontend).
+ * Cleans the URL afterward regardless of outcome. */
+function useBrokerOAuthCallbackHandler(onDone: (result: { broker: string; success: boolean; message?: string }) => void) {
+  const [processing, setProcessing] = useState(() => new URLSearchParams(window.location.search).has("broker"));
 
   useEffect(() => {
-    if (!isDerivCallback()) return;
-    (async () => {
-      try {
-        const authInfo = await handleDerivCallback();
-        await fetchDerivAccounts(authInfo);
-        onDone({ success: true });
-      } catch (err) {
-        const message = err instanceof DerivOAuthError ? err.message : "unknown_error";
-        onDone({ success: false, message });
-      } finally {
-        setProcessing(false);
-      }
-    })();
+    const params = new URLSearchParams(window.location.search);
+    const broker = params.get("broker");
+    if (!broker) return;
+
+    const status = params.get("status");
+    const message = params.get("message") || undefined;
+
+    const url = new URL(window.location.href);
+    ["broker", "status", "message"].forEach((p) => url.searchParams.delete(p));
+    window.history.replaceState(window.history.state, "", url.pathname + url.search);
+
+    onDone({ broker, success: status === "success", message });
+    setProcessing(false);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return processing;
 }
 
-function LoginScreen({ derivError }: { derivError?: string | null }) {
+function LoginScreen({ derivError, onDerivLogin, derivLoading }: {
+  derivError?: string | null;
+  onDerivLogin: () => void;
+  derivLoading: boolean;
+}) {
   const { loginWithRedirect, isLoading } = useAuth0();
-  const [derivLoading, setDerivLoading] = useState(false);
 
   const handleLogin = (connection?: string) => {
     loginWithRedirect({
       authorizationParams: connection ? { connection } : undefined,
       appState: { returnTo: window.location.pathname },
     });
-  };
-
-  const handleDerivLogin = async () => {
-    setDerivLoading(true);
-    await initiateDerivLogin();
   };
 
   return (
@@ -75,7 +86,7 @@ function LoginScreen({ derivError }: { derivError?: string | null }) {
 
         <div className="space-y-3">
           <button
-            onClick={handleDerivLogin}
+            onClick={onDerivLogin}
             disabled={derivLoading}
             className="w-full flex items-center justify-center gap-3 rounded-lg bg-rose-600 text-white font-medium py-2.5 px-4 hover:bg-rose-500 transition disabled:opacity-50"
           >
@@ -136,11 +147,38 @@ function LoginScreen({ derivError }: { derivError?: string | null }) {
 }
 
 export default function LoginGate({ children }: LoginGateProps) {
-  const { isAuthenticated, isLoading, error } = useAuth0();
-  const [derivConnected, setDerivConnected] = useState(hasDerivSession());
+  const { isAuthenticated, isLoading, error, getAccessTokenSilently } = useAuth0();
+  const [derivConnected, setDerivConnected] = useState(false);
+  const [derivChecked, setDerivChecked] = useState(false);
   const [derivError, setDerivError] = useState<string | null>(null);
+  const [derivLoading, setDerivLoading] = useState(false);
+  const linkedAnonymousRef = useRef(false);
 
-  const derivProcessing = useDerivCallbackHandler(({ success, message }) => {
+  // Registers the real token getter for apiClient.ts (a plain module that
+  // can't call useAuth0() itself) as soon as it's available, and clears it
+  // on logout so requests fall back to the anonymous flow rather than
+  // sending a stale/invalid token.
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setAuthTokenGetter(null);
+      return;
+    }
+    setAuthTokenGetter(() => getAccessTokenSilently());
+    // One-time per session: claim any broker connections made before
+    // login under the verified identity. Safe to call repeatedly (it's
+    // idempotent server-side) but there's no reason to.
+    if (!linkedAnonymousRef.current) {
+      linkedAnonymousRef.current = true;
+      apiClient.linkAnonymousConnections().catch(() => {
+        // Non-fatal -- worst case a pre-login Deriv connection stays
+        // anonymous and the user reconnects it manually.
+        linkedAnonymousRef.current = false;
+      });
+    }
+  }, [isAuthenticated, getAccessTokenSilently]);
+
+  const callbackProcessing = useBrokerOAuthCallbackHandler(({ broker, success, message }) => {
+    if (broker !== "deriv") return;
     if (success) {
       setDerivConnected(true);
     } else {
@@ -148,7 +186,21 @@ export default function LoginGate({ children }: LoginGateProps) {
     }
   });
 
-  if (isLoading || derivProcessing) {
+  useEffect(() => {
+    if (callbackProcessing) return; // avoid a redundant check right before the callback sets it directly
+    checkDerivConnected().then((connected) => {
+      setDerivConnected(connected);
+      setDerivChecked(true);
+    });
+  }, [callbackProcessing]);
+
+  const handleDerivLogin = () => {
+    setDerivLoading(true);
+    const userId = getAppUserId();
+    window.location.href = `${API_BASE}/api/v1/auth/deriv/login?user_id=${encodeURIComponent(userId)}&account_type=demo`;
+  };
+
+  if (isLoading || callbackProcessing || (!derivChecked && !derivConnected)) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-white/40 text-sm font-mono">Loading…</div>
@@ -167,7 +219,7 @@ export default function LoginGate({ children }: LoginGateProps) {
   }
 
   if (!isAuthenticated && !derivConnected) {
-    return <LoginScreen derivError={derivError} />;
+    return <LoginScreen derivError={derivError} onDerivLogin={handleDerivLogin} derivLoading={derivLoading} />;
   }
 
   return <>{children}</>;
