@@ -21,6 +21,7 @@ import KycAdminReviewPage from "./components/profile/KycAdminReviewPage";
 import UnifiedAssistant from "./ui/UnifiedAssistant";
 import GuidedWalkthrough from "./components/GuidedWalkthrough";
 import LoginGate from "./components/auth/LoginGate";
+import Landing from "./pages/Landing";
 import { useBrokerConnections } from "./lib/useBrokerConnections";
 import { getAppUserId } from "./lib/appUserId";
 import { initDatadog } from "./lib/datadog";
@@ -29,7 +30,7 @@ interface AppProps {
   initialDevice?: string;
 }
 
-function App({ initialDevice = "desktop" }: AppProps) {
+function GatedApp({ initialDevice = "desktop" }: AppProps) {
   const location = useLocation();
   const [isWalkthroughActive, setWalkthroughActive] = useState(false);
   const [device, setDevice] = useState(initialDevice);
@@ -43,7 +44,6 @@ function App({ initialDevice = "desktop" }: AppProps) {
   const { hasRealDeriv, loading: brokerConnLoading } = useBrokerConnections();
 
   useEffect(() => {
-    initDatadog();
     const hasSeenWalkthrough = localStorage.getItem("hasSeenWalkthrough");
     if (!hasSeenWalkthrough) {
       setWalkthroughActive(true);
@@ -186,7 +186,6 @@ function App({ initialDevice = "desktop" }: AppProps) {
                 className="p-4 sm:p-6"
               >
                 <Routes>
-                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<Dashboard demoMode={demoMode} />} />
                   <Route path="/dashboard/terminal" element={<TradingTerminal />} />
                   <Route path="/dashboard/agi-core" element={<AGICore demoMode={demoMode} />} />
@@ -213,6 +212,21 @@ function App({ initialDevice = "desktop" }: AppProps) {
         <VercelAnalytics />
       </div>
     </LoginGate>
+  );
+}
+
+function App({ initialDevice = "desktop" }: AppProps) {
+  useEffect(() => {
+    initDatadog();
+  }, []);
+
+  return (
+    <Routes>
+      {/* Public marketing page for visitors before login */}
+      <Route path="/" element={<Landing />} />
+      {/* Everything else behind the login gate */}
+      <Route path="/*" element={<GatedApp initialDevice={initialDevice} />} />
+    </Routes>
   );
 }
 
