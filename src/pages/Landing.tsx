@@ -1,12 +1,18 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth0 } from "@auth0/auth0-react";
 
 /**
  * Public marketing landing page served at `/` for visitors who have not
  * logged in yet (mirrors public/landing.html content in React).
  * Authenticated users are sent straight to the dashboard.
+ *
+ * The signal ticket is LIVE: fetched from GET /api/signals/current (one
+ * signal per 6h UTC slot, computed from real Deriv candles). A tick watcher
+ * raises bottom-right toasts on TP1 (stop to breakeven), TP2 and SL.
+ * A cached copy covers backend outages; the static sample only shows when
+ * nothing was ever fetched.
  */
 const STEPS = [
   {
@@ -31,15 +37,190 @@ const STEPS = [
   },
 ];
 
-const TICKET_ROWS: Array<[string, string, string?]> = [
-  ["Entry", "8,452.10", ""],
-  ["Take Profit 1", "8,461.30", "tp"],
-  ["Take Profit 2", "8,470.50", "tp"],
-  ["Stop Loss", "8,443.00", "sl"],
-];
+interface LiveSignal {
+  id: string;
+  symbol: string;
+  display_name: string;
+  direction: "BUY" | "SELL";
+  entry: number;
+  take_profit_1: number;
+  take_profit_2: number;
+  stop_loss: number;
+  atr: number;
+  timeframe: string;
+  slot_start_utc: string;
+  app_id?: string;
+}
+
+const STATIC_SIGNAL: LiveSignal = {
+  id: "static-sample",
+  symbol: "R_100",
+  display_name: "VOLATILITY 100 INDEX",
+  direction: "BUY",
+  entry: 8452.1,
+  take_profit_1: 8461.3,
+  take_profit_2: 8470.5,
+  stop_loss: 8443.0,
+  atr: 6.1,
+  timeframe: "1H",
+  slot_start_utc: "",
+};
+
+interface Toast {
+  id: string;
+  title: string;
+  body: string;
+  kind: "tp1" | "tp2" | "sl" | "info";
+}
+
+function useLiveSignal() {
+  const [signal, setSignal] = useState<LiveSignal | null>(null);
+  const [live, setLive] = useState(false);
+  const [sentLocal, setSentLocal] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/signals/current");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const body = await res.json();
+        const data = (body?.data || body) as LiveSignal;
+        if (!data || !data.entry) throw new Error("bad payload");
+        if (cancelled) return;
+        setSignal(data);
+        setLive(true);
+        try {
+          localStorage.setItem("priv_live_signal", JSON.stringify(data));
+        } catch (_) {}
+      } catch (_) {
+        if (cancelled) return;
+        try {
+          const cached = localStorage.getItem("priv_live_signal");
+          if (cached) {
+            const data = JSON.parse(cached) as LiveSignal;
+            if (data && data.entry) {
+              setSignal(data);
+              setLive(false);
+              return;
+            }
+          }
+        } catch (_) {}
+        setSignal(STATIC_SIGNAL);
+        setLive(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!signal?.slot_start_utc) {
+      setSentLocal("");
+      return;
+    }
+    try {
+      setSentLocal(new Date(signal.slot_start_utc).toLocaleString());
+    } catch (_) {
+      setSentLocal(signal.slot_start_utc);
+    }
+  }, [signal]);
+
+  return { signal: signal || STATIC_SIGNAL, live, sentLocal };
+}
+
+function useSignalToasts(signal: LiveSignal | null, live: boolean) {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const firedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!signal || !live || !signal.app_id || signal.id === "static-sample") return;
+    const key = `priv_toast_fired_${signal.id}`;
+    try {
+      (JSON.parse(localStorage.getItem(key) || "[]") as string[]).forEach((k) => firedRef.current.add(k));
+    } catch (_) {}
+    const persist = () => {
+      try {
+        localStorage.setItem(key, JSON.stringify(Array.from(firedRef.current)));
+      } catch (_) {}
+    };
+    const push = (kind: Toast["kind"], title: string, body: string) => {
+      const id = `${signal.id}-${kind}`;
+      if (firedRef.current.has(id)) return;
+      firedRef.current.add(id);
+      persist();
+      setToasts((prev) => [...prev.slice(-2), { id, kind, title, body }]);
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 12000);
+    };
+
+    let ws: WebSocket | null = null;
+    let closed = false;
+    try {
+      ws = new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${signal.app_id}`);
+    } catch (_) {
+      return;
+    }
+    const isBuy = signal.direction === "BUY";
+    ws.onopen = () => {
+      if (!closed) ws?.send(JSON.stringify({ ticks: signal.symbol, subscribe: 1 }));
+    };
+    ws.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+        const quote = Number(msg?.tick?.quote);
+        if (!Number.isFinite(quote)) return;
+        if (isBuy) {
+          if (quote >= signal.take_profit_1) {
+            push("tp1", "TP1 hit — stop moved to breakeven",
+              `${signal.symbol} reached ${signal.take_profit_1}. Stop loss trailed to entry ${signal.entry}.`);
+          }
+          if (quote >= signal.take_profit_2) {
+            push("tp2", "TP2 hit — full target reached", `${signal.symbol} reached ${signal.take_profit_2}.`);
+          }
+          if (quote <= signal.stop_loss) {
+            push("sl", "Stop loss hit", `${signal.symbol} fell to ${signal.stop_loss}. Position closed.`);
+          }
+        } else {
+          if (quote <= signal.take_profit_1) {
+            push("tp1", "TP1 hit — stop moved to breakeven",
+              `${signal.symbol} dropped to ${signal.take_profit_1}. Stop loss trailed to entry ${signal.entry}.`);
+          }
+          if (quote <= signal.take_profit_2) {
+            push("tp2", "TP2 hit — full target reached", `${signal.symbol} dropped to ${signal.take_profit_2}.`);
+          }
+          if (quote >= signal.stop_loss) {
+            push("sl", "Stop loss hit", `${signal.symbol} rose to ${signal.stop_loss}. Position closed.`);
+          }
+        }
+      } catch (_) {}
+    };
+    ws.onerror = () => {};
+    return () => {
+      closed = true;
+      try {
+        ws?.close();
+      } catch (_) {}
+    };
+  }, [signal, live]);
+
+  const dismiss = (id: string) => setToasts((prev) => prev.filter((t) => t.id !== id));
+  return { toasts, dismiss };
+}
+
+const TOAST_STYLES: Record<Toast["kind"], string> = {
+  tp1: "border-amber-400/40",
+  tp2: "border-emerald-400/40",
+  sl: "border-rose-500/40",
+  info: "border-white/15",
+};
 
 export default function Landing() {
   const { isAuthenticated, isLoading, loginWithRedirect } = useAuth0();
+  const { signal, live, sentLocal } = useLiveSignal();
+  const { toasts, dismiss } = useSignalToasts(live ? signal : null, live);
 
   useEffect(() => {
     document.title = "Priv — Intelligent Trading. Limitless Potential.™";
@@ -55,6 +236,14 @@ export default function Landing() {
       appState: { returnTo: "/dashboard" },
     });
   const signIn = () => loginWithRedirect({ appState: { returnTo: "/dashboard" } });
+
+  const isBuy = signal.direction === "BUY";
+  const rows: Array<[string, number, string?]> = [
+    ["Entry", signal.entry, ""],
+    ["Take Profit 1", signal.take_profit_1, "tp"],
+    ["Take Profit 2", signal.take_profit_2, "tp"],
+    ["Stop Loss", signal.stop_loss, "sl"],
+  ];
 
   return (
     <div className="min-h-screen bg-black text-white neural-grid matrix-bg">
@@ -121,36 +310,46 @@ export default function Landing() {
             <p className="mt-3 text-xs text-white/35">No card required for the free tier. Cancel anytime.</p>
           </motion.div>
 
-          {/* Sample signal ticket */}
+          {/* Live signal ticket */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.15 }}
             className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-5 shadow-2xl"
           >
-            <div className="text-[10px] font-mono tracking-widest text-rose-200/70 mb-3">SAMPLE SIGNAL</div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[10px] font-mono tracking-widest text-rose-200/70">
+                {live ? "LIVE SIGNAL" : "SAMPLE SIGNAL"}
+              </div>
+              {live && <div className="flex items-center gap-1.5 text-[10px] text-emerald-300"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />LIVE</div>}
+            </div>
             <div className="flex items-start justify-between mb-4">
               <div>
-                <div className="text-[11px] text-white/40">VOLATILITY 100 INDEX</div>
-                <div className="text-xl font-bold">R_100</div>
+                <div className="text-[11px] text-white/40">{signal.display_name}</div>
+                <div className="text-xl font-bold">{signal.symbol}</div>
               </div>
-              <div className="text-[11px] font-semibold text-emerald-300">BUY · INSTANT EXECUTION</div>
+              <div className={`text-[11px] font-semibold ${isBuy ? "text-emerald-300" : "text-rose-300"}`}>
+                {signal.direction} · {signal.timeframe}
+              </div>
             </div>
             <div className="space-y-2 text-[14px]">
-              {TICKET_ROWS.map(([k, v, cls]) => (
+              {rows.map(([k, v, cls]) => (
                 <div key={k} className="flex justify-between border-b border-white/5 pb-2">
                   <span className="text-white/45">{k}</span>
                   <span className={`font-mono font-semibold ${cls === "tp" ? "text-emerald-300" : cls === "sl" ? "text-rose-300" : "text-white"}`}>
-                    {v}
+                    {v.toLocaleString()}
                   </span>
                 </div>
               ))}
             </div>
             <p className="mt-4 text-xs text-white/40 leading-relaxed">
-              Stop loss trails to <strong className="text-white">8,452.10</strong> once Take Profit 1 is reached —
-              locking in a breakeven-or-better trade automatically.
+              Stop loss trails to <strong className="text-white">{signal.entry.toLocaleString()}</strong> once Take
+              Profit 1 is reached — locking in a breakeven-or-better trade automatically.
             </p>
-            <p className="mt-2 text-[11px] font-mono text-white/30">basis: ATR(6.10) × 1.5 · signal strength 42/100</p>
+            <p className="mt-2 text-[11px] font-mono text-white/30">
+              basis: ATR({signal.atr}) · {signal.timeframe}
+              {sentLocal ? ` · sent ${sentLocal}` : ""}
+            </p>
           </motion.div>
         </div>
 
@@ -200,6 +399,29 @@ export default function Landing() {
           <p className="text-xs text-white/30">© 2026 Sans Mercantile. All rights reserved.</p>
         </div>
       </footer>
+
+      {/* Bottom-right TP/SL toasts */}
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-xs w-[calc(100%-2rem)]">
+        <AnimatePresence>
+          {toasts.map((t) => (
+            <motion.div
+              key={t.id}
+              initial={{ opacity: 0, x: 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 40 }}
+              className={`rounded-xl border ${TOAST_STYLES[t.kind]} bg-black/85 backdrop-blur-md p-4 shadow-2xl`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[13px] font-semibold">{t.title}</p>
+                <button onClick={() => dismiss(t.id)} className="text-white/40 hover:text-white text-sm leading-none">
+                  ×
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-white/55 leading-relaxed">{t.body}</p>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
