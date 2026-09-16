@@ -565,9 +565,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
           <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
             <button
               onClick={() => {
-                const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || "";
+                // Relative: same-origin /api/* proxy to the live backend.
                 const userId = getAppUserId();
-                window.location.href = `${API_BASE}/api/v1/auth/deriv/login?user_id=${encodeURIComponent(userId)}&account_type=live`;
+                window.location.href = `/api/v1/auth/deriv/login?user_id=${encodeURIComponent(userId)}&account_type=live`;
               }}
               className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-mono font-bold text-xs rounded border border-white/10 transition-all duration-300 flex items-center justify-center space-x-2 cursor-pointer"
             >

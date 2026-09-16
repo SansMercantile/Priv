@@ -101,9 +101,10 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
     // goes through the backend now (not the retired client-side PKCE
     // flow) since backend execution needs the token server-side.
     if (demoMode && !hasRealDeriv) {
-      const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || "";
+      // Relative URL: goes through the same-origin /api/* proxy to the live
+      // backend (never the retired Azure host from VITE_API_BASE_URL).
       const userId = getAppUserId();
-      window.location.href = `${API_BASE}/api/v1/auth/deriv/login?user_id=${encodeURIComponent(userId)}&account_type=live`;
+      window.location.href = `/api/v1/auth/deriv/login?user_id=${encodeURIComponent(userId)}&account_type=live`;
       return;
     }
     setDemoMode(!demoMode);

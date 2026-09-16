@@ -8,7 +8,8 @@ interface LoginGateProps {
   children: React.ReactNode;
 }
 
-const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || "";
+// NOTE (AWS migration): backend calls go same-origin (/api/* proxy);
+// the retired Azure VITE_API_BASE_URL host is no longer referenced.
 
 /**
  * Deriv connection now goes entirely through the backend's legacy
@@ -197,7 +198,8 @@ export default function LoginGate({ children }: LoginGateProps) {
   const handleDerivLogin = () => {
     setDerivLoading(true);
     const userId = getAppUserId();
-    window.location.href = `${API_BASE}/api/v1/auth/deriv/login?user_id=${encodeURIComponent(userId)}&account_type=demo`;
+    // Relative: same-origin /api/* proxy to the live backend.
+    window.location.href = `/api/v1/auth/deriv/login?user_id=${encodeURIComponent(userId)}&account_type=demo`;
   };
 
   if (isLoading || callbackProcessing || (!derivChecked && !derivConnected)) {

@@ -2,7 +2,9 @@
 import { getAppUserId } from "../lib/appUserId";
 import { getAuthToken } from "../lib/authToken";
 
-const BASE = (import.meta as any).env?.VITE_API_BASE_URL || "";
+// NOTE (AWS migration): all calls go same-origin through the /api/*
+// proxy to the live backend. The retired Azure host previously read from
+// VITE_API_BASE_URL is deliberately no longer used.
 
 // X-User-Id is always sent (it's what the pre-login Deriv-connect flow
 // relies on), but when a verified Auth0 session exists we also send the
@@ -18,7 +20,7 @@ async function withUserHeader(headers?: HeadersInit): Promise<HeadersInit> {
 }
 
 async function safeFetch(url: string, options?: RequestInit) {
-  const fullUrl = `${BASE}${url}`;
+  const fullUrl = url;
   const response = await fetch(fullUrl, { ...options, headers: await withUserHeader(options?.headers) });
   const contentType = response.headers.get("content-type") || "";
   // Guard: if server returns HTML (404 page, error page) instead of JSON,
@@ -39,12 +41,8 @@ async function safeFetch(url: string, options?: RequestInit) {
   return data;
 }
 
-// The EC2 Priv Core backend (trading engine, broker OAuth, agents) is a
-// DIFFERENT service from whatever VITE_API_BASE_URL points at (currently
-// the Azure KYC/profile/billing service). Broker/OAuth calls must always
-// use a relative path so they go through vercel.json's /api/* proxy to
-// EC2, never prefixed with BASE - otherwise they get sent cross-origin to
-// Azure, which doesn't have these routes and doesn't allow our origin.
+// Broker/OAuth calls always use a relative path so they go through the
+// same-origin /api/* proxy to the live backend, never a cross-origin host.
 async function safeFetchRelative(url: string, options?: RequestInit) {
   const response = await fetch(url, { ...options, headers: await withUserHeader(options?.headers) });
   const contentType = response.headers.get("content-type") || "";
@@ -79,17 +77,18 @@ export const apiClient = {
     return { data };
   },
 
-  // KYC handlers
-  getKycRecord: () => safeFetch("/api/kyc/record"),
-  getKycStatus: () => safeFetch("/api/kyc/status"),
+  // KYC handlers (relative: served by our backend via the /api/* proxy,
+  // never the retired Azure host)
+  getKycRecord: () => safeFetchRelative("/api/kyc/record"),
+  getKycStatus: () => safeFetchRelative("/api/kyc/status"),
   saveKycDraft: (form: any) =>
-    safeFetch("/api/kyc/draft", {
+    safeFetchRelative("/api/kyc/draft", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     }),
   submitKyc: (form: any) =>
-    safeFetch("/api/kyc/submit", {
+    safeFetchRelative("/api/kyc/submit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
@@ -97,7 +96,7 @@ export const apiClient = {
 
   // AI document verification (sends base64 image to Gemini via backend)
   verifyDocument: (documentBase64: string, mimeType: string, formData: any) =>
-    safeFetch("/api/kyc/verify-document", {
+    safeFetchRelative("/api/kyc/verify-document", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ documentBase64, mimeType, formData }),
@@ -105,7 +104,7 @@ export const apiClient = {
 
   // AI face / liveness verification
   verifyFace: (selfieBase64: string, documentBase64?: string) =>
-    safeFetch("/api/kyc/verify-face", {
+    safeFetchRelative("/api/kyc/verify-face", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ selfieBase64, documentBase64, mimeType: "image/jpeg" }),
