@@ -135,6 +135,48 @@ export const apiClient = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ anonymous_id: getAppUserId() }),
     }),
+
+  // Billing / PayFast. Mirrors the /api/kyc/* convention above (BASE +
+  // /api/<path> — kyc_api mounts internally at /api/v1/kyc but is
+  // reachable here at /api/kyc, so the payment router, mounted with no
+  // internal prefix, is assumed reachable the same way at /api/<path>;
+  // verify this against whatever proxy/prefix mapping actually fronts
+  // the Azure billing deployment). The backend resolves the paying user
+  // from the verified Auth0 Bearer token sent by withUserHeader() above,
+  // never from a client-supplied user id.
+  getPlans: () => safeFetch("/api/plans"),
+  getMySubscription: () => safeFetch("/api/subscriptions/me"),
+  createPayfastSubscription: (payload: {
+    plan_id: string;
+    return_url: string;
+    cancel_url: string;
+    notify_url: string;
+    user_email?: string;
+    user_first_name?: string;
+    user_last_name?: string;
+    billing_frequency?: string;
+  }) =>
+    safeFetch("/api/payfast/create-subscription", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  createPayfastPayment: (payload: {
+    plan_id: string;
+    return_url: string;
+    cancel_url: string;
+    notify_url: string;
+    user_email?: string;
+    user_first_name?: string;
+    user_last_name?: string;
+  }) =>
+    safeFetch("/api/payfast/create-payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  cancelPayfastSubscription: (subscriptionId: string) =>
+    safeFetch(`/api/payfast/cancel-subscription/${subscriptionId}`, { method: "POST" }),
 };
 
 export default apiClient;

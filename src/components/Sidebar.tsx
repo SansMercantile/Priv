@@ -14,6 +14,7 @@ import {
   BarChart2,
   History,
   Link2,
+  CreditCard,
   Menu,
   ChevronLeft,
   ChevronRight,
@@ -169,7 +170,8 @@ export const navigationItems: SectionItem[] = [
   { name: "Tactical News", icon: Newspaper, path: "/dashboard/news" },
   { name: "Diagnostics Log", icon: BarChart2, path: "/dashboard/analytics" },
   { name: "History & Audit", icon: History, path: "/dashboard/history" },
-  { name: "SANS Network Link", icon: Link2, path: "/dashboard/connections" }
+  { name: "SANS Network Link", icon: Link2, path: "/dashboard/connections" },
+  { name: "Billing", icon: CreditCard, path: "/dashboard/billing" }
 ];
 
 export default function Sidebar({

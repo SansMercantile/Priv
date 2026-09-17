@@ -16,6 +16,7 @@ import News from "./components/News";
 import Analytics from "./components/Analytics";
 import History from "./components/History";
 import Connections from "./components/Connections";
+import Billing from "./components/Billing";
 import ProfilePage from "./components/profile/ProfilePage";
 import KycAdminReviewPage from "./components/profile/KycAdminReviewPage";
 import UnifiedAssistant from "./ui/UnifiedAssistant";
@@ -199,6 +200,7 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
                   <Route path="/dashboard/analytics" element={<Analytics demoMode={demoMode} />} />
                   <Route path="/dashboard/history" element={<History demoMode={demoMode} />} />
                   <Route path="/dashboard/connections" element={<Connections demoMode={demoMode} />} />
+                  <Route path="/dashboard/billing" element={<Billing demoMode={demoMode} />} />
                   <Route path="/dashboard/profile" element={<ProfilePage demoMode={demoMode} />} />
                   <Route path="/dashboard/admin/kyc" element={<KycAdminReviewPage />} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
