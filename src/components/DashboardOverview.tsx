@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBrokerConnections } from "../lib/useBrokerConnections";
 import { getAppUserId } from "../lib/appUserId";
+import apiClient from "../api/apiClient";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -287,6 +288,81 @@ export const AdvisorInteractiveInterface: React.FC = () => {
 interface DashboardOverviewProps {
   demoMode?: boolean;
   setActiveSection: (sec: string) => void;
+}
+
+// Fallback when Deriv's OAuth app refuses the browser redirect (Deriv
+// bounces unknown/disabled app_ids to deriv.com instead of showing the
+// authorize screen): paste a user-created API token and validate it
+// server-side over HTTPS. On success the page reloads so connection
+// state (useBrokerConnections) picks the new link up.
+function DerivTokenFallback() {
+  const [open, setOpen] = useState(false);
+  const [token, setToken] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState("");
+
+  async function connect(e: React.FormEvent) {
+    e.preventDefault();
+    const t = token.trim();
+    if (!t || busy) return;
+    setBusy(true);
+    setError("");
+    setDone("");
+    try {
+      const res: any = await apiClient.post("/api/v1/auth/deriv/connect-token", {
+        api_token: t,
+        user_id: getAppUserId(),
+      });
+      const d = res?.data?.data ?? res?.data ?? {};
+      setDone(`Linked ${d.loginid || "Deriv account"} (${d.account_type || "live"}). Reloading…`);
+      setToken("");
+      window.setTimeout(() => window.location.reload(), 1200);
+    } catch (err: any) {
+      setError(err?.message || "Deriv refused the token.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="pt-1">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="text-[11px] font-mono text-zinc-500 underline hover:text-zinc-300"
+      >
+        {open ? "Hide API-token option" : "Deriv page not redirecting back? Use an API token instead"}
+      </button>
+      {open && (
+        <form onSubmit={connect} className="mt-2 text-left space-y-2">
+          <p className="text-[11px] text-zinc-400 font-mono leading-relaxed">
+            Deriv → Account settings → API token → Create (Trade + Account
+            management, ≤ 90 days) → paste below. Validated securely, never
+            stored in the browser.
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              placeholder="Deriv API token"
+              autoComplete="off"
+              className="flex-1 bg-black border border-white/10 rounded p-2 text-xs text-white font-mono focus:outline-none focus:border-white/30"
+            />
+            <button
+              type="submit"
+              disabled={busy || !token.trim()}
+              className="px-4 py-2 bg-white text-black font-mono text-xs font-bold rounded disabled:opacity-40"
+            >
+              {busy ? "Validating…" : "Link token"}
+            </button>
+          </div>
+          {error && <p className="text-[11px] font-mono text-rose-400">{error}</p>}
+          {done && <p className="text-[11px] font-mono text-emerald-400">{done}</p>}
+        </form>
+      )}
+    </div>
+  );
 }
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, setActiveSection }) => {
@@ -577,6 +653,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
             <div className="mt-2 text-[11px] text-zinc-500 font-mono flex items-center gap-3 justify-center">
               <a href="https://deriv.com/signup" target="_blank" rel="noopener noreferrer" className="underline">Don't have an account? Sign up</a>
             </div>
+            <DerivTokenFallback />
           </div>
         </div>
       </div>
