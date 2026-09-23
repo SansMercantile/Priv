@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import KycVerificationPage from './KycVerificationPage';
+import DerivConnectCard from '../DerivConnectCard';
 import { 
   User, 
   CreditCard, 
-  Shield, 
+  Shield,
+  Link2,
   Landmark, 
   Calendar, 
   DollarSign, 
@@ -40,7 +42,7 @@ interface BillingLog {
 
 export default function UserProfileEditor({ demoMode = false }: UserProfileEditorProps) {
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<'profile' | 'billing' | 'kyc'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'billing' | 'kyc' | 'brokers'>('profile');
   const [hasRealConnection, setHasRealConnection] = useState<boolean>(false);
   
   useEffect(() => {
@@ -306,6 +308,7 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
       <div className="flex border-b border-zinc-900 pb-3 gap-2 overflow-x-auto scrollbar-hide">
         {[
           { id: 'profile', label: 'Sovereign Profile', icon: User },
+          { id: 'brokers', label: 'Broker Connections', icon: Link2 },
           { id: 'billing', label: 'Node Allocation & Credits', icon: CreditCard },
           { id: 'kyc', label: 'Identity Registry KYC', icon: Shield }
         ].map(t => {
@@ -895,6 +898,22 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
             </div>
           </div>
 
+        </div>
+      )}
+
+      {activeTab === 'brokers' && (
+        <div className="space-y-4">
+          <div className="p-5 border border-zinc-800 bg-zinc-950/40 rounded-xl">
+            <h3 className="text-sm font-mono font-bold text-white uppercase tracking-widest">
+              Deriv broker connection
+            </h3>
+            <p className="text-[11px] text-zinc-400 font-mono mt-1 mb-4 leading-relaxed">
+              Link your Deriv account (demo works too) so live prices, positions
+              and execution light up across the terminal. Demo mode uses your
+              real Deriv demo account once linked.
+            </p>
+            <DerivConnectCard />
+          </div>
         </div>
       )}
 

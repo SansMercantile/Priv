@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBrokerConnections } from "../lib/useBrokerConnections";
-import { getAppUserId } from "../lib/appUserId";
-import { initiateDerivLogin } from "../lib/derivAuth/oauth";
-import apiClient from "../api/apiClient";
+import DerivConnectCard from "./DerivConnectCard";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -18,7 +16,6 @@ import {
   Terminal,
   BrainCircuit,
   Lock,
-  ArrowUpRight,
   Coins
 } from "lucide-react";
 import { MetricCard } from "./MetricCard";
@@ -285,105 +282,10 @@ export const AdvisorInteractiveInterface: React.FC = () => {
 
 
 
-// Shows the last Deriv return-leg failure (written by LoginGate's PKCE
-// callback handler), if any, then clears it so it displays exactly once.
-function DerivReturnError() {
-  const [msg] = useState(() => {
-    try {
-      const m = sessionStorage.getItem("priv_deriv_error");
-      sessionStorage.removeItem("priv_deriv_error");
-      return m;
-    } catch (_) {
-      return null;
-    }
-  });
-  if (!msg) return null;
-  return (
-    <div className="p-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs font-mono">
-      Deriv return failed: {msg}. You can retry below — if it repeats, use the API-token option.
-    </div>
-  );
-}
-
 // Main Dashboard Tab View
 interface DashboardOverviewProps {
   demoMode?: boolean;
   setActiveSection: (sec: string) => void;
-}
-
-// Fallback when Deriv's OAuth app refuses the browser redirect (Deriv
-// bounces unknown/disabled app_ids to deriv.com instead of showing the
-// authorize screen): paste a user-created API token and validate it
-// server-side over HTTPS. On success the page reloads so connection
-// state (useBrokerConnections) picks the new link up.
-function DerivTokenFallback() {
-  const [open, setOpen] = useState(false);
-  const [token, setToken] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [done, setDone] = useState("");
-
-  async function connect(e: React.FormEvent) {
-    e.preventDefault();
-    const t = token.trim();
-    if (!t || busy) return;
-    setBusy(true);
-    setError("");
-    setDone("");
-    try {
-      const res: any = await apiClient.post("/api/v1/auth/deriv/connect-token", {
-        api_token: t,
-        user_id: getAppUserId(),
-      });
-      const d = res?.data?.data ?? res?.data ?? {};
-      setDone(`Linked ${d.loginid || "Deriv account"} (${d.account_type || "live"}). Reloading…`);
-      setToken("");
-      window.setTimeout(() => window.location.reload(), 1200);
-    } catch (err: any) {
-      setError(err?.message || "Deriv refused the token.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="pt-1">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="text-[11px] font-mono text-zinc-500 underline hover:text-zinc-300"
-      >
-        {open ? "Hide API-token option" : "Deriv page not redirecting back? Use an API token instead"}
-      </button>
-      {open && (
-        <form onSubmit={connect} className="mt-2 text-left space-y-2">
-          <p className="text-[11px] text-zinc-400 font-mono leading-relaxed">
-            Deriv → Account settings → API token → Create (Trade + Account
-            management, ≤ 90 days) → paste below. Validated securely, never
-            stored in the browser.
-          </p>
-          <div className="flex gap-2">
-            <input
-              type="password"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="Deriv API token"
-              autoComplete="off"
-              className="flex-1 bg-black border border-white/10 rounded p-2 text-xs text-white font-mono focus:outline-none focus:border-white/30"
-            />
-            <button
-              type="submit"
-              disabled={busy || !token.trim()}
-              className="px-4 py-2 bg-white text-black font-mono text-xs font-bold rounded disabled:opacity-40"
-            >
-              {busy ? "Validating…" : "Link token"}
-            </button>
-          </div>
-          {error && <p className="text-[11px] font-mono text-rose-400">{error}</p>}
-          {done && <p className="text-[11px] font-mono text-emerald-400">{done}</p>}
-        </form>
-      )}
-    </div>
-  );
 }
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, setActiveSection }) => {
@@ -647,12 +549,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
   if (!demoMode && !brokerLoading && !hasRealDeriv) {
     return (
       <div className="space-y-6 max-w-3xl mx-auto py-12 animate-fadeIn">
-        <DerivReturnError />
         <div className="text-center p-8 bg-[#0a0a0a] border border-white/10 rounded-xl space-y-6 shadow-[0_12px_45px_0_rgba(0,0,0,0.8)]">
           <div className="mx-auto w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20 text-red-500">
             <Lock className="w-5 h-5 animate-pulse" />
           </div>
-          
+
           <div className="space-y-2">
             <h2 className="text-2xl font-serif italic text-white font-normal">Live Dashboard Locked</h2>
             <p className="text-zinc-400 text-xs max-w-md mx-auto leading-relaxed">
@@ -660,25 +561,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
             </p>
           </div>
 
-          <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
-            <button
-              onClick={() => {
-                // Client-side PKCE via auth.deriv.com (see lib/derivAuth):
-                // Deriv shows login (or signup), then the connect-consent
-                // screen, then redirects back here with a code.
-                initiateDerivLogin().catch((e) =>
-                  console.error("Deriv login failed to start:", e?.message || e)
-                );
-              }}
-              className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-mono font-bold text-xs rounded border border-white/10 transition-all duration-300 flex items-center justify-center space-x-2 cursor-pointer"
-            >
-              <span>CONNECT DERIV ACCOUNT</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </button>
-            <div className="mt-2 text-[11px] text-zinc-500 font-mono flex items-center gap-3 justify-center">
+          <div className="pt-2 max-w-md mx-auto text-left">
+            <DerivConnectCard />
+            <div className="mt-3 text-[11px] text-zinc-500 font-mono text-center">
               <a href="https://deriv.com/signup" target="_blank" rel="noopener noreferrer" className="underline">Don't have an account? Sign up</a>
             </div>
-            <DerivTokenFallback />
           </div>
         </div>
       </div>

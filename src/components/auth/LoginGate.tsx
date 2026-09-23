@@ -7,6 +7,7 @@ import {
   handleDerivCallback,
   DerivOAuthError,
 } from "../../lib/derivAuth/oauth";
+import DerivConnectCard from "../DerivConnectCard";
 import apiClient from "../../api/apiClient";
 
 interface LoginGateProps {
@@ -17,15 +18,11 @@ interface LoginGateProps {
 // the retired Azure VITE_API_BASE_URL host is no longer referenced.
 
 /**
- * Deriv connection now goes entirely through the backend's legacy
- * app_id OAuth flow (backend/trading_engine/oauth_api.py), which is the
- * only flow that lets the backend actually execute trades -- the
- * previous client-side PKCE flow (src/lib/derivAuth) kept the token in
- * the browser only, with no route to the backend, and is retired from
- * this login screen. Deriv is now purely a BROKER connection made via
- * getAppUserId() (the same anonymous per-browser id already used to
- * scope broker connections independent of Auth0 -- see appUserId.ts),
- * not an app-identity/login method the way it briefly was.
+ * Auth0 is the one login. Deriv is a BROKER connection made inside the
+ * app (profile brokers tab, dashboard locked screen, first-run onboarding)
+ * via the client-side PKCE flow (src/lib/derivAuth, auth.deriv.com), with
+ * tokens handed to the backend for real execution. Deriv never logs anyone
+ * into Priv itself.
  */
 async function checkDerivConnected(): Promise<boolean> {
   try {
@@ -62,10 +59,8 @@ function useBrokerOAuthCallbackHandler(onDone: (result: { broker: string; succes
   return processing;
 }
 
-function LoginScreen({ derivError, onDerivLogin, derivLoading }: {
+function LoginScreen({ derivError }: {
   derivError?: string | null;
-  onDerivLogin: () => void;
-  derivLoading: boolean;
 }) {
   const { loginWithRedirect, isLoading } = useAuth0();
 
@@ -91,20 +86,6 @@ function LoginScreen({ derivError, onDerivLogin, derivLoading }: {
         )}
 
         <div className="space-y-3">
-          <button
-            onClick={onDerivLogin}
-            disabled={derivLoading}
-            className="w-full flex items-center justify-center gap-3 rounded-lg bg-rose-600 text-white font-medium py-2.5 px-4 hover:bg-rose-500 transition disabled:opacity-50"
-          >
-            {derivLoading ? "Redirecting to Deriv…" : "Continue with Deriv"}
-          </button>
-
-          <div className="flex items-center gap-3 py-1">
-            <div className="h-px flex-1 bg-white/10" />
-            <span className="text-xs text-white/30">or</span>
-            <div className="h-px flex-1 bg-white/10" />
-          </div>
-
           <button
             onClick={() => handleLogin("google-oauth2")}
             disabled={isLoading}
@@ -153,11 +134,10 @@ function LoginScreen({ derivError, onDerivLogin, derivLoading }: {
 }
 
 export default function LoginGate({ children }: LoginGateProps) {
-  const { isAuthenticated, isLoading, error, getAccessTokenSilently } = useAuth0();
+  const { isAuthenticated, isLoading, error, user, getAccessTokenSilently } = useAuth0();
   const [derivConnected, setDerivConnected] = useState(false);
   const [derivChecked, setDerivChecked] = useState(false);
   const [derivError, setDerivError] = useState<string | null>(null);
-  const [derivLoading, setDerivLoading] = useState(false);
   const linkedAnonymousRef = useRef(false);
 
   // Registers the real token getter for apiClient.ts (a plain module that
@@ -200,26 +180,6 @@ export default function LoginGate({ children }: LoginGateProps) {
     });
   }, [callbackProcessing]);
 
-  const handleDerivLogin = () => {
-    setDerivLoading(true);
-    setDerivError(null);
-    // Client-side PKCE via auth.deriv.com (the working August flow -- the
-    // backend-driven oauth.deriv.com route is bounced to marketing by Deriv).
-    // Deriv shows login/signup, then the connect-consent screen, then sends
-    // the browser back here with ?code&state, handled below.
-    initiateDerivLoginSafe();
-  };
-
-  async function initiateDerivLoginSafe() {
-    try {
-      const { initiateDerivLogin } = await import("../../lib/derivAuth/oauth");
-      await initiateDerivLogin();
-    } catch (e: any) {
-      setDerivLoading(false);
-      setDerivError(e?.message || "deriv_init_failed");
-    }
-  }
-
   // PKCE return leg: Deriv redirected back with ?code&state. Exchange the
   // code (proves the user consented at Deriv), hand the access token to the
   // backend so execution/adapters are real, then reload into the app.
@@ -256,6 +216,29 @@ export default function LoginGate({ children }: LoginGateProps) {
     };
   }, []);
 
+  // First-run onboarding: right after Auth0 sign-in, if this identity
+  // has never linked Deriv (and hasn't dismissed this), pop the connect
+  // card first -- demo mode runs on their real Deriv demo once linked.
+  const onboardKey =
+    `priv-onboarded-deriv:${user?.sub || getAppUserId()}`;
+  const [onboarding, setOnboarding] = useState(() => {
+    try {
+      return !localStorage.getItem(onboardKey);
+    } catch (_) {
+      return false;
+    }
+  });
+  const dismissOnboarding = () => {
+    try {
+      localStorage.setItem(onboardKey, new Date().toISOString());
+    } catch (_) {
+      /* ignore */
+    }
+    setOnboarding(false);
+  };
+  const showOnboarding =
+    onboarding && isAuthenticated && derivChecked && !derivConnected;
+
   if (isLoading || callbackProcessing || (!derivChecked && !derivConnected)) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -275,8 +258,33 @@ export default function LoginGate({ children }: LoginGateProps) {
   }
 
   if (!isAuthenticated && !derivConnected) {
-    return <LoginScreen derivError={derivError} onDerivLogin={handleDerivLogin} derivLoading={derivLoading} />;
+    return <LoginScreen derivError={derivError} />;
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {showOnboarding && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md bg-zinc-950 border border-white/10 rounded-2xl p-6 space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold text-white">Connect your Deriv account</h2>
+              <p className="text-xs text-zinc-400 font-mono mt-1 leading-relaxed">
+                One last step: link Deriv (a demo account works) to switch on
+                live prices, positions, and execution. Skip any time from your
+                profile.
+              </p>
+            </div>
+            <DerivConnectCard />
+            <button
+              onClick={dismissOnboarding}
+              className="w-full py-2 text-xs font-mono text-zinc-500 hover:text-zinc-300 underline"
+            >
+              Skip for now
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }

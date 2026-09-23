@@ -105,7 +105,14 @@ function validateCallback(params: CallbackParams): string {
     throw new DerivOAuthError("Missing state parameter - possible CSRF attack");
   }
   const storedToken = getCSRFToken();
-  if (!storedToken || storedToken !== params.state) {
+  if (!storedToken) {
+    // No stored token (expired session, different tab, or storage cleared
+    // mid-flow -- NOT an attack, just stale). Say so plainly.
+    clearAllDerivAuthData();
+    cleanupUrl();
+    throw new DerivOAuthError("Login session expired -- please try connecting again");
+  }
+  if (storedToken !== params.state) {
     clearAllDerivAuthData();
     cleanupUrl();
     throw new DerivOAuthError("CSRF token mismatch - possible CSRF attack");

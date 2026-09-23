@@ -25,7 +25,7 @@ const ACCOUNTS_KEY = "deriv_accounts";
 const ACTIVE_LOGINID_KEY = "deriv_active_loginid";
 const ACCOUNT_TYPE_KEY = "deriv_account_type";
 
-const TOKEN_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes
+const TOKEN_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours (covers full signup + KYC flows)
 
 interface StoredWithTimestamp {
   value: string;

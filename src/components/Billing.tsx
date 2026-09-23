@@ -37,10 +37,19 @@ export default function Billing({ demoMode }: { demoMode?: boolean }) {
         ]);
         if (cancelled) return;
         if (plansRes.status === "fulfilled") {
-          setPlans(plansRes.value.data?.plans ?? plansRes.value.data ?? []);
+          // Backend returns the plans array directly (or {plans:[...]}).
+          // Either can be null (empty body) -- never read .data blind.
+          const v: any = plansRes.value;
+          const body = v?.data ?? v;
+          setPlans(body?.plans ?? (Array.isArray(body) ? body : []));
         }
         if (subRes.status === "fulfilled") {
-          setSubscription(subRes.value.data?.subscription ?? subRes.value.data ?? null);
+          // 200 + null body = signed in but no subscription yet.
+          const v: any = subRes.value;
+          const body = v?.data ?? v;
+          setSubscription(
+            body?.subscription ?? (body && typeof body === "object" ? body : null)
+          );
         }
       } catch (e: any) {
         if (!cancelled) setError(e?.message || "Failed to load billing information.");
