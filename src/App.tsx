@@ -25,7 +25,7 @@ import GuidedWalkthrough from "./components/GuidedWalkthrough";
 import LoginGate from "./components/auth/LoginGate";
 import Landing from "./pages/Landing";
 import { useBrokerConnections } from "./lib/useBrokerConnections";
-import { getAppUserId } from "./lib/appUserId";
+import { initiateDerivLogin } from "./lib/derivAuth/oauth";
 import { initDatadog } from "./lib/datadog";
 
 interface AppProps {
@@ -98,15 +98,16 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
   const handleToggleDemoMode = async () => {
     setDevice(prev => prev); // keep state intact
     // Only demo -> real is gated. If no real Deriv account is connected,
-    // send them to the backend's Deriv login (see oauth_api.py) rather
-    // than flipping into a real-mode view with nothing behind it. This
-    // goes through the backend now (not the retired client-side PKCE
-    // flow) since backend execution needs the token server-side.
+    // run the client-side PKCE flow via auth.deriv.com (the backend-driven
+    // oauth.deriv.com route is dead -- Deriv bounces it to marketing).
+    // After Deriv's login + consent screen it redirects back here with a
+    // code, which LoginGate exchanges and hands to the backend.
     if (demoMode && !hasRealDeriv) {
-      // Relative URL: goes through the same-origin /api/* proxy to the live
-      // backend (never the retired Azure host from VITE_API_BASE_URL).
-      const userId = getAppUserId();
-      window.location.href = `/api/v1/auth/deriv/login?user_id=${encodeURIComponent(userId)}&account_type=live`;
+      try {
+        await initiateDerivLogin();
+      } catch (e: any) {
+        console.error("Deriv login failed to start:", e?.message || e);
+      }
       return;
     }
     setDemoMode(!demoMode);

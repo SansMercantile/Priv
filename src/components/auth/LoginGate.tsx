@@ -2,6 +2,11 @@ import React, { useEffect, useRef, useState } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 import { getAppUserId } from "../../lib/appUserId";
 import { setAuthTokenGetter } from "../../lib/authToken";
+import {
+  isDerivCallback,
+  handleDerivCallback,
+  DerivOAuthError,
+} from "../../lib/derivAuth/oauth";
 import apiClient from "../../api/apiClient";
 
 interface LoginGateProps {
@@ -197,10 +202,59 @@ export default function LoginGate({ children }: LoginGateProps) {
 
   const handleDerivLogin = () => {
     setDerivLoading(true);
-    const userId = getAppUserId();
-    // Relative: same-origin /api/* proxy to the live backend.
-    window.location.href = `/api/v1/auth/deriv/login?user_id=${encodeURIComponent(userId)}&account_type=demo`;
+    setDerivError(null);
+    // Client-side PKCE via auth.deriv.com (the working August flow -- the
+    // backend-driven oauth.deriv.com route is bounced to marketing by Deriv).
+    // Deriv shows login/signup, then the connect-consent screen, then sends
+    // the browser back here with ?code&state, handled below.
+    initiateDerivLoginSafe();
   };
+
+  async function initiateDerivLoginSafe() {
+    try {
+      const { initiateDerivLogin } = await import("../../lib/derivAuth/oauth");
+      await initiateDerivLogin();
+    } catch (e: any) {
+      setDerivLoading(false);
+      setDerivError(e?.message || "deriv_init_failed");
+    }
+  }
+
+  // PKCE return leg: Deriv redirected back with ?code&state. Exchange the
+  // code (proves the user consented at Deriv), hand the access token to the
+  // backend so execution/adapters are real, then reload into the app.
+  useEffect(() => {
+    if (!isDerivCallback()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const authInfo = await handleDerivCallback();
+        if (cancelled) return;
+        await apiClient.post("/api/v1/auth/deriv/connect-token", {
+          api_token: authInfo.access_token,
+          user_id: getAppUserId(),
+        });
+        window.location.reload();
+      } catch (e: any) {
+        if (cancelled) return;
+        const msg = e instanceof DerivOAuthError
+          ? e.message
+          : (e?.message || "deriv_callback_failed");
+        setDerivError(msg);
+        setDerivChecked(true);
+        try {
+          // The locked dashboard screen (mounted when still unconnected)
+          // reads and clears this to show the failure inline.
+          sessionStorage.setItem("priv_deriv_error", msg);
+        } catch (_) {
+          /* ignore */
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (isLoading || callbackProcessing || (!derivChecked && !derivConnected)) {
     return (

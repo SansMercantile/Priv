@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBrokerConnections } from "../lib/useBrokerConnections";
 import { getAppUserId } from "../lib/appUserId";
+import { initiateDerivLogin } from "../lib/derivAuth/oauth";
 import apiClient from "../api/apiClient";
 import { 
   DollarSign, 
@@ -283,6 +284,26 @@ export const AdvisorInteractiveInterface: React.FC = () => {
 };
 
 
+
+// Shows the last Deriv return-leg failure (written by LoginGate's PKCE
+// callback handler), if any, then clears it so it displays exactly once.
+function DerivReturnError() {
+  const [msg] = useState(() => {
+    try {
+      const m = sessionStorage.getItem("priv_deriv_error");
+      sessionStorage.removeItem("priv_deriv_error");
+      return m;
+    } catch (_) {
+      return null;
+    }
+  });
+  if (!msg) return null;
+  return (
+    <div className="p-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs font-mono">
+      Deriv return failed: {msg}. You can retry below — if it repeats, use the API-token option.
+    </div>
+  );
+}
 
 // Main Dashboard Tab View
 interface DashboardOverviewProps {
@@ -626,6 +647,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
   if (!demoMode && !brokerLoading && !hasRealDeriv) {
     return (
       <div className="space-y-6 max-w-3xl mx-auto py-12 animate-fadeIn">
+        <DerivReturnError />
         <div className="text-center p-8 bg-[#0a0a0a] border border-white/10 rounded-xl space-y-6 shadow-[0_12px_45px_0_rgba(0,0,0,0.8)]">
           <div className="mx-auto w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20 text-red-500">
             <Lock className="w-5 h-5 animate-pulse" />
@@ -641,9 +663,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
           <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
             <button
               onClick={() => {
-                // Relative: same-origin /api/* proxy to the live backend.
-                const userId = getAppUserId();
-                window.location.href = `/api/v1/auth/deriv/login?user_id=${encodeURIComponent(userId)}&account_type=live`;
+                // Client-side PKCE via auth.deriv.com (see lib/derivAuth):
+                // Deriv shows login (or signup), then the connect-consent
+                // screen, then redirects back here with a code.
+                initiateDerivLogin().catch((e) =>
+                  console.error("Deriv login failed to start:", e?.message || e)
+                );
               }}
               className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-mono font-bold text-xs rounded border border-white/10 transition-all duration-300 flex items-center justify-center space-x-2 cursor-pointer"
             >
