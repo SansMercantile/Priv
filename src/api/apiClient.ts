@@ -77,8 +77,11 @@ export const apiClient = {
     return { data };
   },
 
-  // KYC handlers (relative: served by our backend via the /api/* proxy,
-  // never the retired Azure host)
+  // KYC handlers (relative: served by kyc_compat_api.py, mounted at
+  // /api/kyc in main.py -- confirmed live: GET /api/kyc/status -> 401
+  // (route exists, needs auth), not 404. Do NOT change these to
+  // /api/v1/kyc/* -- that's a DIFFERENT, older router (kyc_api.py) that
+  // lacks /record, /verify-document, and /verify-face entirely.
   getKycRecord: () => safeFetchRelative("/api/kyc/record"),
   getKycStatus: () => safeFetchRelative("/api/kyc/status"),
   saveKycDraft: (form: any) =>
@@ -94,7 +97,13 @@ export const apiClient = {
       body: JSON.stringify(form),
     }),
 
-  // AI document verification (sends base64 image to Gemini via backend)
+  // AI document verification (sends base64 image to Gemini via backend).
+  // NOTE: confirmed live this currently returns 501 "Document
+  // verification not configured (Bedrock vision unavailable)" -- the
+  // route exists and is wired correctly, but its backend dependency
+  // (AWS Bedrock vision) isn't configured in this environment. Frontend
+  // callers should handle a 501 gracefully rather than treating it as a
+  // generic failure.
   verifyDocument: (documentBase64: string, mimeType: string, formData: any) =>
     safeFetchRelative("/api/kyc/verify-document", {
       method: "POST",
@@ -136,16 +145,16 @@ export const apiClient = {
       body: JSON.stringify({ anonymous_id: getAppUserId() }),
     }),
 
-  // Billing / PayFast. Mirrors the /api/kyc/* convention above (BASE +
-  // /api/<path> — kyc_api mounts internally at /api/v1/kyc but is
-  // reachable here at /api/kyc, so the payment router, mounted with no
-  // internal prefix, is assumed reachable the same way at /api/<path>;
-  // verify this against whatever proxy/prefix mapping actually fronts
-  // the Azure billing deployment). The backend resolves the paying user
-  // from the verified Auth0 Bearer token sent by withUserHeader() above,
-  // never from a client-supplied user id.
-  getPlans: () => safeFetch("/api/plans"),
-  getMySubscription: () => safeFetch("/api/subscriptions/me"),
+  // Billing / PayFast. payment_api.router is mounted at /api/v1/payment
+  // in main.py (fixed: it was previously mounted with no prefix at all,
+  // making it unreachable through the vercel /api/* proxy -- confirmed
+  // live: GET /plans -> 200 with real data, but GET /api/plans -> 404
+  // before this fix). Always relative, through the same proxy as
+  // everything else above -- never the retired Azure BASE. The backend
+  // resolves the paying user from the verified Auth0 Bearer token sent
+  // by withUserHeader() above, never from a client-supplied user id.
+  getPlans: () => safeFetchRelative("/api/v1/payment/plans"),
+  getMySubscription: () => safeFetchRelative("/api/v1/payment/subscriptions/me"),
   createPayfastSubscription: (payload: {
     plan_id: string;
     return_url: string;
@@ -156,7 +165,7 @@ export const apiClient = {
     user_last_name?: string;
     billing_frequency?: string;
   }) =>
-    safeFetch("/api/payfast/create-subscription", {
+    safeFetchRelative("/api/v1/payment/payfast/create-subscription", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -170,13 +179,13 @@ export const apiClient = {
     user_first_name?: string;
     user_last_name?: string;
   }) =>
-    safeFetch("/api/payfast/create-payment", {
+    safeFetchRelative("/api/v1/payment/payfast/create-payment", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     }),
   cancelPayfastSubscription: (subscriptionId: string) =>
-    safeFetch(`/api/payfast/cancel-subscription/${subscriptionId}`, { method: "POST" }),
+    safeFetchRelative(`/api/v1/payment/payfast/cancel-subscription/${subscriptionId}`, { method: "POST" }),
 };
 
 export default apiClient;

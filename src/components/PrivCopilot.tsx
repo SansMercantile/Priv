@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   MessageSquare, X, Send, Mic, Volume2, VolumeX, Brain, RefreshCw, TrendingUp, TrendingDown, Calendar,
+  Camera, CameraOff,
 } from "lucide-react";
 import chatAvatar from "../assets/images/chat_avatar_1779278082106.png";
+import { getAuthToken } from "../lib/authToken";
 
 interface HarmonicPoint {
   index: number;
@@ -50,6 +52,7 @@ interface ChatMessage {
   sender: "user" | "ai";
   text?: string;
   data?: SupportResponse;
+  emotionNote?: string;
 }
 
 // Real pattern/signal chart - plots the detected harmonic X-A-B-C-D points
@@ -176,9 +179,18 @@ export const PrivCopilot: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [speechActive, setSpeechActive] = useState(true);
   const [micActive, setMicActive] = useState(false);
+  // Opt-in camera check-in: off by default. The camera is never accessed
+  // until the user explicitly clicks the toggle, and the stream is fully
+  // stopped (all tracks released) the moment it's turned off or the
+  // widget closes -- no background access.
+  const [cameraEnabled, setCameraEnabled] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   const messageEndRef = useRef<HTMLDivElement | null>(null);
   const speechRecognizer = useRef<any>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -214,6 +226,79 @@ export const PrivCopilot: React.FC = () => {
     }
   };
 
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraEnabled(false);
+  };
+
+  const toggleCamera = async () => {
+    if (cameraEnabled) {
+      stopCamera();
+      return;
+    }
+    setCameraError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setCameraEnabled(true);
+    } catch (err: any) {
+      setCameraError("Couldn't access your camera. Check your browser's camera permission for this site.");
+    }
+  };
+
+  // Release the camera the moment the widget is closed, not just on unmount.
+  useEffect(() => {
+    if (!isOpen && cameraEnabled) stopCamera();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  useEffect(() => () => stopCamera(), []);
+
+  // Captures one frame as base64 JPEG, or null if the camera isn't on /
+  // ready. A single snapshot per message -- never a continuous stream to
+  // the backend.
+  const captureFrame = (): string | null => {
+    if (!cameraEnabled || !videoRef.current || !canvasRef.current) return null;
+    const video = videoRef.current;
+    if (!video.videoWidth || !video.videoHeight) return null;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+    return dataUrl.split(",")[1] || null;
+  };
+
+  const runEmotionCheckIn = async (context: string): Promise<string | undefined> => {
+    const frame = captureFrame();
+    if (!frame) return undefined;
+    try {
+      const token = await getAuthToken();
+      if (!token) return undefined; // camera check-ins require sign-in
+      const res = await fetch("/api/v1/support/emotion-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ imageBase64: frame, mimeType: "image/jpeg", context }),
+      });
+      if (res.status === 429) return undefined; // rate limited -- stay quiet, don't spam the chat
+      if (!res.ok) return undefined;
+      const data = await res.json();
+      if (data.in_cooldown) return undefined; // the chat response already covers this
+      if (data.usable_frame === false) return undefined;
+      return data.trading_note as string | undefined;
+    } catch {
+      return undefined; // check-in is a bonus, never blocks sending the message
+    }
+  };
+
   const speak = (text: string) => {
     if (!speechActive || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
@@ -230,15 +315,24 @@ export const PrivCopilot: React.FC = () => {
     setIsTyping(true);
 
     try {
+      const emotionNotePromise = cameraEnabled ? runEmotionCheckIn(promptToSend) : Promise.resolve(undefined);
+
+      const token = await getAuthToken();
       const res = await fetch("/api/v1/support/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ message: promptToSend }),
       });
       const data: SupportResponse = await res.json();
+      const emotionNote = await emotionNotePromise;
       if (res.ok) {
-        setMessages((prev) => [...prev, { sender: "ai", text: data.message, data }]);
+        setMessages((prev) => [...prev, { sender: "ai", text: data.message, data, emotionNote }]);
         speak(data.message);
+      } else if (res.status === 429) {
+        setMessages((prev) => [...prev, { sender: "ai", text: (data as any).detail || "Slow down a little — please wait a moment before sending another message." }]);
       } else {
         const errText = (data as any).detail || "Priv's analysis engine is temporarily unavailable.";
         setMessages((prev) => [...prev, { sender: "ai", text: errText }]);
@@ -306,6 +400,11 @@ export const PrivCopilot: React.FC = () => {
                   }`}
                 >
                   {msg.text && <p>{msg.text}</p>}
+                  {msg.emotionNote && (
+                    <p className="mt-2 text-[10px] text-white/50 italic border-t border-white/5 pt-2">
+                      {msg.emotionNote}
+                    </p>
+                  )}
                   {msg.data && <SignalCard data={msg.data} />}
                 </div>
               </div>
@@ -319,6 +418,25 @@ export const PrivCopilot: React.FC = () => {
             <div ref={messageEndRef} />
           </div>
 
+          {(cameraEnabled || cameraError) && (
+            <div className="px-3 pt-2 flex-shrink-0 flex items-center gap-2 border-t border-white/10 bg-neutral-950">
+              {cameraEnabled && (
+                <video
+                  ref={videoRef}
+                  muted
+                  playsInline
+                  className="w-12 h-9 rounded object-cover border border-white/15"
+                />
+              )}
+              <p className="text-[9px] text-white/40 leading-tight">
+                {cameraError
+                  ? cameraError
+                  : "Camera check-ins are on: each message includes a quick, private read of your expression to help flag stress before a trade. Frames are never stored."}
+              </p>
+            </div>
+          )}
+          <canvas ref={canvasRef} className="hidden" />
+
           <form onSubmit={handleSendMessage} className="p-3 border-t border-white/10 bg-neutral-950 flex-shrink-0 flex items-center space-x-2">
             <button
               type="button"
@@ -328,6 +446,16 @@ export const PrivCopilot: React.FC = () => {
               }`}
             >
               <Mic className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={toggleCamera}
+              title={cameraEnabled ? "Turn off camera check-ins" : "Turn on camera check-ins (opt-in emotional read before trades)"}
+              className={`p-2.5 rounded border transition flex-shrink-0 ${
+                cameraEnabled ? "text-white border-white/20 bg-white/10" : "text-gray-500 border-white/5 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              {cameraEnabled ? <Camera className="w-4 h-4" /> : <CameraOff className="w-4 h-4" />}
             </button>
             <input
               type="text"

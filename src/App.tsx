@@ -17,6 +17,7 @@ import Analytics from "./components/Analytics";
 import History from "./components/History";
 import Connections from "./components/Connections";
 import Billing from "./components/Billing";
+import Celebrations from "./components/Celebrations";
 import ProfilePage from "./components/profile/ProfilePage";
 import KycAdminReviewPage from "./components/profile/KycAdminReviewPage";
 import UnifiedAssistant from "./ui/UnifiedAssistant";
@@ -211,6 +212,7 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
         </div>
         
         <UnifiedAssistant isVisible={true} />
+        <Celebrations />
         <Toaster />
         <VercelAnalytics />
       </div>
