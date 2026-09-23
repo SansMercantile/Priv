@@ -12,10 +12,12 @@ const clientId = (import.meta as any).env?.VITE_AUTH0_CLIENT_ID;
 const audience = (import.meta as any).env?.VITE_AUTH0_AUDIENCE;
 
 const onRedirectCallback = (appState?: AppState) => {
+  // Land authenticated users in the app (where LoginGate's first-run
+  // onboarding pops for new accounts), never strand them on /callback.
   window.history.replaceState(
     {},
     document.title,
-    appState?.returnTo || window.location.pathname
+    appState?.returnTo || "/dashboard"
   );
 };
 

@@ -71,6 +71,12 @@ export async function initiateDerivSignUp(): Promise<void> {
 }
 
 export function isDerivCallback(): boolean {
+  // Deriv's registered redirect is the bare origin, so a genuine Deriv
+  // return always lands on "/". Auth0 uses /callback with the same
+  // ?code&state shape -- never treat that as Deriv (it produced bogus
+  // "session expired" errors on every Auth0 login).
+  if (typeof window === "undefined") return false;
+  if (window.location.pathname !== "/") return false;
   const params = new URLSearchParams(window.location.search);
   return params.has("code") && params.has("state");
 }
