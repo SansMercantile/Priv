@@ -6,6 +6,13 @@ import { datadogRum } from "@datadog/browser-rum";
  */
 export function initDatadog(): { RUM_STATUS: string; isReal: boolean } {
   const metaEnv = (import.meta as any).env || {};
+  // Kill-switch: set VITE_DD_ENABLED=false in Vercel env + redeploy to
+  // silence RUM entirely (e.g. while the client token is invalid and every
+  // upload 403s noisily). Default stays on.
+  if (String(metaEnv.VITE_DD_ENABLED || "").toLowerCase() === "false") {
+    console.log("[SANS Datadog] Disabled via VITE_DD_ENABLED=false.");
+    return { RUM_STATUS: "disabled", isReal: false };
+  }
   const appId = metaEnv.VITE_DD_APPLICATION_ID || metaEnv.VITE_DD_APP_ID;
   const clientToken = metaEnv.VITE_DD_CLIENT_TOKEN;
   const site = metaEnv.VITE_DD_SITE || "datadoghq.com";
