@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { getAppUserId } from "../lib/appUserId";
 import {
   Activity,
   Wifi,
@@ -11,12 +12,20 @@ import {
 } from "lucide-react";
 
 // ── Real broker constant ─────────────────────────────────────────────────
-// Single business-managed Deriv connection. There is no per-user broker
-// login (no email/password/server) - the backend authenticates once with
-// the PRIV_CORE app's API token and every user trades through that same
-// connection. This intentionally replaces the old multi-broker XM/Binance/
-// Coinbase tab switcher and its fake MT4/MT5-style login simulation.
-const BROKER_ID = "priv_deriv";
+// Default desk connection. At runtime this is replaced by the user's own
+// Deriv account for the current demo toggle position (their per-type
+// default, else first of that type) via /deriv/active-account -- demo
+// toggle => their real Deriv DEMO account, live toggle => their real
+// Deriv LIVE account. Falls back here when they linked nothing.
+const FALLBACK_BROKER_ID = "priv_deriv";
+
+function userHeader(): Record<string, string> {
+  try {
+    return { "X-User-Id": getAppUserId() };
+  } catch (_) {
+    return {};
+  }
+}
 
 interface OpenPosition {
   order_id: string;
@@ -86,14 +95,49 @@ function TradingTerminalInner() {
   const [account, setAccount] = useState<AccountInfo | null>(null);
   const [positions, setPositions] = useState<OpenPosition[]>([]);
   const [logs, setLogs] = useState<string[]>([]);
+  // Active Deriv account for the current demo toggle (loginid for display,
+  // broker id for all backend calls). Re-resolved on every poll so flipping
+  // the demo toggle or changing the profile default takes effect live.
+  const [brokerId, setBrokerId] = useState(FALLBACK_BROKER_ID);
+  const [activeLogin, setActiveLogin] = useState<string | null>(null);
+  const [activeMode, setActiveMode] = useState<"demo" | "live">("demo");
 
   const pushLog = (msg: string) => {
     setLogs((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 100));
   };
 
-  const fetchStatus = async () => {
+  const resolveBroker = async (): Promise<string> => {
+    let mode: "demo" | "live" = "demo";
     try {
-      const res = await fetch(`/api/brokers/status/${BROKER_ID}`);
+      mode = localStorage.getItem("demoMode") === "false" ? "live" : "demo";
+    } catch (_) {
+      /* ignore */
+    }
+    setActiveMode(mode);
+    try {
+      const res = await fetch(`/api/v1/auth/deriv/active-account?mode=${mode}`, {
+        headers: userHeader(),
+      });
+      if (res.ok) {
+        const body = await res.json();
+        const acct = body?.data?.account;
+        if (acct?.broker_id) {
+          setBrokerId(acct.broker_id);
+          setActiveLogin(acct.loginid || null);
+          return acct.broker_id as string;
+        }
+      }
+    } catch {
+      /* fall through to shared desk */
+    }
+    setBrokerId(FALLBACK_BROKER_ID);
+    setActiveLogin(null);
+    return FALLBACK_BROKER_ID;
+  };
+
+  const fetchStatus = async (bid: string) => {
+    try {
+      const res = await fetch(`/api/brokers/status/${bid}`, { headers: userHeader() });
       if (res.ok) {
         const data = await res.json();
         setIsConnected(!data.error);
@@ -105,9 +149,9 @@ function TradingTerminalInner() {
     }
   };
 
-  const fetchAccount = async () => {
+  const fetchAccount = async (bid: string) => {
     try {
-      const res = await fetch(`/api/brokers/account/${BROKER_ID}`);
+      const res = await fetch(`/api/brokers/account/${bid}`, { headers: userHeader() });
       if (res.ok) {
         const data = await res.json();
         if (!data.error) setAccount(data);
@@ -115,9 +159,9 @@ function TradingTerminalInner() {
     } catch {}
   };
 
-  const fetchPositions = async () => {
+  const fetchPositions = async (bid: string) => {
     try {
-      const res = await fetch(`/api/brokers/positions?broker_id=${BROKER_ID}`);
+      const res = await fetch(`/api/brokers/positions?broker_id=${bid}`, { headers: userHeader() });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) setPositions(data);
@@ -126,14 +170,23 @@ function TradingTerminalInner() {
   };
 
   useEffect(() => {
-    fetchStatus();
-    fetchAccount();
-    fetchPositions();
-    const interval = setInterval(() => {
-      fetchAccount();
-      fetchPositions();
+    let cancelled = false;
+    (async () => {
+      const bid = await resolveBroker();
+      if (cancelled) return;
+      fetchStatus(bid);
+      fetchAccount(bid);
+      fetchPositions(bid);
+    })();
+    const interval = setInterval(async () => {
+      const bid = await resolveBroker();
+      if (cancelled) return;
+      fetchAccount(bid);
+      fetchPositions(bid);
     }, 8000);
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const [selectedSymbol, setSelectedSymbol] = useState(SYMBOLS[3].symbol);
@@ -156,9 +209,9 @@ function TradingTerminalInner() {
     try {
       const res = await fetch("/api/brokers/trade", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...userHeader() },
         body: JSON.stringify({
-          broker_id: BROKER_ID,
+          broker_id: brokerId,
           order_type: orderSide,
           symbol: selectedSymbol,
           volume: stake,
@@ -171,8 +224,8 @@ function TradingTerminalInner() {
         pushLog(
           `Order placed: ${orderSide} ${selectedSymbol}, stake ${stake} ${account?.currency || "USD"}, ${duration}m. Contract ID: ${data.order_id?.order_id}.`
         );
-        fetchAccount();
-        fetchPositions();
+        fetchAccount(brokerId);
+        fetchPositions(brokerId);
       } else {
         pushLog(`Order failed: ${data.detail || data.error || "Unknown error"}`);
       }
@@ -187,14 +240,14 @@ function TradingTerminalInner() {
     try {
       const res = await fetch("/api/brokers/close-position", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ broker_id: BROKER_ID, symbol: pos.symbol }),
+        headers: { "Content-Type": "application/json", ...userHeader() },
+        body: JSON.stringify({ broker_id: brokerId, symbol: pos.symbol }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
         pushLog(`Position ${pos.order_id} closed.`);
-        fetchAccount();
-        fetchPositions();
+        fetchAccount(brokerId);
+        fetchPositions(brokerId);
       } else {
         pushLog(`Close failed for ${pos.order_id}: ${data.detail || data.error || "Contract may not be eligible for early exit."}`);
       }
@@ -240,7 +293,14 @@ function TradingTerminalInner() {
       <div className="xl:col-span-4 flex flex-col gap-6">
         <div className="metric-card p-5 rounded border border-white/10 bg-neutral-950/5">
           <div className="flex items-center justify-between pb-3 border-b border-white/5 mb-4">
-            <span className="font-mono text-[10px] text-zinc-500 tracking-wider">DERIV ACCOUNT (PRIV CORE)</span>
+            <span className="font-mono text-[10px] text-zinc-500 tracking-wider">
+              DERIV ACCOUNT{" "}
+              <span className="text-zinc-300">
+                {activeLogin
+                  ? `${activeLogin} (${activeMode.toUpperCase()})`
+                  : "PRIV CORE"}
+              </span>
+            </span>
             <span
               className={`flex items-center gap-1.5 font-mono text-[9px] uppercase px-2 py-0.5 rounded border ${
                 isConnected === null

@@ -1,16 +1,26 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useBrokerConnections } from "../lib/useBrokerConnections";
 import { getAppUserId } from "../lib/appUserId";
 import { initiateDerivLogin } from "../lib/derivAuth/oauth";
 import apiClient from "../api/apiClient";
 
+interface DerivAccount {
+  loginid: string;
+  account_type: string;
+  currency: string;
+  broker_id: string;
+  adapter_live: boolean;
+  is_default: boolean;
+}
+
 // One shared Deriv connect surface used by the dashboard locked screen,
 // the profile brokers tab, and the first-run onboarding modal:
-// live connection status, PKCE connect (auth.deriv.com login + consent),
-// and an API-token fallback for when Deriv's OAuth app misbehaves.
-// Successful connects reload the page so all connection state refreshes.
+// every linked account with per-type defaults, PKCE connect for more,
+// and an API-token fallback. Successful connects reload the page so all
+// connection state refreshes.
 export default function DerivConnectCard() {
   const { hasRealDeriv, hasDemoDeriv, loading } = useBrokerConnections();
+  const [accounts, setAccounts] = useState<DerivAccount[]>([]);
   const [tokenOpen, setTokenOpen] = useState(false);
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
@@ -26,12 +36,35 @@ export default function DerivConnectCard() {
     }
   });
 
+  const loadAccounts = async () => {
+    try {
+      const res: any = await apiClient.getDerivAccounts();
+      setAccounts(res?.data?.data?.accounts ?? res?.data?.accounts ?? []);
+    } catch (_) {
+      /* backend unreachable: keep status dots only */
+    }
+  };
+
+  useEffect(() => {
+    loadAccounts();
+  }, []);
+
   async function connectOAuth() {
     setError(null);
     try {
       await initiateDerivLogin();
     } catch (e: any) {
       setError(e?.message || "Could not start Deriv login.");
+    }
+  }
+
+  async function makeDefault(loginid: string) {
+    setError(null);
+    try {
+      await apiClient.setDerivDefault(loginid);
+      await loadAccounts();
+    } catch (e: any) {
+      setError(e?.message || "Could not set default.");
     }
   }
 
@@ -69,13 +102,53 @@ export default function DerivConnectCard() {
         <span className="text-zinc-300">
           {loading
             ? "Checking Deriv connection…"
-            : hasRealDeriv
-              ? "Deriv REAL account linked"
-              : hasDemoDeriv
-                ? "Deriv DEMO account linked"
-                : "No Deriv account linked"}
+            : hasRealDeriv || hasDemoDeriv
+              ? `Linked (${accounts.length || "…"} account${accounts.length === 1 ? "" : "s"})`
+              : "No Deriv account linked"}
         </span>
       </div>
+
+      {accounts.length > 0 && (
+        <div className="space-y-1.5">
+          {accounts.map((a) => (
+            <div
+              key={a.loginid}
+              className="flex items-center justify-between gap-2 p-2 rounded-lg border border-white/10 bg-black/40 text-xs font-mono"
+            >
+              <div className="min-w-0">
+                <span className="text-white font-bold truncate">{a.loginid}</span>{" "}
+                <span
+                  className={`text-[9px] uppercase px-1.5 py-0.5 rounded ${
+                    a.account_type === "demo"
+                      ? "bg-sky-500/10 text-sky-400"
+                      : "bg-emerald-500/10 text-emerald-400"
+                  }`}
+                >
+                  {a.account_type}
+                </span>{" "}
+                {a.currency && <span className="text-zinc-500">{a.currency}</span>}
+                {a.is_default && (
+                  <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-white/10 text-white ml-1">
+                    default
+                  </span>
+                )}
+              </div>
+              {!a.is_default ? (
+                <button
+                  onClick={() => makeDefault(a.loginid)}
+                  className="text-[10px] text-zinc-400 hover:text-white underline whitespace-nowrap"
+                >
+                  Set as default
+                </button>
+              ) : (
+                <span className="text-[10px] text-zinc-600 whitespace-nowrap">
+                  {a.adapter_live ? "● live" : "○ idle"}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {(returnError || error) && (
         <div className="p-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs font-mono">
@@ -88,14 +161,14 @@ export default function DerivConnectCard() {
         </div>
       )}
 
-      {!hasRealDeriv && (
+      <div className="flex flex-wrap gap-2">
         <button
           onClick={connectOAuth}
           className="px-5 py-2.5 bg-white text-black font-mono font-bold text-xs rounded-lg hover:bg-white/90 transition"
         >
-          Connect Deriv account
+          {accounts.length > 0 ? "Connect another Deriv account" : "Connect Deriv account"}
         </button>
-      )}
+      </div>
 
       <div>
         <button

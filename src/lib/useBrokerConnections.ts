@@ -6,6 +6,9 @@ export interface BrokerConnection {
   account_type: "demo" | "live" | "paper" | string;
   status: string;
   connected_at?: string;
+  loginid?: string;
+  currency?: string;
+  accounts?: Array<{ account_id: string; currency: string }>;
 }
 
 export interface BrokerConnectionsState {

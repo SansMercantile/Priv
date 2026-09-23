@@ -145,6 +145,18 @@ export const apiClient = {
       body: JSON.stringify({ anonymous_id: getAppUserId() }),
     }),
 
+  // Multi-account Deriv management: every linked loginid, per-type
+  // defaults, and the resolved active account for a mode.
+  getDerivAccounts: () => safeFetchRelative("/api/v1/auth/deriv/accounts"),
+  setDerivDefault: (loginid: string) =>
+    safeFetchRelative("/api/v1/auth/deriv/default-account", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ loginid }),
+    }),
+  getActiveDerivAccount: (mode: "demo" | "live") =>
+    safeFetchRelative(`/api/v1/auth/deriv/active-account?mode=${mode}`),
+
   // Billing / PayFast. payment_api.router is mounted at /api/v1/payment
   // in main.py (fixed: it was previously mounted with no prefix at all,
   // making it unreachable through the vercel /api/* proxy -- confirmed
