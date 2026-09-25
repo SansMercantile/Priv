@@ -45,25 +45,9 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<'profile' | 'billing' | 'kyc' | 'brokers'>('profile');
   // Node Allocation & Credits is an admin surface (plan pricing, license
-  // grants). Regular users never see the tab; admins do.
+  // grants). Regular users never see the tab; admins do. (Effects live
+  // below, after kycStatus is declared.)
   const [isAdmin, setIsAdmin] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res: any = await apiClient.get('/api/v1/admin/whoami');
-        if (!cancelled && res?.data?.data?.admin) setIsAdmin(true);
-      } catch (_) {
-        /* stay non-admin */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  useEffect(() => {
-    if (!isAdmin && activeTab === 'billing') setActiveTab('profile');
-  }, [isAdmin, activeTab]);
   const [hasRealConnection, setHasRealConnection] = useState<boolean>(false);
   
   useEffect(() => {
@@ -138,6 +122,55 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
   const [kycStatus, setKycStatus] = useState<string>(() => {
     return localStorage.getItem("xm_kyc_status") || "unsubmitted";
   });
+
+  // Admin probe for the Node Allocation tab (see isAdmin above).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res: any = await apiClient.get('/api/v1/admin/whoami');
+        if (!cancelled && res?.data?.data?.admin) setIsAdmin(true);
+      } catch (_) {
+        /* stay non-admin */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  useEffect(() => {
+    if (!isAdmin && activeTab === 'billing') setActiveTab('profile');
+  }, [isAdmin, activeTab]);
+
+  // Server truth for KYC status: after submit, poll the record so an
+  // admin approve/reject flips this UI without a resubmit. Local status
+  // is only the optimistic default.
+  useEffect(() => {
+    let cancelled = false;
+    let timer: number | undefined;
+    const sync = async () => {
+      try {
+        const st: any = await apiClient.getKycStatus();
+        const serverStatus = st?.status;
+        if (!cancelled && serverStatus && serverStatus !== kycStatus) {
+          setKycStatus(serverStatus);
+          try {
+            localStorage.setItem('xm_kyc_status', serverStatus);
+          } catch (_) {}
+        }
+      } catch (_) {
+        /* offline/anonymous: keep local status */
+      }
+    };
+    if (kycStatus === 'submitted' || kycStatus === 'pending') {
+      sync();
+      timer = window.setInterval(sync, 30000);
+    }
+    return () => {
+      cancelled = true;
+      if (timer) window.clearInterval(timer);
+    };
+  }, [kycStatus]);
 
   // Billing & Usage Credits state
   const [credits, setCredits] = useState<number>(() => {
