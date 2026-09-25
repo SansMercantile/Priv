@@ -61,35 +61,37 @@ function Field({ label, children, required }: { label: string; children: React.R
 const ic = () => 'w-full p-3 rounded-lg bg-zinc-900/90 text-white border border-zinc-800 focus:outline-none focus:ring-1 focus:ring-rose-500/50 focus:border-rose-500/50 transition text-sm font-mono';
 const sc = () => `${ic()} cursor-pointer`;
 
-// ─── Google Maps address autocomplete hook ────────────────────────────────────
-function useGoogleMapsAutocomplete(
-  inputRef: React.RefObject<HTMLInputElement>,
-  onPlace: (place: google.maps.places.PlaceResult) => void
-) {
-  useEffect(() => {
-    const apiKey = (window as any).__GOOGLE_MAPS_KEY__ || (import.meta as any).env?.VITE_GOOGLE_MAPS_KEY;
-    if (!apiKey || !(window as any).google?.maps?.places) {
-      // Load Google Maps script if not present
-      if (apiKey && !document.getElementById('gmaps-script')) {
-        const s = document.createElement('script');
-        s.id = 'gmaps-script';
-        s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-        s.async = true;
-        s.onload = () => initAC();
-        document.head.appendChild(s);
-      }
-      return;
-    }
-    initAC();
+// ─── Address autocomplete (provider-neutral, backed by AWS Location Service
+// via /api/v1/location/autocomplete — never calls a maps provider directly) ──
+interface AddressSuggestion {
+  label: string;
+  municipality: string;
+  region: string;
+  country: string;
+  postal_code: string;
+}
 
-    function initAC() {
-      if (!inputRef.current || !(window as any).google?.maps?.places) return;
-      const ac = new (window as any).google.maps.places.Autocomplete(inputRef.current, {
-        types: ['address'],
-      });
-      ac.addListener('place_changed', () => onPlace(ac.getPlace()));
-    }
-  }, [inputRef, onPlace]);
+function useAddressAutocomplete(query: string) {
+  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 3) { setSuggestions([]); return; }
+    let cancelled = false;
+    setLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const res: any = await apiClient.addressAutocomplete(q);
+        if (!cancelled) setSuggestions(res?.data?.suggestions || []);
+      } catch (e) {
+        if (!cancelled) setSuggestions([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, 300); // debounce
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [query]);
+  return { suggestions, loading };
 }
 
 // ─── Face Camera Modal ────────────────────────────────────────────────────────
@@ -256,19 +258,20 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
     .filter(Boolean) as typeof COUNTRIES;
   const needsFatca = selectedTaxCountries.some(c => c.fatcaRelevant);
 
-  // Google Maps autocomplete
-  useGoogleMapsAutocomplete(addressInputRef as any, (place) => {
-    const comps = place.address_components || [];
-    const get = (type: string) => comps.find(c => c.types.includes(type))?.long_name || '';
-    const getShort = (type: string) => comps.find(c => c.types.includes(type))?.short_name || '';
-    patch('address', 'street_line_1', `${get('street_number')} ${get('route')}`.trim());
-    patch('address', 'city', get('locality') || get('sublocality'));
-    patch('address', 'province_state', get('administrative_area_level_1'));
-    patch('address', 'postal_code', get('postal_code'));
-    patch('address', 'country', get('country'));
+  // Address autocomplete (provider-neutral, AWS Location Service-backed)
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const { suggestions: addressSuggestions, loading: addressLoading } = useAddressAutocomplete(form.address.street_line_1);
+
+  const selectAddressSuggestion = (s: AddressSuggestion) => {
+    patch('address', 'street_line_1', s.label);
+    if (s.municipality) patch('address', 'city', s.municipality);
+    if (s.region) patch('address', 'province_state', s.region);
+    if (s.postal_code) patch('address', 'postal_code', s.postal_code);
+    if (s.country) patch('address', 'country', s.country);
     patch('address', 'verified', true);
     setAddressVerified(true);
-  });
+    setShowSuggestions(false);
+  };
 
   useEffect(() => {
     const email = localStorage.getItem('xm_account_email') || '';
@@ -442,12 +445,12 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
       </div>
     ),
 
-    // Step 1 — Address (Google Maps)
+    // Step 1 — Address
     1: (
       <div className="space-y-5 mt-4">
         <div className="flex items-center gap-2 text-xs font-mono text-zinc-400 bg-zinc-900/40 p-3 rounded-lg border border-zinc-800">
           <MapPin className="w-4 h-4 text-rose-400 flex-shrink-0"/>
-          Start typing your address — Google Maps will auto-complete and verify it.
+          Start typing your address and select a suggestion to auto-fill and verify it.
         </div>
         <div className="grid grid-cols-1 gap-5">
           <Field label="Street address line 1" required>
@@ -456,13 +459,33 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
                 ref={addressInputRef}
                 className={ic()}
                 value={form.address.street_line_1}
-                onChange={e => { patch('address','street_line_1',e.target.value); setAddressVerified(false); }}
+                onChange={e => { patch('address','street_line_1',e.target.value); setAddressVerified(false); setShowSuggestions(true); }}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                 placeholder="Start typing your address..."
+                autoComplete="off"
               />
               {addressVerified && (
                 <span className="absolute right-3 top-3 flex items-center gap-1 text-emerald-400 text-[10px] font-mono">
                   <CheckCircle className="w-3.5 h-3.5"/> Verified
                 </span>
+              )}
+              {showSuggestions && (addressLoading || addressSuggestions.length > 0) && (
+                <div className="absolute z-20 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl max-h-56 overflow-y-auto">
+                  {addressLoading && (
+                    <div className="px-3 py-2 text-[11px] font-mono text-zinc-500">Searching...</div>
+                  )}
+                  {addressSuggestions.map((s, i) => (
+                    <button
+                      type="button"
+                      key={i}
+                      onMouseDown={() => selectAddressSuggestion(s)}
+                      className="w-full text-left px-3 py-2 text-[11px] font-mono text-zinc-200 hover:bg-zinc-800 transition border-b border-zinc-800 last:border-0"
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
           </Field>
@@ -485,7 +508,7 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
         </div>
         {!addressVerified && form.address.street_line_1 && (
           <p className="text-amber-400 text-[10px] font-mono flex items-center gap-1">
-            <AlertCircle className="w-3 h-3"/> Address not yet verified via Google Maps — please select from the autocomplete dropdown.
+            <AlertCircle className="w-3 h-3"/> Address not yet verified — please select a suggestion from the dropdown.
           </p>
         )}
       </div>
@@ -647,7 +670,7 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
         <ShieldCheck className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0"/>
         <div>
           <p className="text-xs font-mono font-bold text-white uppercase tracking-wider">AI-Assisted Document Verification</p>
-          <p className="text-[10px] text-zinc-400 mt-0.5 leading-relaxed">Uploaded documents are analysed by our Gemini AI engine to verify authenticity, cross-reference personal details, and flag anomalies in real time.</p>
+          <p className="text-[10px] text-zinc-400 mt-0.5 leading-relaxed">Uploaded documents are analysed by our AI verification engine to verify authenticity, cross-reference personal details, and flag anomalies in real time.</p>
         </div>
       </div>
 

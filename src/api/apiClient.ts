@@ -97,6 +97,18 @@ export const apiClient = {
       body: JSON.stringify(form),
     }),
 
+  // Provider-neutral address autocomplete / geocode (AWS Location Service
+  // via backend/api/location_api.py, mounted at /api/v1/location). Never
+  // call a maps provider directly from the browser.
+  addressAutocomplete: (q: string, limit = 8) =>
+    safeFetchRelative(`/api/v1/location/autocomplete?q=${encodeURIComponent(q)}&limit=${limit}`),
+  addressGeocode: (label: string) =>
+    safeFetchRelative("/api/v1/location/geocode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label }),
+    }),
+
   // AI document verification (sends base64 image to Gemini via backend).
   // NOTE: confirmed live this currently returns 501 "Document
   // verification not configured (Bedrock vision unavailable)" -- the
