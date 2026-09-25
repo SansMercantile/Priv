@@ -25,7 +25,7 @@ import GuidedWalkthrough from "./components/GuidedWalkthrough";
 import LoginGate from "./components/auth/LoginGate";
 import Landing from "./pages/Landing";
 import { useBrokerConnections } from "./lib/useBrokerConnections";
-import { initiateDerivLogin } from "./lib/derivAuth/oauth";
+import { initiateDerivLogin, isDerivCallback } from "./lib/derivAuth/oauth";
 import { initDatadog } from "./lib/datadog";
 
 interface AppProps {
@@ -228,8 +228,20 @@ function App({ initialDevice = "desktop" }: AppProps) {
 
   return (
     <Routes>
-      {/* Public marketing page for visitors before login */}
-      <Route path="/" element={<Landing />} />
+      {/* Public marketing page for visitors before login -- EXCEPT when
+          Deriv's PKCE return lands here (its registered Redirect URL is
+          the bare origin "/", same as this route). React Router picks the
+          exact "/" match over the "/*" catch-all below, so without this
+          guard every Deriv return rendered Landing instead of GatedApp --
+          LoginGate (which owns the code exchange + /connect-token POST +
+          callback-ping telemetry) never mounted at all, silently
+          swallowing 100% of Deriv connect attempts. isDerivCallback()
+          checks for ?code&state (Deriv's shape); Auth0's own callback is a
+          separate /callback route and is unaffected. */}
+      <Route
+        path="/"
+        element={isDerivCallback() ? <GatedApp initialDevice={initialDevice} /> : <Landing />}
+      />
       {/* Everything else behind the login gate */}
       <Route path="/*" element={<GatedApp initialDevice={initialDevice} />} />
     </Routes>
