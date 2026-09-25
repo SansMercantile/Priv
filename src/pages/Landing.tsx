@@ -217,9 +217,299 @@ const TOAST_STYLES: Record<Toast["kind"], string> = {
   info: "border-white/15",
 };
 
+interface HistSignal {
+  id: string;
+  symbol: string;
+  display_name?: string;
+  direction: string;
+  entry: number;
+  take_profit_1: number;
+  take_profit_2: number;
+  stop_loss: number;
+  slot_start_utc?: string;
+  created_at?: string;
+  timeframe?: string;
+}
+
+function useSignalHistory() {
+  const [history, setHistory] = useState<HistSignal[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/v1/signals/history?limit=6");
+        if (!res.ok) return;
+        const body = await res.json();
+        const glob = body?.data?.global ?? [];
+        if (!cancelled && Array.isArray(glob)) setHistory(glob.slice(0, 5));
+      } catch (_) {
+        /* history is enhancement-only; ticket still renders */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return history;
+}
+
+type SignalStatus = "Hold" | "TP1 Hit" | "TP2 Hit" | "SL Hit" | "Expired" | "…";
+
+const STATUS_STYLES: Record<string, string> = {
+  "Hold": "text-sky-300 border-sky-400/30 bg-sky-400/10",
+  "TP1 Hit": "text-amber-300 border-amber-400/30 bg-amber-400/10",
+  "TP2 Hit": "text-emerald-300 border-emerald-400/30 bg-emerald-400/10",
+  "SL Hit": "text-rose-300 border-rose-500/30 bg-rose-500/10",
+  "Expired": "text-zinc-400 border-white/10 bg-white/5",
+  "…": "text-zinc-500 border-white/10 bg-white/5",
+};
+
+// First-touch outcome over 1h candles after the signal: TP2 > TP1 > SL by
+// touch order. Untouched + fresh slot => Hold; untouched + older => Expired.
+function computeOutcome(
+  direction: string, tp1: number, tp2: number, sl: number,
+  candles: Array<{ high: number; low: number }>, slotAgeH: number
+): SignalStatus {
+  const isBuy = direction === "BUY";
+  for (const c of candles) {
+    const hitTp2 = isBuy ? c.high >= tp2 : c.low <= tp2;
+    const hitTp1 = isBuy ? c.high >= tp1 : c.low <= tp1;
+    const hitSl = isBuy ? c.low <= sl : c.high >= sl;
+    if (hitTp2) return "TP2 Hit";
+    if (hitTp1) return "TP1 Hit";
+    if (hitSl) return "SL Hit";
+  }
+  return slotAgeH <= 30 ? "Hold" : "Expired";
+}
+
+function alternativeOrder(
+  direction: string, entry: number, last: number | null
+): string | null {
+  if (last === null || !Number.isFinite(entry)) return null;
+  const px = (n: number) =>
+    n.toLocaleString(undefined, { maximumFractionDigits: 5 });
+  if (direction === "BUY") {
+    return last < entry ? `Buy Stop @ ${px(entry)}` : `Buy Limit @ ${px(entry)}`;
+  }
+  return last > entry ? `Sell Stop @ ${px(entry)}` : `Sell Limit @ ${px(entry)}`;
+}
+
+function useSignalStatus(item: HistSignal | null, active: boolean, appId: string) {
+  const [status, setStatus] = useState<SignalStatus>("…");
+  const [alt, setAlt] = useState<string | null>(null);
+  const [sentLocal, setSentLocal] = useState("");
+
+  useEffect(() => {
+    if (!item || !active) return;
+    let cancelled = false;
+    try {
+      const d = new Date(item.slot_start_utc || item.created_at || "");
+      if (!isNaN(d.getTime())) setSentLocal(d.toLocaleString());
+    } catch (_) {}
+    let ws: WebSocket | null = null;
+    let closed = false;
+    try {
+      ws = new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${appId || "1089"}`);
+    } catch (_) {
+      setStatus("Hold");
+      return;
+    }
+    ws.onopen = () => {
+      if (closed) return;
+      ws?.send(JSON.stringify({
+        ticks_history: item.symbol, style: "candles",
+        granularity: 3600, count: 30, end: "latest",
+      }));
+    };
+    ws.onmessage = (ev) => {
+      if (cancelled || closed) return;
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg.error || !Array.isArray(msg.candles)) return;
+        const candles = msg.candles
+          .map((c: any) => ({ high: Number(c.high), low: Number(c.low), close: Number(c.close) }))
+          .filter((c: any) => Number.isFinite(c.high) && Number.isFinite(c.low));
+        if (!candles.length) return;
+        const slotStart = new Date(item.slot_start_utc || item.created_at || Date.now()).getTime();
+        const ageH = Math.max(0, (Date.now() - slotStart) / 3600000);
+        const outcome = computeOutcome(
+          item.direction, item.take_profit_1, item.take_profit_2,
+          item.stop_loss, candles, ageH);
+        const last = candles.length ? candles[candles.length - 1].close : null;
+        if (!cancelled) {
+          setStatus(outcome);
+          setAlt(outcome === "Hold" ? alternativeOrder(item.direction, item.entry, last) : null);
+        }
+      } catch (_) {}
+      try {
+        ws?.close();
+      } catch (_) {}
+    };
+    ws.onerror = () => {
+      if (!cancelled) setStatus("Hold");
+    };
+    const fallback = window.setTimeout(() => {
+      if (!cancelled) setStatus((s) => (s === "…" ? "Hold" : s));
+    }, 8000);
+    return () => {
+      cancelled = true;
+      closed = true;
+      window.clearTimeout(fallback);
+      try {
+        ws?.close();
+      } catch (_) {}
+    };
+  }, [item?.id, active]);
+
+  return { status, alt, sentLocal };
+}
+
+function HistorySlide({ item, active, appId }: { item: HistSignal; active: boolean; appId: string }) {
+  const { status, alt, sentLocal } = useSignalStatus(item, active, appId);
+  const isBuy = item.direction === "BUY";
+  const rows: Array<[string, number]> = [
+    ["Entry", item.entry],
+    ["Take Profit 1", item.take_profit_1],
+    ["Take Profit 2", item.take_profit_2],
+    ["Stop Loss", item.stop_loss],
+  ];
+  return (
+    <div>
+      <div className="flex items-start justify-between mb-1">
+        <div>
+          <div className="text-[11px] text-white/40">{item.display_name || item.symbol}</div>
+          <div className="text-xl font-bold">{item.symbol}</div>
+        </div>
+        <span className={`text-[10px] font-mono font-bold uppercase px-2 py-1 rounded border ${STATUS_STYLES[status]}`}>
+          {status === "…" ? "tracking…" : status}
+        </span>
+      </div>
+      <div className={`text-[11px] font-semibold mb-3 ${isBuy ? "text-emerald-300" : "text-rose-300"}`}>
+        {item.direction} · {item.timeframe || "1H"}
+      </div>
+      <div className="space-y-2 text-[14px]">
+        {rows.map(([k, v]) => (
+          <div key={k} className="flex justify-between border-b border-white/5 pb-2">
+            <span className="text-white/45">{k}</span>
+            <span className="font-mono font-semibold text-white">
+              {Number(v).toLocaleString()}
+            </span>
+          </div>
+        ))}
+      </div>
+      {alt && (
+        <p className="mt-3 text-xs font-mono text-sky-300/90">
+          Alternative: {item.symbol} {alt} · TP1 {Number(item.take_profit_1).toLocaleString()} &amp; TP2 {Number(item.take_profit_2).toLocaleString()} · SL {Number(item.stop_loss).toLocaleString()}
+        </p>
+      )}
+      <p className="mt-2 text-[11px] font-mono text-white/30">
+        {sentLocal ? `sent ${sentLocal}` : ""}
+      </p>
+    </div>
+  );
+}
+
+function SignalCarousel({ signal, live, sentLocal, isBuy, rows, history, appId }: {
+  signal: LiveSignal; live: boolean; sentLocal: string; isBuy: boolean;
+  rows: Array<[string, number, string?]>; history: HistSignal[]; appId: string;
+}) {
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const total = 1 + history.length;
+
+  useEffect(() => {
+    if (paused || total <= 1) return;
+    const t = window.setInterval(() => setIndex((i) => (i + 1) % total), 5000);
+    return () => window.clearInterval(t);
+  }, [paused, total]);
+
+  return (
+    <div
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      {index === 0 ? (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[10px] font-mono tracking-widest text-rose-200/70">
+              {live ? "LIVE SIGNAL" : "SAMPLE SIGNAL"}
+            </div>
+            {live && <div className="flex items-center gap-1.5 text-[10px] text-emerald-300"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />LIVE</div>}
+          </div>
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <div className="text-[11px] text-white/40">{signal.display_name}</div>
+              <div className="text-xl font-bold">{signal.symbol}</div>
+            </div>
+            <div className={`text-[11px] font-semibold ${isBuy ? "text-emerald-300" : "text-rose-300"}`}>
+              {signal.direction} · {signal.timeframe}
+            </div>
+          </div>
+          <div className="space-y-2 text-[14px]">
+            {rows.map(([k, v, cls]) => (
+              <div key={k} className="flex justify-between border-b border-white/5 pb-2">
+                <span className="text-white/45">{k}</span>
+                <span className={`font-mono font-semibold ${cls === "tp" ? "text-emerald-300" : cls === "sl" ? "text-rose-300" : "text-white"}`}>
+                  {v.toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-4 text-xs text-white/40 leading-relaxed">
+            Stop loss trails to <strong className="text-white">{signal.entry.toLocaleString()}</strong> once Take
+            Profit 1 is reached — locking in a breakeven-or-better trade automatically.
+          </p>
+          <p className="mt-2 text-[11px] font-mono text-white/30">
+            basis: ATR({signal.atr}) · {signal.timeframe}
+            {sentLocal ? ` · sent ${sentLocal}` : ""}
+          </p>
+        </div>
+      ) : (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[10px] font-mono tracking-widest text-rose-200/70">
+              SIGNAL HISTORY · {index} OF {history.length}
+            </div>
+          </div>
+          <HistorySlide item={history[index - 1]} active={true} appId={appId} />
+        </div>
+      )}
+      {total > 1 && (
+        <div className="mt-4 flex items-center justify-between">
+          <button
+            onClick={() => setIndex((index - 1 + total) % total)}
+            className="px-3 py-1 rounded-lg border border-white/15 text-white/60 hover:text-white text-sm"
+            aria-label="Previous signal"
+          >
+            ‹
+          </button>
+          <div className="flex gap-1.5">
+            {Array.from({ length: total }).map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setIndex(i)}
+                aria-label={`Signal ${i + 1}`}
+                className={`h-1.5 rounded-full transition-all ${i === index ? "w-6 bg-rose-400" : "w-1.5 bg-white/20 hover:bg-white/40"}`}
+              />
+            ))}
+          </div>
+          <button
+            onClick={() => setIndex((index + 1) % total)}
+            className="px-3 py-1 rounded-lg border border-white/15 text-white/60 hover:text-white text-sm"
+            aria-label="Next signal"
+          >
+            ›
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Landing() {
   const { isAuthenticated, isLoading, loginWithRedirect } = useAuth0();
   const { signal, live, sentLocal } = useLiveSignal();
+  const history = useSignalHistory();
   const { toasts, dismiss } = useSignalToasts(live ? signal : null, live);
 
   useEffect(() => {
@@ -317,39 +607,15 @@ export default function Landing() {
             transition={{ duration: 0.5, delay: 0.15 }}
             className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-5 shadow-2xl"
           >
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-[10px] font-mono tracking-widest text-rose-200/70">
-                {live ? "LIVE SIGNAL" : "SAMPLE SIGNAL"}
-              </div>
-              {live && <div className="flex items-center gap-1.5 text-[10px] text-emerald-300"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />LIVE</div>}
-            </div>
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <div className="text-[11px] text-white/40">{signal.display_name}</div>
-                <div className="text-xl font-bold">{signal.symbol}</div>
-              </div>
-              <div className={`text-[11px] font-semibold ${isBuy ? "text-emerald-300" : "text-rose-300"}`}>
-                {signal.direction} · {signal.timeframe}
-              </div>
-            </div>
-            <div className="space-y-2 text-[14px]">
-              {rows.map(([k, v, cls]) => (
-                <div key={k} className="flex justify-between border-b border-white/5 pb-2">
-                  <span className="text-white/45">{k}</span>
-                  <span className={`font-mono font-semibold ${cls === "tp" ? "text-emerald-300" : cls === "sl" ? "text-rose-300" : "text-white"}`}>
-                    {v.toLocaleString()}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <p className="mt-4 text-xs text-white/40 leading-relaxed">
-              Stop loss trails to <strong className="text-white">{signal.entry.toLocaleString()}</strong> once Take
-              Profit 1 is reached — locking in a breakeven-or-better trade automatically.
-            </p>
-            <p className="mt-2 text-[11px] font-mono text-white/30">
-              basis: ATR({signal.atr}) · {signal.timeframe}
-              {sentLocal ? ` · sent ${sentLocal}` : ""}
-            </p>
+            <SignalCarousel
+              signal={signal}
+              live={live}
+              sentLocal={sentLocal}
+              isBuy={isBuy}
+              rows={rows}
+              history={history}
+              appId={signal.app_id || ""}
+            />
           </motion.div>
         </div>
 
