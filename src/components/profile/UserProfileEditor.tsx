@@ -96,15 +96,25 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
     if (saved) {
       try { return JSON.parse(saved); } catch (_) {}
     }
+    // FIX: this used to fall back to a fabricated identity (name
+    // "Alistair Sterling", a South African phone number) that every
+    // user without a saved profile yet would see -- indistinguishable
+    // from a real person's details being shown on someone else's
+    // account. LoginGate.tsx now prefills real Auth0 profile data
+    // (given_name/family_name/email/picture) into xm_user_profile right
+    // after login, so this fallback should rarely even be reached; when
+    // it is (e.g. this component rendering before that prefill runs),
+    // it must show an empty shell for the user to fill in themselves,
+    // never someone else's -- or a fictional -- identity.
     return {
-      firstName: 'Alistair',
-      lastName: 'Sterling',
-      email: 'client@merchant.priv',
-      phone: '+27 82 123 4567',
-      country: 'South Africa',
-      experience: '5+ years',
-      riskAppetite: 'Aggressive',
-      tradingGoal: 'Capital Expansion & Systematic Arbitrage'
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      country: '',
+      experience: '< 1 year',
+      riskAppetite: 'Moderate',
+      tradingGoal: ''
     };
   });
 
