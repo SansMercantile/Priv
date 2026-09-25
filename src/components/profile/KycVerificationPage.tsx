@@ -239,6 +239,12 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
     need(d.aml_consent, "AML/CTF screening consent", 3);
     need(d.sanctions_screening_consent, "Sanctions screening consent", 3);
     need(uploads['id_front'], "Government ID / Passport (front) upload", 4);
+    // Back side mandatory only for card-type documents with two sides.
+    // Passports carry everything on the front.
+    if (['national_id', 'drivers_license', 'residence_permit'].includes(id.document_type)) {
+      need(uploads['id_back'], "ID card back upload (required for card documents)", 4);
+    }
+    need(uploads['proof_of_address'], "Proof of residence upload (< 3 months)", 4);
     need(selfieBase64, "Biometric selfie capture", 4);
     need(d.accurate_information_declaration, "Perjury declaration checkbox", 5);
     return missing;
@@ -265,7 +271,7 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
   });
 
   useEffect(() => {
-    const email = localStorage.getItem('xm_account_email') || 'client@merchant.priv';
+    const email = localStorage.getItem('xm_account_email') || '';
     setForm(f => ({ ...f, contact: { ...f.contact, email } }));
   }, []);
 
@@ -647,9 +653,9 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
 
       {/* Document uploads */}
       {[
-        { key:'id_front', label:'Government ID / Passport (Front)', desc:'Must show photo, name, ID number, DOB and expiry clearly.' },
-        { key:'id_back',  label:'National ID Card (Back — if applicable)', desc:'Barcode, machine-readable zone, or signature strip.' },
-        { key:'proof_of_address', label:'Proof of Residence (< 3 months)', desc:'Utility bill or bank statement. Name + address must match form.' },
+        { key:'id_front', label:'Government ID / Passport (Front) *', desc:'Must show photo, name, ID number, DOB and expiry clearly.' },
+        { key:'id_back',  label:`National ID Card (Back${['national_id','drivers_license','residence_permit'].includes(form.identity.document_type) ? ' — required' : ' — if applicable'})`, desc:'Barcode, machine-readable zone, or signature strip.' },
+        { key:'proof_of_address', label:'Proof of Residence (< 3 months) *', desc:'Utility bill or bank statement. Name + address must match form.' },
       ].map(({ key, label, desc }) => (
         <div key={key} className="border border-zinc-800 bg-zinc-950/60 rounded-xl p-4 hover:bg-zinc-950 transition">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">

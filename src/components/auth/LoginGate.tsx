@@ -147,12 +147,76 @@ export default function LoginGate({ children }: LoginGateProps) {
   // can't call useAuth0() itself) as soon as it's available, and clears it
   // on logout so requests fall back to the anonymous flow rather than
   // sending a stale/invalid token.
+  // Per-person browser cache: all xm_* profile/KYC keys are device-global
+  // in localStorage, so on a shared device a second person would otherwise
+  // inherit the first person's profile, email, avatar, and KYC status.
+  // On every identity change we wipe person-scoped keys, then prefill the
+  // profile shell from the Auth0 social profile (name, email, picture)
+  // instead of placeholders or anyone else's data.
+  const identityKey = user?.sub || null;
+  const lastIdentityRef = useRef<string | null>(null);
   useEffect(() => {
     if (!isAuthenticated) {
       setAuthTokenGetter(null);
+      lastIdentityRef.current = null;
       return;
     }
     setAuthTokenGetter(() => getAccessTokenSilently());
+    if (lastIdentityRef.current !== identityKey) {
+      lastIdentityRef.current = identityKey;
+      try {
+        const personKeys = [
+          "xm_user_profile", "xm_account_email", "xm_user_avatar",
+          "xm_kyc_status", "xm_kyc_ref", "xm_kyc_submitted_at",
+          "xm_user_risk_appetite", "xm_profile_leverage", "xm_risk_pct",
+          "xm_node_tier", "xm_preferred_strategies",
+          "priv_connected_ai", "priv-onboarded-deriv",
+        ];
+        for (const k of personKeys) localStorage.removeItem(k);
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const k = localStorage.key(i) || "";
+          if (k.startsWith("priv-onboarded-deriv:") || k.startsWith("priv-celebrated:")) {
+            localStorage.removeItem(k);
+          }
+        }
+      } catch (_) {
+        /* ignore */
+      }
+      // Prefill from the social profile (given/family name, email, picture)
+      // only into an empty shell -- never overwrite existing entries.
+      try {
+        const raw = localStorage.getItem("xm_user_profile");
+        const profile = raw ? JSON.parse(raw) : {};
+        const given = (user?.given_name || "").trim();
+        const family = (user?.family_name || "").trim();
+        const full = (user?.name || "").trim();
+        const email = (user?.email || "").trim();
+        const picture = (user?.picture || "").trim();
+        let changed = false;
+        const put = (k: string, v: string) => {
+          if (v && !profile[k]) {
+            profile[k] = v;
+            changed = true;
+          }
+        };
+        put("firstName", given);
+        put("lastName", family);
+        if (!profile.firstName && !profile.lastName && full) {
+          const parts = full.split(/\s+/);
+          profile.firstName = parts[0];
+          if (parts.length > 1) profile.lastName = parts.slice(1).join(" ");
+          changed = true;
+        }
+        put("email", email);
+        if (email) localStorage.setItem("xm_account_email", email);
+        if (picture && !localStorage.getItem("xm_user_avatar")) {
+          localStorage.setItem("xm_user_avatar", picture);
+        }
+        if (changed || !raw) localStorage.setItem("xm_user_profile", JSON.stringify(profile));
+      } catch (_) {
+        /* ignore */
+      }
+    }
     // One-time per session: claim any broker connections made before
     // login under the verified identity, and ensure the free subscription
     // every account holds from signup. Both idempotent server-side.
@@ -167,7 +231,7 @@ export default function LoginGate({ children }: LoginGateProps) {
         /* non-fatal: billing page retries on view */
       });
     }
-  }, [isAuthenticated, getAccessTokenSilently]);
+  }, [isAuthenticated, getAccessTokenSilently, identityKey]);
 
   const callbackProcessing = useBrokerOAuthCallbackHandler(({ broker, success, message }) => {
     if (broker !== "deriv") return;

@@ -146,7 +146,7 @@ export default function KycAdminReviewPage() {
       } catch (_) {}
       
       // If it's the current user's submission, update their active KYC status in local storage
-      const userEmailFromMemory = localStorage.getItem("xm_account_email") || "client@merchant.priv";
+      const userEmailFromMemory = localStorage.getItem("xm_account_email") || "";
       if (selectedUser.email === userEmailFromMemory) {
         localStorage.setItem("xm_kyc_status", reviewAction.status);
       }
@@ -163,7 +163,7 @@ export default function KycAdminReviewPage() {
           localStorage.setItem("kyc_applications_queue", JSON.stringify(list));
         }
         
-        const userEmailFromMemory = localStorage.getItem("xm_account_email") || "client@merchant.priv";
+        const userEmailFromMemory = localStorage.getItem("xm_account_email") || "";
         if (selectedUser.email === userEmailFromMemory) {
           localStorage.setItem("xm_kyc_status", reviewAction.status);
         }
