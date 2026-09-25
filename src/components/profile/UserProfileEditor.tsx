@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import KycVerificationPage from './KycVerificationPage';
 import DerivConnectCard from '../DerivConnectCard';
+import apiClient from '../../api/apiClient';
 import { 
   User, 
   CreditCard, 
@@ -43,6 +44,26 @@ interface BillingLog {
 export default function UserProfileEditor({ demoMode = false }: UserProfileEditorProps) {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<'profile' | 'billing' | 'kyc' | 'brokers'>('profile');
+  // Node Allocation & Credits is an admin surface (plan pricing, license
+  // grants). Regular users never see the tab; admins do.
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res: any = await apiClient.get('/api/v1/admin/whoami');
+        if (!cancelled && res?.data?.data?.admin) setIsAdmin(true);
+      } catch (_) {
+        /* stay non-admin */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  useEffect(() => {
+    if (!isAdmin && activeTab === 'billing') setActiveTab('profile');
+  }, [isAdmin, activeTab]);
   const [hasRealConnection, setHasRealConnection] = useState<boolean>(false);
   
   useEffect(() => {
@@ -309,7 +330,7 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
         {[
           { id: 'profile', label: 'Sovereign Profile', icon: User },
           { id: 'brokers', label: 'Broker Connections', icon: Link2 },
-          { id: 'billing', label: 'Node Allocation & Credits', icon: CreditCard },
+          ...(isAdmin ? [{ id: 'billing', label: 'Node Allocation & Credits', icon: CreditCard }] : []),
           { id: 'kyc', label: 'Identity Registry KYC', icon: Shield }
         ].map(t => {
           const Icon = t.icon;
