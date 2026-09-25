@@ -938,8 +938,27 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
               <div>
                 <h3 className="text-lg font-serif italic text-white font-normal">AML DOSSIER IN REVIEW</h3>
                 <p className="text-xs text-zinc-400 font-mono mt-1.5 max-w-sm mx-auto">
-                  Our compliance officers are tracking biometric, address, and blacklist entries. You can verify and advance this workflow in the Compliance Desk.
+                  Dossier received and queued for compliance review — biometric,
+                  address, and blacklist checks run in that order. A copy was
+                  emailed to our compliance desk for the human review step.
                 </p>
+                {(() => {
+                  let ref = "";
+                  let when = "";
+                  try {
+                    ref = localStorage.getItem("xm_kyc_ref") || "";
+                    const ts = localStorage.getItem("xm_kyc_submitted_at") || "";
+                    if (ts) when = new Date(ts).toLocaleString();
+                  } catch (_) {}
+                  if (!ref && !when) return null;
+                  return (
+                    <p className="text-[11px] text-zinc-500 font-mono mt-2">
+                      {ref ? <>Ref: <span className="text-zinc-200">{ref}</span></> : null}
+                      {ref && when ? " · " : null}
+                      {when ? <>submitted {when}</> : null}
+                    </p>
+                  );
+                })()}
                 <div className="inline-block mt-4 p-2 px-4 bg-rose-950/30 text-rose-400 font-mono text-[9px] uppercase font-bold border border-rose-500/20 rounded-lg animate-pulse">
                   Ledger status: Pending Queue Handshake
                 </div>

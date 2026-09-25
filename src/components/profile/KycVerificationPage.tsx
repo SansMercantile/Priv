@@ -42,7 +42,7 @@ const emptyForm = () => ({
   address:   { street_line_1: '', street_line_2: '', city: '', province_state: '', postal_code: '', country: '', verified: false },
   financial: { employment_status: '', employer_name: '', occupation: '', source_of_funds: '', annual_income_range: '', net_worth_range: '', is_politically_exposed: false, pep_details: '' },
   trading:   { years_trading_experience: '', trading_knowledge_level: '', risk_appetite: '' },
-  tax: { tax_residency_countries: [] as string[], tax_identification_number: '', us_person_fatca: false, fatca_declaration_acknowledged: false },
+  tax: { tax_residency_countries: [] as string[], tax_identification_number: '', has_no_tax_number: false, us_person_fatca: false, fatca_declaration_acknowledged: false },
   contact: { email: '', phone_country_code: '+27', phone_number: '' },
   declarations: { terms_accepted: false, privacy_accepted: false, aml_consent: false, sanctions_screening_consent: false, accurate_information_declaration: false },
 });
@@ -202,6 +202,47 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
   const [verifyingDoc, setVerifyingDoc] = useState<string | null>(null);
   const [addressVerified, setAddressVerified] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
+  // Outstanding-items popup: listing of required (*) fields still empty.
+  const [outstanding, setOutstanding] = useState<Array<{ label: string; step: number }> | null>(null);
+
+  // Every *-marked field must be filled before dispatch. Returns the
+  // missing items with their step so the popup can jump straight there.
+  const validateAll = (): Array<{ label: string; step: number }> => {
+    const missing: Array<{ label: string; step: number }> = [];
+    const need = (cond: any, label: string, step: number) => {
+      if (!cond) missing.push({ label, step });
+    };
+    const p = form.personal, id = form.identity, a = form.address;
+    const f = form.financial, t = form.trading, tx = form.tax, d = form.declarations;
+    need(p.legal_first_name?.trim(), "Legal first name", 0);
+    need(p.legal_last_name?.trim(), "Legal last name", 0);
+    need(p.date_of_birth, "Date of birth", 0);
+    need(p.nationality?.trim(), "Nationality", 0);
+    need(p.country_of_residence, "Country of residence", 0);
+    need(id.document_number?.trim(), "Document number", 0);
+    need(id.issuing_country, "Issuing country", 0);
+    need(a.street_line_1?.trim(), "Street address", 1);
+    need(a.city?.trim(), "City", 1);
+    need(a.country, "Address country", 1);
+    need(form.contact.phone_number?.trim(), "Phone number", 5);
+    need(f.employment_status, "Employment status", 2);
+    need(f.source_of_funds, "Source of funds", 2);
+    need(t.years_trading_experience, "Trading experience", 2);
+    need(t.trading_knowledge_level, "Knowledge level", 2);
+    need(t.risk_appetite, "Risk appetite", 2);
+    if (f.is_politically_exposed) need(f.pep_details?.trim(), "PEP duties / associations", 2);
+    need((tx.tax_residency_countries || []).length > 0, "Tax residency country", 3);
+    if (!tx.has_no_tax_number) need(tx.tax_identification_number?.trim(), "Tax identification number (or tick 'no tax number')", 3);
+    if (needsFatca) need(tx.fatca_declaration_acknowledged, "FATCA / CRS acknowledgement", 3);
+    need(d.terms_accepted, "Terms of Execution acceptance", 3);
+    need(d.privacy_accepted, "Privacy consent", 3);
+    need(d.aml_consent, "AML/CTF screening consent", 3);
+    need(d.sanctions_screening_consent, "Sanctions screening consent", 3);
+    need(uploads['id_front'], "Government ID / Passport (front) upload", 4);
+    need(selfieBase64, "Biometric selfie capture", 4);
+    need(d.accurate_information_declaration, "Perjury declaration checkbox", 5);
+    return missing;
+  };
 
   // Selected tax countries info
   const selectedTaxCountries = (form.tax.tax_residency_countries || [])
@@ -304,7 +345,15 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
   const back = () => setStep(s => Math.max(s - 1, 0));
 
   const submit = async () => {
-    setSubmitting(true); setError(null);
+    setSubmitting(true); setError(null); setOutstanding(null);
+    // Every *-marked field must be filled: pop up exactly what is
+    // outstanding (with jump-to-step) instead of failing server-side.
+    const missing = validateAll();
+    if (missing.length > 0) {
+      setSubmitting(false);
+      setOutstanding(missing);
+      return;
+    }
     const payload = {
       ...form,
       fullName: `${form.personal.legal_first_name} ${form.personal.legal_last_name}`,
@@ -321,14 +370,27 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
     if (demoMode) {
       localStorage.setItem('xm_kyc_status', 'submitted');
       const q = JSON.parse(localStorage.getItem('kyc_applications_queue') || '[]');
-      q.push({ id: `KYC-DEMO-${Date.now()}`, ...payload, status: 'pending', submittedAt: new Date().toLocaleString() });
+      const demoId = `KYC-DEMO-${Date.now()}`;
+      q.push({ id: demoId, ...payload, status: 'pending', submittedAt: new Date().toLocaleString() });
       localStorage.setItem('kyc_applications_queue', JSON.stringify(q));
+      try {
+        localStorage.setItem('xm_kyc_ref', demoId);
+        localStorage.setItem('xm_kyc_submitted_at', new Date().toISOString());
+      } catch (_) {}
       setTimeout(() => { setSubmitting(false); onSuccess ? onSuccess() : navigate('/dashboard'); }, 1200);
       return;
     }
     try {
-      await apiClient.submitKyc(payload);
+      const res: any = await apiClient.submitKyc(payload);
       localStorage.setItem('xm_kyc_status', 'submitted');
+      try {
+        const appId = res?.application?.id || res?.id;
+        if (appId) localStorage.setItem('xm_kyc_ref', String(appId));
+        localStorage.setItem('xm_kyc_submitted_at', new Date().toISOString());
+        if (res?.emailed === false) {
+          console.warn('KYC emailed copy failed:', res?.email_error || 'unknown');
+        }
+      } catch (_) { /* storage best-effort */ }
       onSuccess ? onSuccess() : navigate('/dashboard');
     } catch (e: any) {
       setError(e.response?.data?.detail || e.message || 'Submission failed');
@@ -520,9 +582,27 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
       {selectedTaxCountries.map(c => (
         <div key={c.code} className="p-4 bg-zinc-900/40 rounded-xl border border-zinc-800">
           <p className="text-rose-400 font-mono text-[10px] uppercase tracking-widest mb-3 font-bold">{c.name} — Tax Details</p>
-          <Field label={c.tinLabel} required>
-            <input className={ic()} value={form.tax.tax_identification_number} onChange={e => patch('tax','tax_identification_number',e.target.value)} placeholder={c.tinFormat}/>
+          <Field label={c.tinLabel} required={!form.tax.has_no_tax_number}>
+            <input
+              className={ic()}
+              value={form.tax.has_no_tax_number ? '' : form.tax.tax_identification_number}
+              disabled={form.tax.has_no_tax_number}
+              onChange={e => patch('tax','tax_identification_number',e.target.value)}
+              placeholder={form.tax.has_no_tax_number ? 'No tax number declared' : c.tinFormat}
+            />
           </Field>
+          <label className="mt-2 flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              className="accent-rose-500"
+              checked={!!form.tax.has_no_tax_number}
+              onChange={e => {
+                patch('tax','has_no_tax_number',e.target.checked);
+                if (e.target.checked) patch('tax','tax_identification_number','');
+              }}
+            />
+            <span className="text-[11px] font-mono text-zinc-400">I do not have a tax number</span>
+          </label>
           {c.fatcaRelevant && (
             <div className="mt-3 p-3 bg-amber-950/20 border border-amber-800/30 rounded-lg text-xs font-mono text-amber-300 flex items-start gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5"/>
@@ -639,7 +719,7 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
       <div className="p-3 bg-zinc-950 rounded border border-zinc-800 flex items-start gap-3">
         <input type="checkbox" id="solemnDecl" className="mt-1 accent-rose-500" checked={form.declarations.accurate_information_declaration} onChange={e => patch('declarations','accurate_information_declaration',e.target.checked)}/>
         <label htmlFor="solemnDecl" className="text-[11px] font-mono text-zinc-300 leading-relaxed">
-          <strong>Solemn Attestation:</strong> I declare under penalty of perjury that all details and uploaded files correspond strictly to my legal, true, and active personal assets, accounts, and residential status.
+          <strong>I declare under penalty of perjury that all details and uploaded files correspond strictly to my legal, true, and active personal assets, accounts, and residential status.</strong>
         </label>
       </div>
 
@@ -697,6 +777,43 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
           {error && (
             <div className="text-rose-400 text-xs font-mono mb-5 p-3 bg-rose-950/20 rounded border border-rose-500/30 flex items-start gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5"/><span>{error}</span>
+            </div>
+          )}
+
+          {/* Outstanding-items popup: every *-marked field still empty */}
+          {outstanding && (
+            <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 p-4">
+              <div className="w-full max-w-md bg-zinc-950 border border-rose-500/30 rounded-2xl p-6 space-y-4">
+                <div>
+                  <h2 className="text-base font-bold text-white font-mono">
+                    {outstanding.length} required item{outstanding.length === 1 ? "" : "s"} outstanding
+                  </h2>
+                  <p className="text-[11px] text-zinc-400 font-mono mt-1">
+                    Fill the starred (*) fields below, then dispatch again.
+                  </p>
+                </div>
+                <ul className="space-y-1.5 max-h-64 overflow-y-auto">
+                  {outstanding.map((m, i) => (
+                    <li key={i}>
+                      <button
+                        type="button"
+                        onClick={() => { setOutstanding(null); setStep(m.step); }}
+                        className="w-full text-left px-3 py-2 rounded-lg border border-zinc-800 bg-zinc-900/40 hover:border-rose-500/50 text-xs font-mono text-zinc-200 transition"
+                      >
+                        <span className="text-rose-400 font-bold">•</span> {m.label}
+                        <span className="text-zinc-500"> — step {m.step + 1}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => setOutstanding(null)}
+                  className="w-full py-2 border border-zinc-700 rounded-lg text-xs font-mono text-zinc-300 hover:text-white transition"
+                >
+                  Back to the form
+                </button>
+              </div>
             </div>
           )}
 
