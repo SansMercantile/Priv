@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth0 } from "@auth0/auth0-react";
 import { LogOut } from "lucide-react";
+import apiClient from "../api/apiClient";
 import { 
   LayoutDashboard, 
   Brain, 
@@ -189,6 +190,28 @@ export default function Sidebar({
     logout({ logoutParams: { returnTo: window.location.origin } });
   };
 
+  // Admin-gated Compliance Desk link: visible only when the signed-in
+  // identity verifies as admin (GET /api/v1/admin/whoami). Hidden on any
+  // failure -- never leaks the route's existence to non-admins.
+  const [showCompliance, setShowCompliance] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res: any = await apiClient.get("/api/v1/admin/whoami");
+        if (!cancelled && res?.data?.data?.admin) setShowCompliance(true);
+      } catch (_) {
+        /* stay hidden */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const items: SectionItem[] = showCompliance
+    ? [...navigationItems, { name: "Compliance Desk", icon: ShieldCheck, path: "/dashboard/admin/kyc" }]
+    : navigationItems;
+
   // Mobile Top Bar
   if (isMobile) {
     return (
@@ -202,7 +225,7 @@ export default function Sidebar({
         
         {/* Horizontal Navigation List */}
         <div className="flex items-center space-x-1.5 overflow-x-auto max-w-[200px] sm:max-w-none scrollbar-hide py-1">
-          {navigationItems.map((item) => {
+          {items.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink
@@ -258,7 +281,7 @@ export default function Sidebar({
 
       {/* Navigation list */}
       <nav className="flex-1 space-y-1 overflow-y-auto scrollbar-hide">
-        {navigationItems.map((item) => {
+        {items.map((item) => {
           const Icon = item.icon;
           return (
             <NavLink
