@@ -653,6 +653,43 @@ export default function Landing() {
             </Link>
           </div>
         </section>
+      {/* Pricing — mirrors /api/v1/payment/plans exactly */}
+      <section id="pricing" className="py-14 border-t border-white/5">
+        <p className="text-[11px] font-mono tracking-widest text-rose-200/70 mb-2">PRICING</p>
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">One plan for every pace.</h2>
+        <p className="text-white/55 text-[15px] max-w-2xl mb-8">
+          Start free. Upgrade when the signals start paying for themselves. Prices in USD, billed in Rand at checkout.
+        </p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[
+            { name: "Priv Signals Free", price: "$0", per: "/mo", tag: "Try Priv's AI trading signals at no cost.", feats: ["4 free AI signals / day", "Synthetics market only", "Entry, TP1 & TP2, trailing Stop Loss", "Email or SMS delivery", "Manual execution only"], cta: "Start free" },
+            { name: "Priv Signal Pro", price: "$29", per: "/mo", tag: "More signals across more instruments.", feats: ["8 signals / day: Synthetics, Indices, Commodities & Shares", "Entry, TP1 & TP2, trailing Stop Loss", "Email, SMS, or WhatsApp", "Manual execution only"], cta: "Go Pro" },
+            { name: "Priv Signal Elite", price: "$79", per: "/mo", tag: "High-volume signals for active intraday traders.", feats: ["16 signals / day, all asset categories", "Real-time entry, SL, TP1, TP2, dynamic trailing stops", "Instant delivery, priority routing", "Manual execution only"], cta: "Go Elite" },
+            { name: "Priv Signal Sovereign", price: "$149", per: "/mo", tag: "Complete coverage plus event setups.", feats: ["32 signals / day, all categories", "Exclusive Event-Driven Signals: NFP, CPI, rate decisions", "Prop-firm parameters (FTMO / funded compliance)", "Priority instant delivery"], cta: "Go Sovereign" },
+            { name: "Priv Autonomous", price: "$199", per: "/mo", tag: "Priv trades your connected Deriv account for you.", feats: ["Unlimited active setups, all categories", "Autonomous execution via Deriv API", "Entry management, TP scaling, SL adjustment, trailing locks", "Hands-free execution"], cta: "Go Autonomous" },
+          ].map((p) => (
+            <div key={p.name} className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 flex flex-col">
+              <h3 className="font-semibold text-white">{p.name}</h3>
+              <p className="text-xs text-white/45 mt-1">{p.tag}</p>
+              <p className="mt-3">
+                <span className="text-3xl font-bold">{p.price}</span>
+                <span className="text-sm text-white/40">{p.per}</span>
+              </p>
+              <ul className="mt-3 space-y-1.5 text-[13px] text-white/55 flex-1">
+                {p.feats.map((f) => (
+                  <li key={f} className="flex gap-2"><span className="text-emerald-400">✓</span>{f}</li>
+                ))}
+              </ul>
+              <button
+                onClick={startFree}
+                className="mt-4 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white text-sm font-semibold transition"
+              >
+                {p.cta}
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
       </main>
 
       {/* Footer */}
