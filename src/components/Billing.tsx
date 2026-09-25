@@ -62,8 +62,38 @@ export default function Billing({ demoMode }: { demoMode?: boolean }) {
     };
   }, []);
 
+  const myPlanId = subscription?.plan_id || null;
+
+  const goLive = () => {
+    try {
+      localStorage.setItem("demoMode", "false");
+    } catch (_) {}
+    window.location.reload();
+  };
+
   const subscribeWithPayFast = async (plan: Plan) => {
     setError(null);
+    // Subscribing is a live-mode action; demo mode keeps everything
+    // read-only. Offer the switch inline instead of a dead button.
+    if (demoMode) {
+      setError("Subscriptions need live mode — your demo stays intact. Switch below to continue.");
+      return;
+    }
+    // Free tier needs no checkout: grant it directly.
+    if (!plan.price || Number(plan.price) <= 0) {
+      setRedirecting(plan.plan_id);
+      try {
+        await apiClient.post("/api/v1/payment/subscriptions/ensure-free", {});
+        const sub: any = await apiClient.getMySubscription();
+        const body = sub?.data ?? sub;
+        setSubscription(body?.subscription ?? (body && typeof body === "object" ? body : null));
+      } catch (e: any) {
+        setError(e?.message || "Could not activate the free plan.");
+      } finally {
+        setRedirecting(null);
+      }
+      return;
+    }
     setRedirecting(plan.plan_id);
     try {
       const origin = window.location.origin;
@@ -104,7 +134,15 @@ export default function Billing({ demoMode }: { demoMode?: boolean }) {
       {error && (
         <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 text-red-300 text-sm rounded-lg p-3">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-          {error}
+          <span className="flex-1">{error}</span>
+          {demoMode && (
+            <button
+              onClick={goLive}
+              className="shrink-0 px-3 py-1 rounded-lg bg-white text-black font-mono text-xs font-bold"
+            >
+              Go live
+            </button>
+          )}
         </div>
       )}
 
@@ -147,17 +185,19 @@ export default function Billing({ demoMode }: { demoMode?: boolean }) {
             )}
             <button
               onClick={() => subscribeWithPayFast(plan)}
-              disabled={!!redirecting || demoMode}
+              disabled={!!redirecting || myPlanId === plan.plan_id}
               className="mt-2 w-full rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-medium py-2 text-sm flex items-center justify-center gap-2 transition-colors"
-              title={demoMode ? "Disable demo mode to subscribe" : undefined}
+              title={myPlanId === plan.plan_id ? "Your current subscription" : demoMode ? "Works in live mode" : undefined}
             >
-                {redirecting === plan.plan_id ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Redirecting to checkout…
-                  </>
-                ) : (
-                  "Subscribe"
-                )}
+              {redirecting === plan.plan_id ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" /> Redirecting to checkout…
+                </>
+              ) : myPlanId === plan.plan_id ? (
+                "Current Subscription"
+              ) : (
+                "Subscribe"
+              )}
             </button>
           </div>
         ))}

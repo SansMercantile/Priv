@@ -154,14 +154,17 @@ export default function LoginGate({ children }: LoginGateProps) {
     }
     setAuthTokenGetter(() => getAccessTokenSilently());
     // One-time per session: claim any broker connections made before
-    // login under the verified identity. Safe to call repeatedly (it's
-    // idempotent server-side) but there's no reason to.
+    // login under the verified identity, and ensure the free subscription
+    // every account holds from signup. Both idempotent server-side.
     if (!linkedAnonymousRef.current) {
       linkedAnonymousRef.current = true;
       apiClient.linkAnonymousConnections().catch(() => {
         // Non-fatal -- worst case a pre-login Deriv connection stays
         // anonymous and the user reconnects it manually.
         linkedAnonymousRef.current = false;
+      });
+      apiClient.post("/api/v1/payment/subscriptions/ensure-free", {}).catch(() => {
+        /* non-fatal: billing page retries on view */
       });
     }
   }, [isAuthenticated, getAccessTokenSilently]);
