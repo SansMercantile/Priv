@@ -151,13 +151,13 @@ export default function Billing({ demoMode }: { demoMode?: boolean }) {
               className="mt-2 w-full rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-medium py-2 text-sm flex items-center justify-center gap-2 transition-colors"
               title={demoMode ? "Disable demo mode to subscribe" : undefined}
             >
-              {redirecting === plan.plan_id ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Redirecting to PayFast…
-                </>
-              ) : (
-                "Subscribe with PayFast"
-              )}
+                {redirecting === plan.plan_id ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Redirecting to checkout…
+                  </>
+                ) : (
+                  "Subscribe"
+                )}
             </button>
           </div>
         ))}
