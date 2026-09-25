@@ -186,20 +186,47 @@ export default function LoginGate({ children }: LoginGateProps) {
   useEffect(() => {
     if (!isDerivCallback()) return;
     let cancelled = false;
+    // Fire-and-forget stage telemetry so a stuck return leg is diagnosable
+    // server-side (stage only, no user data). Never throws.
+    const ping = (stage: string, detail?: string) => {
+      try {
+        const body = JSON.stringify({ stage, detail, user_id: getAppUserId() });
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(
+            "/api/v1/auth/deriv/callback-ping",
+            new Blob([body], { type: "application/json" })
+          );
+        } else {
+          fetch("/api/v1/auth/deriv/callback-ping", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body,
+            keepalive: true,
+          }).catch(() => {});
+        }
+      } catch (_) {
+        /* telemetry must never break the flow */
+      }
+    };
     (async () => {
       try {
+        ping("started");
         const authInfo = await handleDerivCallback();
         if (cancelled) return;
+        ping("exchanged");
         await apiClient.post("/api/v1/auth/deriv/connect-token", {
           api_token: authInfo.access_token,
           user_id: getAppUserId(),
         });
+        if (cancelled) return;
+        ping("posted");
         window.location.reload();
       } catch (e: any) {
         if (cancelled) return;
         const msg = e instanceof DerivOAuthError
           ? e.message
           : (e?.message || "deriv_callback_failed");
+        ping("failed", msg);
         setDerivError(msg);
         setDerivChecked(true);
         try {
@@ -270,9 +297,10 @@ export default function LoginGate({ children }: LoginGateProps) {
             <div>
               <h2 className="text-lg font-semibold text-white">Connect your Deriv account</h2>
               <p className="text-xs text-zinc-400 font-mono mt-1 leading-relaxed">
-                One last step: link Deriv (a demo account works) to switch on
-                live prices, positions, and execution. Skip any time from your
-                profile.
+                One last step: click below, log in (or sign up) on Deriv's
+                site, approve the connect screen, and you'll land back here
+                linked. Stay in this tab throughout -- authorizing inside
+                Deriv's own dashboard alone does not complete the loop.
               </p>
             </div>
             <DerivConnectCard />
