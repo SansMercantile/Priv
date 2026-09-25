@@ -168,8 +168,8 @@ export default function Billing({ demoMode }: { demoMode?: boolean }) {
       )}
 
       <p className="text-xs text-white/30">
-        Payments are processed by PayFast. You'll be redirected to PayFast's secure checkout to
-        complete payment, then returned here.
+        Payments are processed by PayFast. You'll be redirected to PayFast's secure checkout to complete payment, then returned here.
+        Prices in USD — charged in South African Rand (ZAR) at checkout at the day's rate.
       </p>
     </div>
   );
