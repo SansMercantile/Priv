@@ -19,6 +19,11 @@ import {
 const DERIV_APP_ID = "340CMkSyVrWLSlXnzSaIP"; // PRIVCore - real OAuth-type app, registered redirect: https://priv.sansmercantile.com
 const AUTH_BASE = "https://auth.deriv.com/oauth2";
 const REDIRECT_URI = window.location.origin + "/"; // must exactly match Deriv's registered Redirect URL, trailing slash included
+// Set just before navigating to Deriv so the return leg can tell "came
+// back with nothing" (abandoned at Deriv, bounced to marketing, popup
+// closed) apart from "never left".
+const PENDING_KEY = "deriv_oauth_pending";
+const DONE_KEY = "deriv_oauth_done";
 
 export class DerivOAuthError extends Error {
   constructor(message: string) {
@@ -61,6 +66,11 @@ async function buildPkceParams(): Promise<URLSearchParams> {
 
 export async function initiateDerivLogin(): Promise<void> {
   const params = await buildPkceParams();
+  try {
+    localStorage.setItem(PENDING_KEY, String(Date.now()));
+  } catch (_) {
+    /* ignore */
+  }
   window.location.href = `${AUTH_BASE}/auth?${params.toString()}`;
 }
 
@@ -68,6 +78,39 @@ export async function initiateDerivSignUp(): Promise<void> {
   const params = await buildPkceParams();
   params.set("prompt", "registration");
   window.location.href = `${AUTH_BASE}/auth?${params.toString()}`;
+}
+
+export function derivReturnEmpty(): boolean {
+  // True when a previous initiateDerivLogin never produced a callback.
+  // Ignored when another tab already completed the flow after this flag
+  // was set (its done-marker is newer). Clears state either way.
+  try {
+    const pending = localStorage.getItem(PENDING_KEY);
+    if (!pending) return false;
+    localStorage.removeItem(PENDING_KEY);
+    const done = Number(localStorage.getItem(DONE_KEY) || 0);
+    if (done > Number(pending)) return false;
+    const params = new URLSearchParams(window.location.search);
+    return !params.has("code");
+  } catch (_) {
+    return false;
+  }
+}
+
+export function markDerivDone(): void {
+  try {
+    localStorage.setItem(DONE_KEY, String(Date.now()));
+  } catch (_) {
+    /* ignore */
+  }
+}
+
+export function clearDerivPending(): void {
+  try {
+    localStorage.removeItem(PENDING_KEY);
+  } catch (_) {
+    /* ignore */
+  }
 }
 
 export function isDerivCallback(): boolean {

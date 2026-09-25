@@ -33,12 +33,16 @@ interface StoredWithTimestamp {
 }
 
 export function storeCSRFToken(token: string): void {
+  // localStorage (NOT sessionStorage): the Deriv round-trip may complete
+  // in a different tab than the one that started it (Ctrl+click, Deriv's
+  // own "open app" links, mobile handoffs). sessionStorage is tab-scoped
+  // and silently breaks those flows with CSRF mismatches.
   const stored: StoredWithTimestamp = { value: token, createdAt: Date.now() };
-  sessionStorage.setItem(CSRF_TOKEN_KEY, JSON.stringify(stored));
+  localStorage.setItem(CSRF_TOKEN_KEY, JSON.stringify(stored));
 }
 
 export function getCSRFToken(): string | null {
-  const raw = sessionStorage.getItem(CSRF_TOKEN_KEY);
+  const raw = localStorage.getItem(CSRF_TOKEN_KEY);
   if (!raw) return null;
   const stored: StoredWithTimestamp = JSON.parse(raw);
   if (Date.now() - stored.createdAt > TOKEN_MAX_AGE_MS) {
@@ -49,16 +53,16 @@ export function getCSRFToken(): string | null {
 }
 
 export function clearCSRFToken(): void {
-  sessionStorage.removeItem(CSRF_TOKEN_KEY);
+  localStorage.removeItem(CSRF_TOKEN_KEY);
 }
 
 export function storeCodeVerifier(verifier: string): void {
   const stored: StoredWithTimestamp = { value: verifier, createdAt: Date.now() };
-  sessionStorage.setItem(CODE_VERIFIER_KEY, JSON.stringify(stored));
+  localStorage.setItem(CODE_VERIFIER_KEY, JSON.stringify(stored));
 }
 
 export function getCodeVerifier(): string | null {
-  const raw = sessionStorage.getItem(CODE_VERIFIER_KEY);
+  const raw = localStorage.getItem(CODE_VERIFIER_KEY);
   if (!raw) return null;
   const stored: StoredWithTimestamp = JSON.parse(raw);
   if (Date.now() - stored.createdAt > TOKEN_MAX_AGE_MS) {
@@ -69,7 +73,7 @@ export function getCodeVerifier(): string | null {
 }
 
 export function clearCodeVerifier(): void {
-  sessionStorage.removeItem(CODE_VERIFIER_KEY);
+  localStorage.removeItem(CODE_VERIFIER_KEY);
 }
 
 export function storeAuthInfo(authInfo: DerivAuthInfo): void {

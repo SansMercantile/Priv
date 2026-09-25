@@ -4,6 +4,9 @@ import { getAppUserId } from "../../lib/appUserId";
 import { setAuthTokenGetter } from "../../lib/authToken";
 import {
   isDerivCallback,
+  derivReturnEmpty,
+  clearDerivPending,
+  markDerivDone,
   handleDerivCallback,
   DerivOAuthError,
 } from "../../lib/derivAuth/oauth";
@@ -184,8 +187,27 @@ export default function LoginGate({ children }: LoginGateProps) {
   // code (proves the user consented at Deriv), hand the access token to the
   // backend so execution/adapters are real, then reload into the app.
   useEffect(() => {
-    if (!isDerivCallback()) return;
+    if (window.location.pathname !== "/") return;
+    if (!isDerivCallback()) {
+      // A previous Connect attempt never produced a Deriv callback (user
+      // abandoned the Deriv tab, or Deriv bounced to marketing instead of
+      // authorizing). Say so plainly instead of silent nothing.
+      if (derivReturnEmpty()) {
+        const msg =
+          "Returned from Deriv without credentials — the Deriv tab was closed, or Deriv did not authorize this app. Try Connect again, or use the API-token option.";
+        setDerivError(msg);
+        setDerivChecked(true);
+        try {
+          sessionStorage.setItem("priv_deriv_error", msg);
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      return;
+    }
     let cancelled = false;
+    // Genuine Deriv return: the pending flag has served its purpose.
+    clearDerivPending();
     // Fire-and-forget stage telemetry so a stuck return leg is diagnosable
     // server-side (stage only, no user data). Never throws.
     const ping = (stage: string, detail?: string) => {
@@ -220,6 +242,7 @@ export default function LoginGate({ children }: LoginGateProps) {
         });
         if (cancelled) return;
         ping("posted");
+        markDerivDone();
         window.location.reload();
       } catch (e: any) {
         if (cancelled) return;
@@ -298,9 +321,9 @@ export default function LoginGate({ children }: LoginGateProps) {
               <h2 className="text-lg font-semibold text-white">Connect your Deriv account</h2>
               <p className="text-xs text-zinc-400 font-mono mt-1 leading-relaxed">
                 One last step: click below, log in (or sign up) on Deriv's
-                site, approve the connect screen, and you'll land back here
-                linked. Stay in this tab throughout -- authorizing inside
-                Deriv's own dashboard alone does not complete the loop.
+                site in any tab, approve the connect screen, and you'll land
+                back here linked. Then pick demo or live under Profile →
+                Broker Connections.
               </p>
             </div>
             <DerivConnectCard />
