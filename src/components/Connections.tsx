@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link2, Globe, Server, Radio, ShieldCheck, Play, ArrowRight, Activity, Brain, Cpu, Landmark, Cloud, Database, Layers, Zap, Sparkles, RefreshCw, CheckCircle2, Terminal } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import apiClient from "../api/apiClient";
 
 interface ConnectionNode {
   id: string;
@@ -122,8 +123,9 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
   const [activeGateway, setActiveGateway] = useState("Rest API Gate");
 
   // Institutional-tier gate — Cluster/Gateway/AI-sync infrastructure UI is
-  // reserved for the Sovereign node tier. Reads the same xm_node_tier key
+  // reserved for the Autonomous node tier. Reads the same xm_node_tier key
   // UserProfileEditor writes, polling to stay in sync without a reload.
+  // Admin accounts (per backend ADMIN_EMAILS) always pass regardless of tier.
   const [nodeTier, setNodeTier] = useState<string>(() => {
     return localStorage.getItem("xm_node_tier") || "obsidian";
   });
@@ -132,7 +134,22 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
     const interval = setInterval(syncTier, 900);
     return () => clearInterval(interval);
   }, []);
-  const isInstitutional = nodeTier === "sovereign";
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res: any = await apiClient.get('/api/v1/admin/whoami');
+        if (!cancelled && res?.data?.data?.admin) setIsAdmin(true);
+      } catch (_) {
+        /* stay non-admin */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const isInstitutional = isAdmin || nodeTier === "autonomous";
 
   if (!isInstitutional) {
     return (
@@ -141,10 +158,10 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
           <ShieldCheck className="w-10 h-10 text-teal-400" />
         </div>
         <div>
-          <h1 className="text-2xl font-serif italic text-white">Cluster Node Interconnections</h1>
+          <h1 className="text-2xl font-serif italic text-white">Cluster Interconnections</h1>
           <p className="text-white/40 text-sm mt-2 max-w-md">
             Direct infrastructure control — cluster topology, gateway routing, and
-            sovereign AI synchronization — is available on the Sovereign node tier.
+            AI synchronization — is available on the Autonomous tier.
           </p>
         </div>
         <button
@@ -152,7 +169,7 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
           className="flex items-center space-x-2 px-5 py-2.5 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/40 rounded text-teal-300 text-sm font-medium transition-colors"
         >
           <Sparkles className="w-4 h-4" />
-          <span>Upgrade to Sovereign</span>
+          <span>Upgrade to Autonomous</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>
@@ -166,7 +183,7 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
         <div>
           <h1 className="text-3xl font-serif italic text-white flex items-center">
             <Radio className="w-8 h-8 mr-3 text-white/75 animate-pulse" />
-            Cluster Node Interconnections
+            Cluster Interconnections
           </h1>
           <p className="text-white/40 text-xs mt-1 font-light">Manage and monitor physical server topologies and encrypted API pathways</p>
         </div>
