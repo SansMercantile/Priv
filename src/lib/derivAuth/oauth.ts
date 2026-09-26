@@ -208,11 +208,32 @@ async function exchangeCodeForTokens(code: string, codeVerifier: string): Promis
   return authInfo;
 }
 
+/**
+ * Validate the Deriv return and hand back the single-use code + PKCE
+ * verifier WITHOUT exchanging them in the browser. The exchange must
+ * happen server-side (POST /api/v1/auth/deriv/connect-code): Deriv's
+ * token endpoint has no CORS allow-list for our origin, so a browser
+ * POST dies with a network error after the user already consented.
+ * Cleans the URL afterward regardless of success or failure.
+ */
+export function consumeValidatedCallback(): { code: string; codeVerifier: string } {
+  const params = parseCallbackParams();
+  const code = validateCallback(params);
+  const codeVerifier = getCodeVerifier();
+  if (!codeVerifier) {
+    clearAllDerivAuthData();
+    cleanupUrl();
+    throw new DerivOAuthError("Login session expired -- please try connecting again");
+  }
+  clearCodeVerifier();
+  cleanupUrl();
+  return { code, codeVerifier };
+}
+
 /** Full callback handling: validate -> exchange code -> return auth info.
  * Call this when isDerivCallback() is true. Cleans the URL afterward
  * regardless of success or failure. */
-export async function handleDerivCallback(): Promise<DerivAuthInfo> {
-  const params = parseCallbackParams();
+export async function handleDerivCallback(): Promise<DerivAuthInfo> {  const params = parseCallbackParams();
   const code = validateCallback(params);
 
   const codeVerifier = getCodeVerifier();

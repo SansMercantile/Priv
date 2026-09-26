@@ -189,6 +189,12 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
                 transition={{ duration: 0.3 }}
                 className="p-4 sm:p-6"
               >
+                {/* Dashboard routes only mount under /dashboard/*. Rendering
+                    a descendant <Routes> at the bare "/" (Deriv's registered
+                    redirect) trips React Router's "parent route has no
+                    trailing /*" warning and can never match anything -- the
+                    return leg needs LoginGate, not these routes. */}
+                {location.pathname.startsWith("/dashboard") && (
                 <Routes>
                   <Route path="/dashboard" element={<Dashboard demoMode={demoMode} />} />
                   <Route path="/dashboard/terminal" element={<TradingTerminal />} />
@@ -207,6 +213,7 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
                   <Route path="/dashboard/admin/kyc" element={<KycAdminReviewPage />} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </Routes>
+                )}
               </motion.div>
             </AnimatePresence>
           </main>

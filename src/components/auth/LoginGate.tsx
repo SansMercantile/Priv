@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 import { getAppUserId } from "../../lib/appUserId";
-import { setAuthTokenGetter } from "../../lib/authToken";
+import { setAuthTokenGetter, getAuthToken } from "../../lib/authToken";
 import {
   isDerivCallback,
   derivReturnEmpty,
   clearDerivPending,
   markDerivDone,
-  handleDerivCallback,
+  consumeValidatedCallback,
   DerivOAuthError,
 } from "../../lib/derivAuth/oauth";
 import DerivConnectCard from "../DerivConnectCard";
@@ -137,7 +137,7 @@ function LoginScreen({ derivError }: {
 }
 
 export default function LoginGate({ children }: LoginGateProps) {
-  const { isAuthenticated, isLoading, error, user, getAccessTokenSilently } = useAuth0();
+  const { isAuthenticated, isLoading, error, user, getAccessTokenSilently, loginWithRedirect } = useAuth0();
   const [derivConnected, setDerivConnected] = useState(false);
   const [derivChecked, setDerivChecked] = useState(false);
   const [derivError, setDerivError] = useState<string | null>(null);
@@ -155,13 +155,23 @@ export default function LoginGate({ children }: LoginGateProps) {
   // instead of placeholders or anyone else's data.
   const identityKey = user?.sub || null;
   const lastIdentityRef = useRef<string | null>(null);
+  // True when Auth0 thinks we're signed in but can't produce a usable
+  // access token (silent renewal blocked/expired). Every Bearer call then
+  // 401s -- surfacing "sign in again" beats silent failures everywhere.
+  const [sessionExpired, setSessionExpired] = useState(false);
   useEffect(() => {
     if (!isAuthenticated) {
       setAuthTokenGetter(null);
       lastIdentityRef.current = null;
+      setSessionExpired(false);
       return;
     }
     setAuthTokenGetter(() => getAccessTokenSilently());
+    // Probe token health once per identity: a throw here means the
+    // session is a cached shell with no working token.
+    getAccessTokenSilently()
+      .then(() => setSessionExpired(false))
+      .catch(() => setSessionExpired(true));
     if (lastIdentityRef.current !== identityKey) {
       lastIdentityRef.current = identityKey;
       try {
@@ -220,12 +230,21 @@ export default function LoginGate({ children }: LoginGateProps) {
     // One-time per session: claim any broker connections made before
     // login under the verified identity, and ensure the free subscription
     // every account holds from signup. Both idempotent server-side.
+    // Skipped when no usable token exists (would just 401): the
+    // session-expired banner above handles re-login, and the next
+    // successful login retries the claim.
     if (!linkedAnonymousRef.current) {
       linkedAnonymousRef.current = true;
-      apiClient.linkAnonymousConnections().catch(() => {
-        // Non-fatal -- worst case a pre-login Deriv connection stays
-        // anonymous and the user reconnects it manually.
-        linkedAnonymousRef.current = false;
+      getAuthToken().then((tok) => {
+        if (!tok) {
+          linkedAnonymousRef.current = false;
+          return;
+        }
+        apiClient.linkAnonymousConnections().catch(() => {
+          // Non-fatal -- worst case a pre-login Deriv connection stays
+          // anonymous and the user reconnects it manually.
+          linkedAnonymousRef.current = false;
+        });
       });
       apiClient.post("/api/v1/payment/subscriptions/ensure-free", {}).catch(() => {
         /* non-fatal: billing page retries on view */
@@ -300,11 +319,14 @@ export default function LoginGate({ children }: LoginGateProps) {
     (async () => {
       try {
         ping("started");
-        const authInfo = await handleDerivCallback();
-        if (cancelled) return;
-        ping("exchanged");
-        await apiClient.post("/api/v1/auth/deriv/connect-token", {
-          api_token: authInfo.access_token,
+        // Validate ?code&state + CSRF locally, then let the BACKEND
+        // exchange the code (Deriv's token endpoint has no CORS
+        // allow-list for our origin -- a browser-side POST dies with a
+        // network error after the user already consented).
+        const { code, codeVerifier } = consumeValidatedCallback();
+        await apiClient.post("/api/v1/auth/deriv/connect-code", {
+          code,
+          code_verifier: codeVerifier,
           user_id: getAppUserId(),
         });
         if (cancelled) return;
@@ -380,6 +402,17 @@ export default function LoginGate({ children }: LoginGateProps) {
 
   return (
     <>
+      {isAuthenticated && sessionExpired && (
+        <div className="fixed top-0 left-0 right-0 z-[10001] bg-amber-500/95 text-black text-xs font-mono py-2 px-4 flex items-center justify-center gap-3">
+          <span>Session expired — Deriv linking and account actions need a fresh sign-in.</span>
+          <button
+            onClick={() => loginWithRedirect()}
+            className="underline font-bold hover:text-white"
+          >
+            Sign in again
+          </button>
+        </div>
+      )}
       {children}
       {showOnboarding && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 p-4">
