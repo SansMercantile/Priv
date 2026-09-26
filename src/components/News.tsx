@@ -48,198 +48,18 @@ interface CalendarEvent {
   assessment: string;
 }
 
-const GLOBAL_CALENDAR_EVENTS: CalendarEvent[] = [
-  {
-    id: 1,
-    time: "12:30 UTC",
-    date: "May 22, 2026",
-    country: "USA",
-    currency: "USD",
-    event: "Core Retail Sales (MoM) (Apr)",
-    impact: "HIGH",
-    previous: "0.2%",
-    forecast: "0.4%",
-    actual: "0.6%",
-    state: "positive",
-    assessment: "US retail patterns represent incredibly resilient consumer spend lines, reinforcing a longer hawk horizon for the FOMC."
-  },
-  {
-    id: 2,
-    time: "08:00 UTC",
-    date: "May 21, 2026",
-    country: "EUR",
-    currency: "EUR",
-    event: "HCOB Eurozone Manufacturing PMI (May)",
-    impact: "HIGH",
-    previous: "45.7",
-    forecast: "46.2",
-    actual: "47.4",
-    state: "positive",
-    assessment: "European industrial sectors beat down contraction models. Provides temporary backing strength to local EUR spot indices."
-  },
-  {
-    id: 3,
-    time: "06:00 UTC",
-    date: "May 20, 2026",
-    country: "GBR",
-    currency: "GBP",
-    event: "Core CPI Inflation (YoY) (Apr)",
-    impact: "HIGH",
-    previous: "3.5%",
-    forecast: "2.1%",
-    actual: "2.3%",
-    state: "negative",
-    assessment: "Sticky UK services CPI exceeds forecasts. Restricts immediate Bank of England rate easing targets, keeping Sterling firm."
-  },
-  {
-    id: 4,
-    time: "23:30 UTC",
-    date: "May 21, 2026",
-    country: "JPN",
-    currency: "JPY",
-    event: "National Core CPI (YoY) (Apr)",
-    impact: "HIGH",
-    previous: "2.6%",
-    forecast: "2.2%",
-    actual: "2.2%",
-    state: "neutral",
-    assessment: "Inflation perfectly aligns with central bank targets. Steady pressure remains on BoJ for minor rate hikes in Q3 session."
-  },
-  {
-    id: 5,
-    time: "02:00 UTC",
-    date: "May 21, 2026",
-    country: "NZD",
-    currency: "NZD",
-    event: "RBNZ Interest Rate Decision",
-    impact: "HIGH",
-    previous: "5.50%",
-    forecast: "5.50%",
-    actual: "5.50%",
-    state: "neutral",
-    assessment: "Reserve Bank of New Zealand issued hawk warnings, delaying rate-cuts to early 2027. Kiwi holds value spreads."
-  },
-  {
-    id: 6,
-    time: "01:30 UTC",
-    date: "May 21, 2026",
-    country: "AUS",
-    currency: "AUD",
-    event: "Employment Change (Apr)",
-    impact: "HIGH",
-    previous: "-5.8k",
-    forecast: "20.0k",
-    actual: "38.5k",
-    state: "positive",
-    assessment: "Extremely tight labor statistics. Validates RBA's decision to maintain high-yield rates longer than peer Western banks."
-  },
-  {
-    id: 7,
-    time: "12:30 UTC",
-    date: "May 21, 2026",
-    country: "CAN",
-    currency: "CAD",
-    event: "Retail Sales (MoM) (Mar)",
-    impact: "MEDIUM",
-    previous: "-0.1%",
-    forecast: "0.0%",
-    actual: "-0.6%",
-    state: "negative",
-    assessment: "Canadian retail contraction points to high level of consumer strain, supporting case for an upcoming Bank of Canada easing path."
-  },
-  {
-    id: 8,
-    time: "18:00 UTC",
-    date: "May 20, 2026",
-    country: "USA",
-    currency: "USD",
-    event: "FOMC Meeting Minutes",
-    impact: "HIGH",
-    previous: "---",
-    forecast: "---",
-    actual: "Hawkish",
-    state: "neutral",
-    assessment: "Minutes emphasize consensus on rigid inflation barriers. Capital reallocations safely rotate toward high-yielding bills."
-  },
-  {
-    id: 9,
-    time: "14:00 UTC",
-    date: "May 25, 2026",
-    country: "USA",
-    currency: "USD",
-    event: "New Home Sales (MoM) (May)",
-    impact: "MEDIUM",
-    previous: "-8.6%",
-    forecast: "2.1%",
-    actual: "---",
-    state: "pending",
-    assessment: "Core real estate indices continue a soft contraction. Outperformance would trigger equity buying blocks."
-  },
-  {
-    id: 10,
-    time: "09:00 UTC",
-    date: "May 28, 2026",
-    country: "EUR",
-    currency: "EUR",
-    event: "ECB Interest Rate Decision",
-    impact: "HIGH",
-    previous: "4.50%",
-    forecast: "4.25%",
-    actual: "---",
-    state: "pending",
-    assessment: "High probability of standard 25bps ease. Focus centers on forward-looking comments relative to Euro carry pressure."
-  },
-  {
-    id: 11,
-    time: "07:00 UTC",
-    date: "May 29, 2026",
-    country: "CHE",
-    currency: "CHF",
-    event: "KOF Leading Indicators (May)",
-    impact: "MEDIUM",
-    previous: "101.8",
-    forecast: "102.1",
-    actual: "---",
-    state: "pending",
-    assessment: "Swiss forward indicators remain rigid. Suggests persisting Swiss Franc safe-haven hedge activity."
-  },
-  {
-    id: 12,
-    time: "12:30 UTC",
-    date: "Jun 05, 2026",
-    country: "USA",
-    currency: "USD",
-    event: "Non-Farm Employment Change (NFP)",
-    impact: "HIGH",
-    previous: "175k",
-    forecast: "185k",
-    actual: "---",
-    state: "pending",
-    assessment: "SANS core trigger point. Major labor reports printing below 160k acts as powerful federal policy easing catalyst."
-  },
-  {
-    id: 13,
-    time: "12:30 UTC",
-    date: "Jun 10, 2026",
-    country: "USA",
-    currency: "USD",
-    event: "Core CPI Inflation (YoY)",
-    impact: "HIGH",
-    previous: "3.6%",
-    forecast: "3.5%",
-    actual: "---",
-    state: "pending",
-    assessment: "Inherent inflation tracker. Reading above 3.5% will keep treasury rates locked at peaks until late winter sessions."
-  }
-];
 
 export default function News({ demoMode }: { demoMode?: boolean }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"NEWS" | "CALENDAR">("NEWS");
   
-  // Dynamic Economic Calendar events state
-  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(GLOBAL_CALENDAR_EVENTS);
+  // Economic calendar: live backend feed only (/api/v1/economic-calendar,
+  // refreshed every 60s). Starts EMPTY -- a hardcoded seed table used to
+  // sit here (May 2026 fiction) and lingered whenever the feed faltered.
+  // An empty feed now renders an honest empty state, never stale fiction.
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [calendarLoading, setCalendarLoading] = useState<boolean>(false);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -247,14 +67,56 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
       setCalendarLoading(true);
       try {
         const response = await fetch("/api/v1/economic-calendar");
+        if (!active) return;
         if (response.ok) {
           const data = await response.json();
-          if (active && data.success && data.events && data.events.length > 0) {
-            setCalendarEvents(data.events);
+          if (data.success && Array.isArray(data.events)) {
+            // Map the backend shape {id,time,date,country,currency,event,
+            // impact,previous,forecast,actual} onto display rows, deriving
+            // the release state from actual-vs-forecast (numbers arrive as
+            // floats or null -- never invented).
+            const num = (v: any): number | null => {
+              if (v === null || v === undefined || v === "") return null;
+              const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^0-9.\-]/g, ""));
+              return Number.isFinite(n) ? n : null;
+            };
+            const mapped: CalendarEvent[] = data.events.map((e: any, i: number) => {
+              const a = num(e.actual);
+              const f = num(e.forecast);
+              const p = num(e.previous);
+              const fmt = (v: number | null) => (v === null ? "---" : String(v));
+              let state: CalendarEvent["state"] = "pending";
+              let assessment = `Scheduled — forecast ${fmt(f)} (prev ${fmt(p)}).`;
+              if (a !== null) {
+                if (f !== null && a > f) state = "positive";
+                else if (f !== null && a < f) state = "negative";
+                else state = "neutral";
+                assessment = `Released at ${fmt(a)} vs forecast ${fmt(f)} (prev ${fmt(p)}).`;
+              }
+              return {
+                id: typeof e.id === "number" ? e.id : i,
+                time: e.time || "--:--",
+                date: e.date || "",
+                country: e.country || e.currency || "",
+                currency: e.currency || "",
+                event: e.event || "Unknown event",
+                impact: (["HIGH", "MEDIUM", "LOW"].includes(e.impact) ? e.impact : "LOW") as CalendarEvent["impact"],
+                previous: fmt(p),
+                forecast: fmt(f),
+                actual: fmt(a),
+                state,
+                assessment,
+              };
+            });
+            setCalendarEvents(mapped);
+            setCalendarError(mapped.length === 0 ? "No upcoming events in the live feed right now." : null);
           }
+        } else {
+          setCalendarError("Live calendar feed unavailable (backend error).");
         }
       } catch (err) {
         console.warn("Could not retrieve live economic calendar events:", err);
+        if (active) setCalendarError("Live calendar feed unreachable.");
       } finally {
         if (active) setCalendarLoading(false);
       }
@@ -815,7 +677,9 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
                   {filteredEvents.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-12 text-center text-xs font-mono text-stone-500">
-                        No macroeconomic calendar entries found in active search parameters.
+                        {calendarEvents.length === 0
+                          ? (calendarLoading ? "Loading live calendar…" : (calendarError || "No upcoming events in the live feed right now."))
+                          : "No macroeconomic calendar entries found in active search parameters."}
                       </td>
                     </tr>
                   ) : (

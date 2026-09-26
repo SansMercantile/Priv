@@ -390,10 +390,33 @@ export const PrivCopilot: React.FC = () => {
     }
   };
 
+  // Narrator hygiene: support replies are markdown (tables, **bold**,
+  // ## headings). Reading that raw makes speech synthesis spell out
+  // "asterisk asterisk hash hash". Strip to plain spoken prose first.
+  const stripMarkdownForSpeech = (md: string): string => {
+    let t = md || "";
+    t = t.replace(/```[\s\S]*?```/g, " ");       // fenced code
+    t = t.replace(/`([^`]*)`/g, "$1");            // inline code
+    t = t.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1"); // images -> alt
+    t = t.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");  // links -> text
+    t = t.replace(/<[^>]+>/g, " ");               // html tags
+    t = t.replace(/^#{1,6}\s*/gm, "");            // headings
+    t = t.replace(/^>\s?/gm, "");                 // quotes
+    t = t.replace(/^(\s*[-*+]\s+)/gm, " ");       // bullets
+    t = t.replace(/^(\s*\d+[.)]\s+)/gm, " ");     // numbered lists
+    t = t.replace(/\|/g, " ");                    // table pipes
+    t = t.replace(/(\*\*|__)(.*?)\1/g, "$2");     // bold
+    t = t.replace(/(\*|_)(.*?)\1/g, "$2");        // italic
+    t = t.replace(/~~(.*?)~~/g, "$1");            // strike
+    t = t.replace(/[•#*_~`]/g, "");               // leftovers
+    t = t.replace(/\s+/g, " ").trim();
+    return t;
+  };
+
   const speak = (text: string) => {
     if (!speechActive || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(stripMarkdownForSpeech(text)));
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -522,7 +545,7 @@ export const PrivCopilot: React.FC = () => {
               <p className="text-[9px] text-white/40 leading-tight">
                 {cameraError
                   ? cameraError
-                  : "Camera check-ins are on: each message includes a quick, private read of your expression to help flag stress before a trade. Frames are never stored."}
+                  : "Camera check-ins are on: each message includes a quick, private read of your expression to help flag stress before a trade. Reads are logged to your own history only (view/delete anytime)."}
               </p>
             </div>
           )}

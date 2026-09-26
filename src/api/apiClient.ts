@@ -233,6 +233,27 @@ export const apiClient = {
   getSignalHistory: (limit: number = 50) =>
     safeFetchRelative(`/api/v1/signals/history?limit=${limit}`),
   getCurrentSignal: () => safeFetchRelative("/api/signals/current"),
+
+  // Contact OTP verification + emotion check-in log (backend/api/verify_api.py).
+  getVerifiedContacts: () => safeFetchRelative("/api/v1/verify/contacts"),
+  requestOtp: (channel: string, contact: string) =>
+    safeFetchRelative("/api/v1/verify/otp/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel, contact }),
+    }),
+  confirmOtp: (channel: string, contact: string, code: string) =>
+    safeFetchRelative("/api/v1/verify/otp/confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel, contact, code }),
+    }),
+  getEmotionHistory: (days: number = 30) =>
+    safeFetchRelative(`/api/v1/verify/emotion/history?days=${days}`),
+  getEmotionCheckin: (id: number) =>
+    safeFetchRelative(`/api/v1/verify/emotion/checkin/${id}`),
+  deleteEmotionCheckin: (id: number) =>
+    safeFetchRelative(`/api/v1/verify/emotion/checkin/${id}`, { method: "DELETE" }),
 };
 
 export default apiClient;
