@@ -12,7 +12,6 @@ import {
   Terminal, 
   Landmark,
   Newspaper,
-  BarChart2,
   History,
   Link2,
   CreditCard,
@@ -23,7 +22,8 @@ import {
   Smartphone,
   Laptop,
   Coins,
-  User
+  User,
+  Radio
 } from "lucide-react";
 import logo from "../assets/images/logo_1779280505672.png";
 
@@ -169,7 +169,7 @@ export const navigationItems: SectionItem[] = [
   { name: "Automation System", icon: Terminal, path: "/dashboard/automation" },
   { name: "Tax Intelligence", icon: Landmark, path: "/dashboard/tax" },
   { name: "Tactical News", icon: Newspaper, path: "/dashboard/news" },
-  { name: "Diagnostics Log", icon: BarChart2, path: "/dashboard/analytics" },
+  { name: "My Signals", icon: Radio, path: "/dashboard/signals" },
   { name: "History & Audit", icon: History, path: "/dashboard/history" },
   { name: "SANS Network Link", icon: Link2, path: "/dashboard/connections" },
   { name: "Billing", icon: CreditCard, path: "/dashboard/billing" }
@@ -210,7 +210,9 @@ export default function Sidebar({
   }, []);
   const items: SectionItem[] = showCompliance
     ? [...navigationItems, { name: "Compliance Desk", icon: ShieldCheck, path: "/dashboard/admin/kyc" }]
-    : navigationItems;
+    // Security Check is admin-only; Diagnostics Log now lives inside
+    // History & Audit instead of its own tab.
+    : navigationItems.filter((i) => i.path !== "/dashboard/security");
 
   // Mobile Top Bar
   if (isMobile) {

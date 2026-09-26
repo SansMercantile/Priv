@@ -13,7 +13,7 @@ import Security from "./components/Security";
 import Automation from "./components/Automation";
 import Tax from "./components/Tax";
 import News from "./components/News";
-import Analytics from "./components/Analytics";
+import MySignals from "./components/MySignals";
 import History from "./components/History";
 import Connections from "./components/Connections";
 import Billing from "./components/Billing";
@@ -205,7 +205,10 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
                   <Route path="/dashboard/automation" element={<Automation demoMode={demoMode} />} />
                   <Route path="/dashboard/tax" element={<Tax demoMode={demoMode} />} />
                   <Route path="/dashboard/news" element={<News demoMode={demoMode} />} />
-                  <Route path="/dashboard/analytics" element={<Analytics demoMode={demoMode} />} />
+                  <Route path="/dashboard/signals" element={<MySignals />} />
+                  {/* Diagnostics Log merged into History & Audit -- old
+                      bookmarked URL redirects there. */}
+                  <Route path="/dashboard/analytics" element={<Navigate to="/dashboard/history" replace />} />
                   <Route path="/dashboard/history" element={<History demoMode={demoMode} />} />
                   <Route path="/dashboard/connections" element={<Connections demoMode={demoMode} />} />
                   <Route path="/dashboard/billing" element={<Billing demoMode={demoMode} />} />

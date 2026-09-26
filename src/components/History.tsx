@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { History as HistoryIcon, Search, RefreshCw, AlertTriangle } from "lucide-react";
+import { History as HistoryIcon, Search, RefreshCw, AlertTriangle, BarChart2 } from "lucide-react";
+import Analytics from "./Analytics";
 
 interface Transaction {
   id: string;
@@ -135,6 +136,15 @@ export default function History({ demoMode }: { demoMode?: boolean }) {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Diagnostics Log now lives here instead of its own sidebar tab. */}
+      <div className="pt-4 border-t border-white/10">
+        <h2 className="text-lg font-serif italic text-white flex items-center mb-4">
+          <BarChart2 className="w-5 h-5 mr-2 text-white/70" />
+          Diagnostics Log
+        </h2>
+        <Analytics demoMode={demoMode} />
       </div>
     </div>
   );

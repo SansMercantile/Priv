@@ -210,6 +210,29 @@ export const apiClient = {
     }),
   cancelPayfastSubscription: (subscriptionId: string) =>
     safeFetchRelative(`/api/v1/payment/payfast/cancel-subscription/${subscriptionId}`, { method: "POST" }),
+
+  // Subscriber signals (mounted at /api/v1/signals). Preferences choose
+  // the instruments per paid tier; history mixes the caller's issued
+  // signals with the global landing-ticket archive.
+  getSignalTiers: () => safeFetchRelative("/api/v1/signals/tiers"),
+  getSignalCategories: () => safeFetchRelative("/api/v1/signals/categories"),
+  getSignalPreferences: () => safeFetchRelative("/api/v1/signals/preferences"),
+  setSignalPreferences: (payload: {
+    category: string;
+    instruments: string[];
+    delivery_channel: string;
+    contact_email?: string;
+    contact_phone?: string;
+    broker?: string;
+  }) =>
+    safeFetchRelative("/api/v1/signals/preferences", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  getSignalHistory: (limit: number = 50) =>
+    safeFetchRelative(`/api/v1/signals/history?limit=${limit}`),
+  getCurrentSignal: () => safeFetchRelative("/api/signals/current"),
 };
 
 export default apiClient;
