@@ -179,7 +179,7 @@ export default function LoginGate({ children }: LoginGateProps) {
           "xm_user_profile", "xm_account_email", "xm_user_avatar",
           "xm_kyc_status", "xm_kyc_ref", "xm_kyc_submitted_at",
           "xm_user_risk_appetite", "xm_profile_leverage", "xm_risk_pct",
-          "xm_node_tier", "xm_preferred_strategies",
+          "xm_node_tier_display", "xm_preferred_strategies",
           "priv_connected_ai", "priv-onboarded-deriv",
         ];
         for (const k of personKeys) localStorage.removeItem(k);

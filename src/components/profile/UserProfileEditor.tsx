@@ -123,9 +123,15 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
     return parseInt(localStorage.getItem("xm_profile_leverage") || "20");
   });
 
-  // Pricing & Licensing Node Tier
+  // Pricing & Licensing Node Tier -- this is a cosmetic gamification
+  // display only (fake credits ledger, fake pilot simulator below); it
+  // has no connection to the real subscribed tier or any paywall.
+  // Deliberately stored under its own key (not "xm_node_tier") so a
+  // click here can never be confused with -- or leak into -- a real
+  // access gate. Connections.tsx reads the actual tier from
+  // GET /subscriptions/me instead of trusting anything client-side.
   const [nodeTier, setNodeTier] = useState<'standard' | 'obsidian' | 'sovereign'>(() => {
-    return (localStorage.getItem("xm_node_tier") as any) || "obsidian";
+    return (localStorage.getItem("xm_node_tier_display") as any) || "obsidian";
   });
 
   // KYC Status Sync
@@ -208,7 +214,7 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
   }, [leverage]);
 
   useEffect(() => {
-    localStorage.setItem("xm_node_tier", nodeTier);
+    localStorage.setItem("xm_node_tier_display", nodeTier);
   }, [nodeTier]);
 
   // Real-time synchronization

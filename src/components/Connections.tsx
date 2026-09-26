@@ -123,16 +123,32 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
   const [activeGateway, setActiveGateway] = useState("Rest API Gate");
 
   // Institutional-tier gate — Cluster/Gateway/AI-sync infrastructure UI is
-  // reserved for the Autonomous node tier. Reads the same xm_node_tier key
-  // UserProfileEditor writes, polling to stay in sync without a reload.
+  // reserved for the Autonomous node tier. Tier comes from the real
+  // subscription (GET /subscriptions/me -> tier, derived server-side by
+  // tier_for_plan_name from the row the user actually paid for), never
+  // from localStorage -- any client-side value is user-editable via
+  // devtools and must never be trusted for a paywall decision. Polls on
+  // an interval so an in-session upgrade unlocks without a reload.
   // Admin accounts (per backend ADMIN_EMAILS) always pass regardless of tier.
-  const [nodeTier, setNodeTier] = useState<string>(() => {
-    return localStorage.getItem("xm_node_tier") || "obsidian";
-  });
+  const [nodeTier, setNodeTier] = useState<string>("free");
   useEffect(() => {
-    const syncTier = () => setNodeTier(localStorage.getItem("xm_node_tier") || "obsidian");
-    const interval = setInterval(syncTier, 900);
-    return () => clearInterval(interval);
+    let cancelled = false;
+    const syncTier = async () => {
+      try {
+        const res: any = await apiClient.getMySubscription();
+        const body = res?.data ?? res;
+        const sub = body?.subscription ?? (body && typeof body === "object" ? body : null);
+        if (!cancelled) setNodeTier(sub?.tier || "free");
+      } catch (_) {
+        /* offline/unauthenticated: stay on last known tier (defaults free) */
+      }
+    };
+    syncTier();
+    const interval = setInterval(syncTier, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
   const [isAdmin, setIsAdmin] = useState(false);
   useEffect(() => {
