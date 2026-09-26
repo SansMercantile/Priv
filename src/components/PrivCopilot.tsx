@@ -32,17 +32,41 @@ interface EconomicEvent {
   impact?: string;
   currency?: string;
 }
+interface DoubleTriplePattern {
+  pattern_name: string;
+  direction?: "Bullish" | "Bearish" | string;
+  neckline_price?: number;
+  bar_index?: number;
+  time?: string | null;
+  confirmed?: boolean;
+  confirmation_time?: string | null;
+}
+interface BlackSwanEvent {
+  title?: string;
+  domain?: string;
+  seendate?: string;
+  url?: string;
+}
+interface PowerScore {
+  score?: number;
+  label?: string;
+  confidence?: string;
+  factors_used?: number;
+}
 interface SupportResponse {
   message: string;
   symbol?: string;
   technical_analysis?: {
     recommendation?: { recommendation: string; aggression: string } | null;
     harmonic_patterns?: HarmonicPattern[];
+    double_triple_patterns?: DoubleTriplePattern[];
+    bullish_bearish_power?: PowerScore;
     fuzzy_signal_strength?: number;
   };
   fundamentals?: {
     economic_calendar_events?: EconomicEvent[];
     economic_calendar_link?: string;
+    black_swan_events?: BlackSwanEvent[];
   };
   trading_signal?: TradingSignal | null;
   position_advice?: Array<{ order_id: string; symbol: string; note: string }>;
@@ -124,6 +148,70 @@ const PatternSignalChart: React.FC<{ pattern?: HarmonicPattern; signal?: Trading
   );
 };
 
+// Real double/triple top-bottom patterns detected server-side (never
+// fabricated -- each entry only exists if analytics_engine actually
+// found it in the price series, with its real bar time and neckline).
+const DoubleTriplePatternsList: React.FC<{ patterns?: DoubleTriplePattern[] }> = ({ patterns }) => {
+  if (!patterns || patterns.length === 0) return null;
+  return (
+    <div className="p-2 bg-neutral-950 border border-white/5 rounded space-y-1.5">
+      <div className="text-[9px] text-zinc-500 font-mono uppercase mb-1">Double/Triple Top &amp; Bottom</div>
+      {patterns.slice(0, 3).map((p, i) => (
+        <div key={i} className="flex items-start gap-1.5 text-[9px] font-mono">
+          {p.direction === "Bullish" ? (
+            <TrendingUp className="w-3 h-3 text-emerald-400 mt-0.5 flex-shrink-0" />
+          ) : (
+            <TrendingDown className="w-3 h-3 text-red-400 mt-0.5 flex-shrink-0" />
+          )}
+          <div className="text-zinc-300">
+            <span className="text-white">{p.pattern_name}</span>
+            {p.time ? ` at ${p.time}` : p.bar_index != null ? ` at bar ${p.bar_index}` : ""}
+            {" "}
+            {p.neckline_price != null && (
+              <span className="text-zinc-500">(neckline {p.neckline_price})</span>
+            )}
+            {" "}
+            <span className={p.confirmed ? "text-emerald-400" : "text-amber-400"}>
+              {p.confirmed ? "confirmed" : "unconfirmed"}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const PowerScoreBar: React.FC<{ power?: PowerScore }> = ({ power }) => {
+  if (!power || power.score == null) return null;
+  const pct = Math.max(0, Math.min(100, power.score));
+  const color = pct >= 60 ? "bg-emerald-400" : pct <= 40 ? "bg-red-400" : "bg-amber-400";
+  return (
+    <div className="text-[9px] font-mono">
+      <div className="flex items-center justify-between text-zinc-400 mb-1">
+        <span>Bullish/Bearish Power</span>
+        <span className="text-white">{power.score}/100 ({power.label})</span>
+      </div>
+      <div className="w-full h-1.5 bg-neutral-800 rounded overflow-hidden">
+        <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+};
+
+const BlackSwanAlerts: React.FC<{ events?: BlackSwanEvent[] }> = ({ events }) => {
+  if (!events || events.length === 0) return null;
+  return (
+    <div className="p-2 bg-red-500/5 border border-red-500/20 rounded space-y-1">
+      <div className="text-[9px] text-red-400 font-mono uppercase">Black Swan / Geopolitical Risk</div>
+      {events.slice(0, 3).map((e, i) => (
+        <div key={i} className="text-[9px] font-mono text-zinc-300">
+          {e.title}{e.domain ? <span className="text-zinc-500"> — {e.domain}</span> : null}
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const SignalCard: React.FC<{ data: SupportResponse }> = ({ data }) => {
   const rec = data.technical_analysis?.recommendation;
   const pattern = data.technical_analysis?.harmonic_patterns?.slice(-1)[0];
@@ -142,7 +230,10 @@ const SignalCard: React.FC<{ data: SupportResponse }> = ({ data }) => {
           <span className="text-zinc-500">({rec.aggression})</span>
         </div>
       )}
+      <PowerScoreBar power={data.technical_analysis?.bullish_bearish_power} />
       <PatternSignalChart pattern={pattern} signal={data.trading_signal} />
+      <DoubleTriplePatternsList patterns={data.technical_analysis?.double_triple_patterns} />
+      <BlackSwanAlerts events={data.fundamentals?.black_swan_events} />
       {events.length > 0 && (
         <div className="p-2 bg-neutral-950 border border-white/5 rounded">
           <div className="flex items-center gap-1.5 text-[9px] text-zinc-500 font-mono uppercase mb-1">
