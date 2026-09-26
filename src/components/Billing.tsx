@@ -63,6 +63,10 @@ export default function Billing({ demoMode }: { demoMode?: boolean }) {
   }, []);
 
   const myPlanId = subscription?.plan_id || null;
+  const myPlan = plans.find((p) => p.plan_id === myPlanId) || null;
+  const holdingActive = subscription?.status === "active";
+  const holdingPaid = holdingActive && myPlan !== null && Number(myPlan.price) > 0;
+  const [cancelling, setCancelling] = useState(false);
 
   const goLive = () => {
     try {
@@ -112,7 +116,32 @@ export default function Billing({ demoMode }: { demoMode?: boolean }) {
       window.location.href = url;
     } catch (e: any) {
       setRedirecting(null);
-      setError(e?.message || "Could not start PayFast checkout. Please try again.");
+      const detail: string = e?.message || "Could not start PayFast checkout. Please try again.";
+      // Backend refuses duplicates/downgrades with 400 "already has an
+      // active subscription" -- translate to actionable copy instead of
+      // the raw row text.
+      setError(
+        /already has an active subscription/i.test(detail)
+          ? `You already hold an active plan${myPlan ? ` (${myPlan.name})` : ""}. Cancel it below first, then subscribe to a different one.`
+          : detail
+      );
+    }
+  };
+
+  const cancelSubscription = async () => {
+    if (!subscription?.subscription_id) return;
+    if (!window.confirm(`Cancel your ${myPlan?.name || subscription.plan_id} subscription? It stays active until the period ends.`)) return;
+    setCancelling(true);
+    setError(null);
+    try {
+      await apiClient.cancelPayfastSubscription(subscription.subscription_id);
+      const sub: any = await apiClient.getMySubscription();
+      const body = sub?.data ?? sub;
+      setSubscription(body?.subscription ?? (body && typeof body === "object" ? body : null));
+    } catch (e: any) {
+      setError(e?.message || "Could not cancel the subscription.");
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -149,13 +178,22 @@ export default function Billing({ demoMode }: { demoMode?: boolean }) {
       {subscription && subscription.status === "active" && (
         <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 flex items-center gap-3">
           <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-          <div className="text-sm text-white/90">
-            Active plan: <span className="font-semibold">{subscription.plan_id}</span> via{" "}
+          <div className="text-sm text-white/90 flex-1">
+            Active plan: <span className="font-semibold">{myPlan?.name || subscription.plan_id}</span> via{" "}
             {subscription.payment_provider}
             {subscription.current_period_end && (
               <> — renews {new Date(subscription.current_period_end).toLocaleDateString()}</>
             )}
           </div>
+          {holdingPaid && (
+            <button
+              onClick={cancelSubscription}
+              disabled={cancelling}
+              className="shrink-0 px-3 py-1.5 rounded-lg border border-red-500/40 text-red-300 font-mono text-xs hover:bg-red-500/10 transition disabled:opacity-50"
+            >
+              {cancelling ? "Cancelling…" : "Cancel plan"}
+            </button>
+          )}
         </div>
       )}
 
@@ -185,9 +223,17 @@ export default function Billing({ demoMode }: { demoMode?: boolean }) {
             )}
             <button
               onClick={() => subscribeWithPayFast(plan)}
-              disabled={!!redirecting || myPlanId === plan.plan_id}
+              disabled={!!redirecting || myPlanId === plan.plan_id || (holdingPaid && Number(plan.price) > 0)}
               className="mt-2 w-full rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-medium py-2 text-sm flex items-center justify-center gap-2 transition-colors"
-              title={myPlanId === plan.plan_id ? "Your current subscription" : demoMode ? "Works in live mode" : undefined}
+              title={
+                myPlanId === plan.plan_id
+                  ? "Your current subscription"
+                  : holdingPaid && Number(plan.price) > 0
+                    ? `You hold ${myPlan?.name || "a plan"} — cancel it first to switch`
+                    : demoMode
+                      ? "Works in live mode"
+                      : undefined
+              }
             >
               {redirecting === plan.plan_id ? (
                 <>

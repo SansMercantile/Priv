@@ -380,11 +380,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
     const isLive = localStorage.getItem("demoMode") === "false";
 
     if (isLive) {
-      // No real-time balance/risk/agent-count endpoints exist yet for live
-      // accounts. Showing fabricated numbers here would mislead a real
-      // trader into thinking they have real P&L/risk data. Be honest
-      // instead: null means "not available yet", rendered as such below,
-      // not randomized like the clearly-labeled demo simulation is.
+      // Live AND demo both show real Deriv data (demo = real Deriv demo
+      // account, live = real Deriv live account). Nothing here is
+      // fabricated: null means "not loaded yet", rendered as such below.
+      // Real balances arrive from GET /api/v1/auth/deriv/balances in the
+      // effect further down; agent counts arrive from the backend registry.
       return {
         totalProfit: null as number | null,
         dailyReturn: null as number | null,
@@ -395,17 +395,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
       };
     }
 
-    const baseBal = 10000.0;
-    const binanceBal = localStorage.getItem("ex_conn_binance") === "true" ? 148251.52 : 0.0;
-    const coinbaseBal = localStorage.getItem("ex_conn_coinbase") === "true" ? 92410.88 : 0.0;
-    const combinedVal = baseBal + binanceBal + coinbaseBal;
+    // Demo opens with the same honest nulls; the balances effect fills
+    // in the real Deriv demo balance once it loads. No base figures, no
+    // exchange placeholders, no random walk -- ever.
     return {
-      totalProfit: combinedVal,
-      dailyReturn: 12.34,
-      activeAgents: 12,
-      dataPoints: 847392,
-      riskScore: 23.5,
-      executionSpeed: 0.003
+      totalProfit: null as number | null,
+      dailyReturn: null as number | null,
+      activeAgents: null as number | null,
+      dataPoints: null as number | null,
+      riskScore: null as number | null,
+      executionSpeed: null as number | null,
     };
   });
 
@@ -413,12 +412,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
   // the backend's agent registry, not a hardcoded guess.
   const [liveTotalAgents, setLiveTotalAgents] = useState<number | null>(null);
 
-  // Live-mode real data: actual Deriv balance (re-fetched from Deriv's own
-  // API, not just the cached value from login) and actual backend agent
-  // counts. Runs only when in real mode with a real Deriv account, polls
-  // periodically so numbers stay current rather than going stale.
+  // Real data in BOTH modes: demo shows the real Deriv DEMO account,
+  // live shows the real Deriv LIVE account (GET /api/v1/auth/deriv/
+  // balances, resolved server-side through the linked adapters), plus
+  // real backend agent counts. Polls so numbers stay current. Anything
+  // unavailable stays null ("—") rather than fabricated.
   useEffect(() => {
-    if (demoMode || !hasRealDeriv) return;
+    const wantLive = !demoMode;
+    if (wantLive && !hasRealDeriv) return;
+    if (!wantLive && !hasDemoDeriv) return;
     let cancelled = false;
 
     const refreshRealData = async () => {
@@ -434,15 +436,20 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         // leave as-is (null/stale) rather than fabricate a number
       }
 
-      // Real Deriv balance would go here. Previously fetched directly
-      // from Deriv's REST API using the client-side OAuth token; that
-      // token no longer reaches the browser (see LoginGate.tsx), so this
-      // needs a new backend endpoint (DerivAPIAdapter.get_account_info()
-      // already exists and is real -- it just isn't exposed over HTTP
-      // yet). Left as a known gap rather than built here: leaving
-      // totalProfit unavailable is consistent with this file's own
-      // stated approach elsewhere ("leave as-is rather than fabricate a
-      // number") until that endpoint exists.
+      // Real Deriv balance for this mode's account.
+      try {
+        const res = await fetch("/api/v1/auth/deriv/balances");
+        const json = await res.json();
+        const rows: any[] = json?.data?.balances || [];
+        const pick = rows.find((r: any) =>
+          wantLive ? r.account_type !== "demo" : r.account_type === "demo"
+        ) || rows[0];
+        if (!cancelled && pick && typeof pick.balance === "number") {
+          setStats(prev => ({ ...prev, totalProfit: pick.balance, dailyReturn: null }));
+        }
+      } catch {
+        // leave as-is (null) rather than fabricate a number
+      }
     };
 
     refreshRealData();
@@ -451,60 +458,19 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
       cancelled = true;
       clearInterval(interval);
     };
-  }, [demoMode, hasRealDeriv]);
+  }, [demoMode, hasRealDeriv, hasDemoDeriv]);
 
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
 
-  useEffect(() => {
-    // Generate base charts
-    const initialData = Array.from({ length: 50 }, (_, i) => ({
-      time: Date.now() - (50 - i) * 2000,
-      value: 100 + Math.random() * 50 - 25,
-      volume: Math.random() * 1000000,
-      sentiment: Math.random()
-    }));
-    setChartData(initialData);
+  // NOTE: no fabricated chart points. The performance canvas renders
+  // whatever real series exist (currently none -- no equity-history
+  // feed yet) and stays empty otherwise. A random walk here would be
+  // fake P&L on a real-money screen.
 
-    // Dynamic metrics generation loop - demo mode ONLY. Live mode's numbers
-    // stay null (see above) until real backend endpoints for balance/risk/
-    // agent-count exist; randomizing fake data for a real account would be
-    // actively misleading, not just a cosmetic placeholder.
-    const interval = setInterval(() => {
-      setStats(prev => {
-        const isLive = localStorage.getItem("demoMode") === "false";
-        if (isLive) {
-          return prev;
-        }
-        const binanceBal = localStorage.getItem("ex_conn_binance") === "true" ? 148251.52 : 0.0;
-        const coinbaseBal = localStorage.getItem("ex_conn_coinbase") === "true" ? 92410.88 : 0.0;
-        const dynamicTotal = 10000.0 + binanceBal + coinbaseBal;
-        return {
-          ...prev,
-          totalProfit: dynamicTotal,
-          dailyReturn: (prev.dailyReturn ?? 12.34) + (Math.random() - 0.5) * 0.15,
-          dataPoints: (prev.dataPoints ?? 847392) + Math.floor(Math.random() * 20),
-          riskScore: Math.max(0, Math.min(100, (prev.riskScore ?? 23.5) + (Math.random() - 0.5) * 0.2)),
-          executionSpeed: 0.001 + Math.random() * 0.004
-        };
-      });
-
-      setChartData(prev => {
-        const lastVal = prev.length > 0 ? prev[prev.length - 1].value : 100;
-        const lastSentiment = prev.length > 0 ? prev[prev.length - 1].sentiment : 0.5;
-        const newPoint = {
-          time: Date.now(),
-          value: lastVal + (Math.random() - 0.5) * 5,
-          volume: Math.random() * 1000000,
-          sentiment: Math.max(0, Math.min(1, lastSentiment + (Math.random() - 0.5) * 0.1))
-        };
-        return [...prev.slice(1), newPoint];
-      });
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Sync agents status and balance with backend APIs dynamically
+  // Sync agent count with the backend registry. Balances come from
+  // the real-data effect above (GET /api/v1/auth/deriv/balances) --
+  // the old token_meta.balance read below it always resolved undefined
+  // (token_meta carries no balance) and is gone.
   useEffect(() => {
     // 1. Live agents count from backend
     fetch("/api/v1/agents/status")
@@ -518,24 +484,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         }
       })
       .catch(err => console.error("Error pulling live agent stats:", err));
-
-    if (isLiveMode && hasRealDeriv) {
-      fetch(`/api/v1/auth/connections`)
-        .then(res => res.json())
-        .then(result => {
-          const derivConn = (result?.data?.connections || []).find((c: any) => c.broker === "deriv" && c.account_type === "live");
-          const balance = derivConn?.token_meta?.balance;
-          if (typeof balance === "number") {
-            localStorage.setItem("xm_balance", balance.toString());
-            setStats(prev => ({
-              ...prev,
-              totalProfit: balance,
-              dailyReturn: 0.0
-            }));
-          }
-        })
-        .catch(err => console.error("Error fetching live Deriv account balance:", err));
-    }
   }, [demoMode, hasRealDeriv]);
 
   const getSovereignGrade = () => {
@@ -557,7 +505,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
           <div className="space-y-2">
             <h2 className="text-2xl font-serif italic text-white font-normal">Live Dashboard Locked</h2>
             <p className="text-zinc-400 text-xs max-w-md mx-auto leading-relaxed">
-              Because you have disabled the Demo Environment, standard simulated stats (like fake $2.8M margins and randomized charts) are removed. You must connect a verified Deriv account to link your genuine live data.
+              Live mode shows your real Deriv account data. Connect your Deriv account below to link it.
+              Demo mode shows your real Deriv demo account — no simulations, no placeholder figures.
             </p>
           </div>
 
@@ -610,8 +559,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         </div>
       </div>
 
-      {/* Demo/Simulation disclosure panel — rewritten so it no longer claims demo
-          performance predicts live results. Real users can reach this page. */}
+      {/* Data honesty panel: both modes show real Deriv data. */}
       <div className="p-5 border border-white/5 bg-gradient-to-br from-neutral-950/25 via-[#0d0708]/5 to-black rounded-lg space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-white/5">
           <div className="flex items-center space-x-2.5">
@@ -619,32 +567,32 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="font-serif italic text-white text-md tracking-wide">Demo Mode Notice</span>
+            <span className="font-serif italic text-white text-md tracking-wide">Real Data Notice</span>
           </div>
           <span className="font-mono text-[9px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded uppercase font-extrabold tracking-widest animate-pulse">
-            DEMO ARBITRAGE MODE
+            LIVE DERIV FEED
           </span>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs font-mono">
           <div className="p-3 bg-white/[0.01] border border-white/5 rounded-lg space-y-1">
-            <span className="text-[9.5px] font-bold text-rose-500 uppercase tracking-wider block">Simulated Data</span>
+            <span className="text-[9.5px] font-bold text-emerald-500 uppercase tracking-wider block">Demo Mode</span>
             <p className="text-zinc-400 font-sans text-[11px] leading-relaxed font-light">
-              Figures shown in Demo Mode are simulated for demonstration purposes and do not reflect real market
-              activity or a real account balance.
+              Figures shown in Demo Mode are your real Deriv demo account balance and activity —
+              real data, zero risk.
             </p>
           </div>
           <div className="p-3 bg-white/[0.01] border border-white/5 rounded-lg space-y-1">
-            <span className="text-[9.5px] font-bold text-rose-500 uppercase tracking-wider block">Live Mode Is Separate</span>
+            <span className="text-[9.5px] font-bold text-emerald-500 uppercase tracking-wider block">Live Mode</span>
             <p className="text-zinc-400 font-sans text-[11px] leading-relaxed font-light">
-              Real Mode uses your connected broker's live data. It runs independently of the demo simulation above.
+              Live Mode shows your connected Deriv live account. Connect an account to link it.
             </p>
           </div>
           <div className="p-3 bg-white/[0.01] border border-white/5 rounded-lg space-y-1">
             <span className="text-[9.5px] font-bold text-[#FF6B35] uppercase tracking-wider block">No Performance Guarantee</span>
             <p className="text-zinc-400 font-sans text-[11px] leading-relaxed font-light font-normal text-zinc-350">
-              Demo Mode results do not predict or guarantee how a live, funded account will perform. Past or
-              simulated performance is not indicative of future results.
+              Demo results do not predict or guarantee how a live, funded account will perform. Past
+              performance is not indicative of future results.
             </p>
           </div>
         </div>
