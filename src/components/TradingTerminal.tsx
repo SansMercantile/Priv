@@ -9,7 +9,13 @@ import {
   RefreshCw,
   X,
   Calculator,
+  Maximize2,
 } from "lucide-react";
+
+// Rise & Fall mini app (Deriv "Priv Core mini" app id 34vzk..., served
+// as-is from its own Vercel project; its OAuth redirect URI is pinned to
+// this exact host, so it must be framed from this URL, never rewritten).
+const RISE_FALL_MINI_APP_URL = "https://privcoremini.sansmercantile.com";
 
 // ── Real broker constant ─────────────────────────────────────────────────
 // Default desk connection. At runtime this is replaced by the user's own
@@ -118,6 +124,9 @@ function TradingTerminalInner() {
   const [brokerId, setBrokerId] = useState<string | null>(null);
   const [activeLogin, setActiveLogin] = useState<string | null>(null);
   const [activeMode, setActiveMode] = useState<"demo" | "live">("demo");
+  // Rise & Fall mini app: swapped in place of the desk grid so the
+  // embedded app gets full terminal width for its own chart + controls.
+  const [showMiniApp, setShowMiniApp] = useState(false);
 
   const pushLog = (msg: string) => {
     setLogs((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 100));
@@ -323,7 +332,51 @@ function TradingTerminalInner() {
   const calcPayout = (calcStake * calcPayoutPct) / 100;
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <span className="font-mono text-[10px] text-zinc-500 tracking-wider">
+          BROKER TERMINAL
+          {showMiniApp && <span className="text-zinc-300"> · RISE &amp; FALL MINI APP</span>}
+        </span>
+        <div className="flex items-center gap-3">
+          {showMiniApp && (
+            <span className="font-mono text-[9px] text-zinc-600 hidden md:inline">
+              Sign in with your Deriv login inside the mini app — separate session from Priv.
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowMiniApp((v) => !v)}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded font-mono text-xs border transition ${
+              showMiniApp
+                ? "bg-white/10 hover:bg-white/15 text-white border-white/15"
+                : "bg-white text-black border-white hover:bg-neutral-200"
+            }`}
+          >
+            {showMiniApp ? (
+              <>
+                <X className="w-3.5 h-3.5" /> CLOSE MINI APP
+              </>
+            ) : (
+              <>
+                <Maximize2 className="w-3.5 h-3.5" /> RISE &amp; FALL MINI APP
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {showMiniApp ? (
+        <div className="metric-card rounded border border-white/10 bg-neutral-950/5 overflow-hidden h-[calc(100vh-240px)] min-h-[640px]">
+          <iframe
+            src={RISE_FALL_MINI_APP_URL}
+            title="Priv Core mini — Rise & Fall"
+            className="w-full h-full bg-white"
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; payment"
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
       <div className="xl:col-span-4 flex flex-col gap-6">
         <div className="metric-card p-5 rounded border border-white/10 bg-neutral-950/5">
           <div className="flex items-center justify-between pb-3 border-b border-white/5 mb-4">
@@ -569,6 +622,8 @@ function TradingTerminalInner() {
           </div>
         </div>
       </div>
+        </div>
+      )}
     </div>
   );
 }
