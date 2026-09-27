@@ -160,6 +160,15 @@ export const apiClient = {
   // Multi-account Deriv management: every linked loginid, per-type
   // defaults, and the resolved active account for a mode.
   getDerivAccounts: () => safeFetchRelative("/api/v1/auth/deriv/accounts"),
+  // Self-heal for rotted OAuth sessions: renews stored sessions via
+  // refresh_token and re-registers adapters. No-ops when nothing is
+  // stored. Called once when the account list comes back empty.
+  refreshDerivSession: () =>
+    safeFetchRelative("/api/v1/auth/deriv/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    }),
   setDerivDefault: (loginid: string) =>
     safeFetchRelative("/api/v1/auth/deriv/default-account", {
       method: "PUT",

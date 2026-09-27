@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useBrokerConnections } from "../lib/useBrokerConnections";
 import { getAppUserId } from "../lib/appUserId";
 import { initiateDerivLogin } from "../lib/derivAuth/oauth";
@@ -26,6 +26,7 @@ export default function DerivConnectCard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState("");
+  const refreshedRef = useRef(false);
   const [returnError] = useState<string | null>(() => {
     try {
       const m = sessionStorage.getItem("priv_deriv_error");
@@ -39,7 +40,21 @@ export default function DerivConnectCard() {
   const loadAccounts = async () => {
     try {
       const res: any = await apiClient.getDerivAccounts();
-      setAccounts(res?.data?.data?.accounts ?? res?.data?.accounts ?? []);
+      const list = res?.data?.data?.accounts ?? res?.data?.accounts ?? [];
+      setAccounts(list);
+      // Empty list with a previously completed connect usually means the
+      // stored OAuth session rotted (access tokens expire). One refresh
+      // attempt, then show whatever survived -- never loops.
+      if (list.length === 0 && !refreshedRef.current) {
+        refreshedRef.current = true;
+        try {
+          await apiClient.refreshDerivSession();
+          const retry: any = await apiClient.getDerivAccounts();
+          setAccounts(retry?.data?.data?.accounts ?? retry?.data?.accounts ?? []);
+        } catch {
+          /* backend unreachable or nothing stored: keep status dots only */
+        }
+      }
     } catch (_) {
       /* backend unreachable: keep status dots only */
     }
