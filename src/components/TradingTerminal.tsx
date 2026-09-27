@@ -127,6 +127,37 @@ function TradingTerminalInner() {
   // Rise & Fall mini app: swapped in place of the desk grid so the
   // embedded app gets full terminal width for its own chart + controls.
   const [showMiniApp, setShowMiniApp] = useState(false);
+  const [miniAppSrc, setMiniAppSrc] = useState<string>(RISE_FALL_MINI_APP_URL);
+  const [miniAppLoading, setMiniAppLoading] = useState(false);
+
+  // SSO handoff: fetch THIS user's own Deriv session from the backend
+  // (verified Bearer required server-side) and pass it to the mini app
+  // via the URL hash, so it opens already authorized -- no second Deriv
+  // sign-in inside the frame. Falls back to the plain URL (the mini
+  // app's own sign-in) when there is no valid connected session.
+  const openMiniApp = async () => {
+    setMiniAppLoading(true);
+    let src = RISE_FALL_MINI_APP_URL;
+    try {
+      const res = await fetch("/api/v1/auth/deriv/sso", {
+        headers: await userHeader(),
+      });
+      if (res.ok) {
+        const body = await res.json().catch(() => null);
+        const token = body?.data?.access_token;
+        if (token) {
+          src =
+            `${RISE_FALL_MINI_APP_URL}/#sso=` +
+            encodeURIComponent(JSON.stringify({ access_token: token }));
+        }
+      }
+    } catch {
+      /* offline/backend hiccup -> plain URL, never block the terminal */
+    }
+    setMiniAppSrc(src);
+    setMiniAppLoading(false);
+    setShowMiniApp(true);
+  };
 
   const pushLog = (msg: string) => {
     setLogs((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 100));
@@ -341,19 +372,30 @@ function TradingTerminalInner() {
         <div className="flex items-center gap-3">
           {showMiniApp && (
             <span className="font-mono text-[9px] text-zinc-600 hidden md:inline">
-              Sign in with your Deriv login inside the mini app — separate session from Priv.
+              Uses your connected Deriv session from Priv — no separate sign-in needed.
             </span>
           )}
           <button
             type="button"
-            onClick={() => setShowMiniApp((v) => !v)}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded font-mono text-xs border transition ${
+            disabled={miniAppLoading}
+            onClick={() => {
+              if (showMiniApp) {
+                setShowMiniApp(false);
+              } else {
+                void openMiniApp();
+              }
+            }}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded font-mono text-xs border transition disabled:opacity-60 ${
               showMiniApp
                 ? "bg-white/10 hover:bg-white/15 text-white border-white/15"
                 : "bg-white text-black border-white hover:bg-neutral-200"
             }`}
           >
-            {showMiniApp ? (
+            {miniAppLoading ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" /> CONNECTING...
+              </>
+            ) : showMiniApp ? (
               <>
                 <X className="w-3.5 h-3.5" /> CLOSE MINI APP
               </>
@@ -369,7 +411,7 @@ function TradingTerminalInner() {
       {showMiniApp ? (
         <div className="metric-card rounded border border-white/10 bg-neutral-950/5 overflow-hidden h-[calc(100vh-240px)] min-h-[640px]">
           <iframe
-            src={RISE_FALL_MINI_APP_URL}
+            src={miniAppSrc}
             title="Priv Core mini — Rise & Fall"
             className="w-full h-full bg-white"
             allow="autoplay; clipboard-write; encrypted-media; fullscreen; payment"
