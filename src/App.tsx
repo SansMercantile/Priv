@@ -25,7 +25,7 @@ import GuidedWalkthrough from "./components/GuidedWalkthrough";
 import LoginGate from "./components/auth/LoginGate";
 import Landing from "./pages/Landing";
 import { useBrokerConnections } from "./lib/useBrokerConnections";
-import { initiateDerivLogin, isDerivCallback } from "./lib/derivAuth/oauth";
+import { isDerivCallback } from "./lib/derivAuth/oauth";
 import { initDatadog } from "./lib/datadog";
 
 interface AppProps {
@@ -97,19 +97,10 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
 
   const handleToggleDemoMode = async () => {
     setDevice(prev => prev); // keep state intact
-    // Only demo -> real is gated. If no real Deriv account is connected,
-    // run the client-side PKCE flow via auth.deriv.com (the backend-driven
-    // oauth.deriv.com route is dead -- Deriv bounces it to marketing).
-    // After Deriv's login + consent screen it redirects back here with a
-    // code, which LoginGate exchanges and hands to the backend.
-    if (demoMode && !hasRealDeriv) {
-      try {
-        await initiateDerivLogin();
-      } catch (e: any) {
-        console.error("Deriv login failed to start:", e?.message || e);
-      }
-      return;
-    }
+    // The sidebar toggle flips demo <-> live directly, always. Both
+    // modes show real Deriv data (demo account vs live account); when
+    // the target mode has no linked account the locked screen's connect
+    // card handles onboarding. No forced login at toggle time.
     setDemoMode(!demoMode);
   };
 

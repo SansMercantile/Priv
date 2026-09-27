@@ -385,8 +385,24 @@ export default function LoginGate({ children }: LoginGateProps) {
     }
     setOnboarding(false);
   };
-  const showOnboarding =
+  const showOnboardingBase =
     onboarding && isAuthenticated && derivChecked && !derivConnected;
+
+  // Once accounts are confirmed connected, keep the modal up a few
+  // seconds as a visible confirmation (the card flips to "Linked"),
+  // then dismiss it for good -- the sidebar toggle takes over
+  // demo/live switching from there.
+  const [confirming, setConfirming] = useState(false);
+  useEffect(() => {
+    if (!(onboarding && isAuthenticated && derivChecked && derivConnected && !confirming)) return;
+    setConfirming(true);
+    const t = window.setTimeout(() => {
+      dismissOnboarding();
+    }, 4000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onboarding, isAuthenticated, derivChecked, derivConnected]);
+  const showOnboarding = showOnboardingBase || (confirming && onboarding && isAuthenticated);
 
   if (isLoading || callbackProcessing || (!derivChecked && !derivConnected)) {
     return (
@@ -432,8 +448,8 @@ export default function LoginGate({ children }: LoginGateProps) {
               <p className="text-xs text-zinc-400 font-mono mt-1 leading-relaxed">
                 One last step: click below, log in (or sign up) on Deriv's
                 site in any tab, approve the connect screen, and you'll land
-                back here linked. Then pick demo or live under Profile →
-                Broker Connections.
+                back here linked. Then switch demo or live anytime with the
+                sidebar toggle.
               </p>
             </div>
             <DerivConnectCard />

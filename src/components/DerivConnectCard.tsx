@@ -88,16 +88,6 @@ export default function DerivConnectCard() {
     }
   }
 
-  async function makeDefault(loginid: string) {
-    setError(null);
-    try {
-      await apiClient.setDerivDefault(loginid);
-      await loadAccounts();
-    } catch (e: any) {
-      setError(e?.message || "Could not set default.");
-    }
-  }
-
   async function connectToken(e: React.FormEvent) {
     e.preventDefault();
     const t = token.trim();
@@ -121,18 +111,20 @@ export default function DerivConnectCard() {
     }
   }
 
+  const linked = accounts.length > 0 || hasRealDeriv || hasDemoDeriv;
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-xs font-mono">
         <span
           className={`w-2 h-2 rounded-full ${
-            hasRealDeriv || hasDemoDeriv ? "bg-emerald-400 animate-pulse" : "bg-red-500"
+            linked ? "bg-emerald-400 animate-pulse" : "bg-red-500"
           }`}
         />
         <span className="text-zinc-300">
-          {loading
+          {loading && accounts.length === 0
             ? "Checking Deriv connection…"
-            : hasRealDeriv || hasDemoDeriv
+            : linked
               ? `Linked (${accounts.length || "…"} account${accounts.length === 1 ? "" : "s"})`
               : "No Deriv account linked"}
         </span>
@@ -157,24 +149,12 @@ export default function DerivConnectCard() {
                   {a.account_type}
                 </span>{" "}
                 {a.currency && <span className="text-zinc-500">{a.currency}</span>}
-                {a.is_default && (
-                  <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-white/10 text-white ml-1">
-                    default
-                  </span>
-                )}
               </div>
-              {!a.is_default ? (
-                <button
-                  onClick={() => makeDefault(a.loginid)}
-                  className="text-[10px] text-zinc-400 hover:text-white underline whitespace-nowrap"
-                >
-                  Set as default
-                </button>
-              ) : (
-                <span className="text-[10px] text-zinc-600 whitespace-nowrap">
-                  {a.adapter_live ? "● live" : "○ idle"}
-                </span>
-              )}
+              {/* Both accounts stay connected; demo/live is chosen with
+                  the sidebar toggle, not per-account defaults. */}
+              <span className="text-[10px] whitespace-nowrap text-emerald-400">
+                ● connected
+              </span>
             </div>
           ))}
         </div>
