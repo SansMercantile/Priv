@@ -19,7 +19,7 @@ interface DerivAccount {
 // and an API-token fallback. Successful connects reload the page so all
 // connection state refreshes.
 export default function DerivConnectCard() {
-  const { hasRealDeriv, hasDemoDeriv, loading } = useBrokerConnections();
+  const { hasRealDeriv, hasDemoDeriv, loading, refresh } = useBrokerConnections();
   const [accounts, setAccounts] = useState<DerivAccount[]>([]);
   const [tokenOpen, setTokenOpen] = useState(false);
   const [token, setToken] = useState("");
@@ -42,6 +42,19 @@ export default function DerivConnectCard() {
       const res: any = await apiClient.getDerivAccounts();
       const list = res?.data?.data?.accounts ?? res?.data?.accounts ?? [];
       setAccounts(list);
+      if (list.length > 0) {
+        // The shared connections hook may have loaded before the claim
+        // finished (empty), leaving "No Deriv account linked" stuck on
+        // screen next to a populated list. Nudge it to re-fetch.
+        refresh();
+        // Same staleness one level up: LoginGate's onboarding snapshot.
+        // A reload used to be the only cure; now the modal closes live.
+        try {
+          window.dispatchEvent(new Event("priv:deriv-linked"));
+        } catch {
+          /* non-DOM environment */
+        }
+      }
       // Empty list with a previously completed connect usually means the
       // stored OAuth session rotted (access tokens expire). One refresh
       // attempt, then show whatever survived -- never loops.
@@ -50,7 +63,9 @@ export default function DerivConnectCard() {
         try {
           await apiClient.refreshDerivSession();
           const retry: any = await apiClient.getDerivAccounts();
-          setAccounts(retry?.data?.data?.accounts ?? retry?.data?.accounts ?? []);
+          const relist = retry?.data?.data?.accounts ?? retry?.data?.accounts ?? [];
+          setAccounts(relist);
+          if (relist.length > 0) refresh();
         } catch {
           /* backend unreachable or nothing stored: keep status dots only */
         }

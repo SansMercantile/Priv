@@ -267,6 +267,16 @@ export default function LoginGate({ children }: LoginGateProps) {
       setDerivConnected(connected);
       setDerivChecked(true);
     });
+    // A linked account can appear after this snapshot (claim finishes,
+    // token connect, refresh self-heal). DerivConnectCard broadcasts
+    // priv:deriv-linked when its list goes non-empty -- close the
+    // onboarding modal live instead of waiting for a reload.
+    const onLinked = () => {
+      setDerivConnected(true);
+      setDerivChecked(true);
+    };
+    window.addEventListener("priv:deriv-linked", onLinked);
+    return () => window.removeEventListener("priv:deriv-linked", onLinked);
   }, [callbackProcessing]);
 
   // PKCE return leg: Deriv redirected back with ?code&state. Exchange the
