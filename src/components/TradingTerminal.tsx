@@ -13,18 +13,33 @@ import {
 
 // ── Real broker constant ─────────────────────────────────────────────────
 // Default desk connection. At runtime this is replaced by the user's own
+// Trading terminal resolves its broker from the signed-in user's linked
 // Deriv account for the current demo toggle position (their per-type
-// default, else first of that type) via /deriv/active-account -- demo
-// toggle => their real Deriv DEMO account, live toggle => their real
-// Deriv LIVE account. Falls back here when they linked nothing.
-const FALLBACK_BROKER_ID = "priv_deriv";
+// account via /deriv/active-account). Null when the mode has nothing
+// linked -- the UI prompts to connect instead of showing any shared or
+// other-mode account.
 
-function userHeader(): Record<string, string> {
+import { getAuthToken } from "../lib/authToken";
+
+// Authenticated headers for every backend call: the verified Bearer
+// token (when signed in) plus the browser id. The old version sent
+// X-User-Id only, so every call resolved the anonymous key -- whose
+// records were claimed away at login -- and the terminal fell back to
+// the shared desk (a LIVE account) in every mode, including demo.
+async function userHeader(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {};
   try {
-    return { "X-User-Id": getAppUserId() };
+    headers["X-User-Id"] = getAppUserId();
   } catch (_) {
-    return {};
+    /* ignore */
   }
+  try {
+    const token = await getAuthToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+  } catch (_) {
+    /* ignore */
+  }
+  return headers;
 }
 
 interface OpenPosition {
@@ -97,8 +112,10 @@ function TradingTerminalInner() {
   const [logs, setLogs] = useState<string[]>([]);
   // Active Deriv account for the current demo toggle (loginid for display,
   // broker id for all backend calls). Re-resolved on every poll so flipping
-  // the demo toggle or changing the profile default takes effect live.
-  const [brokerId, setBrokerId] = useState(FALLBACK_BROKER_ID);
+  // the demo toggle takes effect live. Null when this mode has no linked
+  // account -- the UI shows a link prompt, never the shared desk (which
+  // is bound to a live key and must not leak into demo mode).
+  const [brokerId, setBrokerId] = useState<string | null>(null);
   const [activeLogin, setActiveLogin] = useState<string | null>(null);
   const [activeMode, setActiveMode] = useState<"demo" | "live">("demo");
 
@@ -106,7 +123,7 @@ function TradingTerminalInner() {
     setLogs((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 100));
   };
 
-  const resolveBroker = async (): Promise<string> => {
+  const resolveBroker = async (): Promise<string | null> => {
     let mode: "demo" | "live" = "demo";
     try {
       mode = localStorage.getItem("demoMode") === "false" ? "live" : "demo";
@@ -116,7 +133,7 @@ function TradingTerminalInner() {
     setActiveMode(mode);
     try {
       const res = await fetch(`/api/v1/auth/deriv/active-account?mode=${mode}`, {
-        headers: userHeader(),
+        headers: await userHeader(),
       });
       if (res.ok) {
         const body = await res.json();
@@ -128,16 +145,20 @@ function TradingTerminalInner() {
         }
       }
     } catch {
-      /* fall through to shared desk */
+      /* fall through to unlinked state */
     }
-    setBrokerId(FALLBACK_BROKER_ID);
+    setBrokerId(null);
     setActiveLogin(null);
-    return FALLBACK_BROKER_ID;
+    return null;
   };
 
-  const fetchStatus = async (bid: string) => {
+  const fetchStatus = async (bid: string | null) => {
+    if (!bid) {
+      setIsConnected(false);
+      return;
+    }
     try {
-      const res = await fetch(`/api/brokers/status/${bid}`, { headers: userHeader() });
+      const res = await fetch(`/api/brokers/status/${bid}`, { headers: await userHeader() });
       if (res.ok) {
         const data = await res.json();
         setIsConnected(!data.error);
@@ -149,9 +170,13 @@ function TradingTerminalInner() {
     }
   };
 
-  const fetchAccount = async (bid: string) => {
+  const fetchAccount = async (bid: string | null) => {
+    if (!bid) {
+      setAccount(null);
+      return;
+    }
     try {
-      const res = await fetch(`/api/brokers/account/${bid}`, { headers: userHeader() });
+      const res = await fetch(`/api/brokers/account/${bid}`, { headers: await userHeader() });
       if (res.ok) {
         const data = await res.json();
         if (!data.error) setAccount(data);
@@ -159,9 +184,13 @@ function TradingTerminalInner() {
     } catch {}
   };
 
-  const fetchPositions = async (bid: string) => {
+  const fetchPositions = async (bid: string | null) => {
+    if (!bid) {
+      setPositions([]);
+      return;
+    }
     try {
-      const res = await fetch(`/api/brokers/positions?broker_id=${bid}`, { headers: userHeader() });
+      const res = await fetch(`/api/brokers/positions?broker_id=${bid}`, { headers: await userHeader() });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) setPositions(data);
@@ -197,6 +226,10 @@ function TradingTerminalInner() {
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!brokerId) {
+      pushLog(`No Deriv ${activeMode} account linked — connect one first.`);
+      return;
+    }
     if (!isConnected) {
       pushLog("Cannot place order - Deriv connection is offline.");
       return;
@@ -209,7 +242,7 @@ function TradingTerminalInner() {
     try {
       const res = await fetch("/api/brokers/trade", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...userHeader() },
+        headers: { "Content-Type": "application/json", ...(await userHeader()) },
         body: JSON.stringify({
           broker_id: brokerId,
           order_type: orderSide,
@@ -237,10 +270,11 @@ function TradingTerminalInner() {
   };
 
   const handleClosePosition = async (pos: OpenPosition) => {
+    if (!brokerId) return;
     try {
       const res = await fetch("/api/brokers/close-position", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...userHeader() },
+        headers: { "Content-Type": "application/json", ...(await userHeader()) },
         body: JSON.stringify({ broker_id: brokerId, symbol: pos.symbol }),
       });
       const data = await res.json();
@@ -298,7 +332,7 @@ function TradingTerminalInner() {
               <span className="text-zinc-300">
                 {activeLogin
                   ? `${activeLogin} (${activeMode.toUpperCase()})`
-                  : "PRIV CORE"}
+                  : activeMode === "demo" ? "DEMO — NO ACCOUNT" : "LIVE — NO ACCOUNT"}
               </span>
             </span>
             <span
@@ -321,7 +355,12 @@ function TradingTerminalInner() {
             </span>
           </div>
 
-          {!isConnected && isConnected !== null ? (
+          {!brokerId ? (
+            <div className="p-6 text-center rounded border border-white/5 bg-neutral-900/10 font-mono text-[11px] text-stone-500">
+              No Deriv {activeMode} account linked. Connect one under Profile → Broker Connections,
+              then return here to trade it.
+            </div>
+          ) : !isConnected && isConnected !== null ? (
             <div className="p-6 text-center rounded border border-white/5 bg-neutral-900/10 font-mono text-[11px] text-stone-500">
               Deriv broker connection is offline. This is managed server-side by Priv - no user login required.
             </div>
