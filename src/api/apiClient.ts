@@ -160,6 +160,10 @@ export const apiClient = {
   // Multi-account Deriv management: every linked loginid, per-type
   // defaults, and the resolved active account for a mode.
   getDerivAccounts: () => safeFetchRelative("/api/v1/auth/deriv/accounts"),
+  // Real per-account balances (demo + live), resolved server-side
+  // through the linked adapters. balance=null means unreachable,
+  // never zero-filled.
+  getDerivBalances: () => safeFetchRelative("/api/v1/auth/deriv/balances"),
   // Self-heal for rotted OAuth sessions: renews stored sessions via
   // refresh_token and re-registers adapters. No-ops when nothing is
   // stored. Called once when the account list comes back empty.
