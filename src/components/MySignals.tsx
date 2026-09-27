@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Radio, RefreshCw, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../api/apiClient";
+import { getAuthToken } from "../lib/authToken";
 
 // "My Signals" tab: the subscriber signal product, real data only.
 // - Today's ticket (GET /api/signals/current, stale-flagged archive when live budgets out)
@@ -32,6 +33,7 @@ export default function MySignals() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tier, setTier] = useState<string>("free");
+  const [authState, setAuthState] = useState<boolean | null>(null);
   const [limits, setLimits] = useState<TierLimits | null>(null);
   const [categories, setCategories] = useState<Record<string, { label: string; instruments: Record<string, string> }>>({});
   const [channels, setChannels] = useState<string[]>(["email"]);
@@ -72,6 +74,13 @@ export default function MySignals() {
   const load = async () => {
     setLoading(true);
     setError(null);
+    // Whether the backend can see a signed-in identity on this call.
+    // Without it every tier/preference read resolves anonymously (free
+    // limits) no matter what plan the account holds.
+    getAuthToken().then(
+      (t) => setAuthState(!!t),
+      () => setAuthState(false)
+    );
     try {
       const [tiersRes, catsRes, prefsRes, histRes, curRes, verRes] = await Promise.allSettled([
         apiClient.getSignalTiers(),
@@ -260,6 +269,9 @@ export default function MySignals() {
             Tier <span className="text-white font-mono uppercase">{tier}</span>
             {limits && (
               <> · {limits.daily_signals}/day · up to {limits.max_instruments} instruments</>
+            )}
+            {authState === false && (
+              <> · <span className="text-amber-400 font-mono">not signed in — limits reflect the logged-out tier; sign in for your plan</span></>
             )}
           </p>
         </div>
