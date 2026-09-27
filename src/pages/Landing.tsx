@@ -514,6 +514,17 @@ export default function Landing() {
 
   useEffect(() => {
     document.title = "Priv — Intelligent Trading. Limitless Potential.™";
+    // Referral capture: a share link lands here as ?ref=CODE. Stash it
+    // so the post-login bind (LoginGate) can credit the referrer on
+    // first sign-in. Survives the Auth0 redirect round-trip.
+    try {
+      const ref = new URLSearchParams(window.location.search).get("ref");
+      if (ref && ref.trim()) {
+        localStorage.setItem("priv_referral_code", ref.trim().toUpperCase().slice(0, 16));
+      }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   if (!isLoading && isAuthenticated) {

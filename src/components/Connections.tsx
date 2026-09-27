@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link2, Globe, Server, Radio, ShieldCheck, Play, ArrowRight, Activity, Brain, Cpu, Landmark, Cloud, Database, Layers, Zap, Sparkles, RefreshCw, CheckCircle2, Terminal } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../api/apiClient";
+import ClientConnections from "./ClientConnections";
 import { TaxPortalRow, ExchangeRow } from "./ConnectionRows";
 
 interface ConnectionNode {
@@ -168,29 +169,11 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
   }, []);
   const isInstitutional = isAdmin || nodeTier === "autonomous";
 
+  // Ordinary users get the client view (AI Core + own-country eTax +
+  // real brokers + referrals). The full cluster/gateway/sandbox page
+  // below stays admin/autonomous-only.
   if (!isInstitutional) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[420px] space-y-5 text-center px-6">
-        <div className="p-4 rounded-full bg-teal-500/10 border border-teal-500/30">
-          <ShieldCheck className="w-10 h-10 text-teal-400" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-serif italic text-white">Cluster Interconnections</h1>
-          <p className="text-white/40 text-sm mt-2 max-w-md">
-            Direct infrastructure control — cluster topology, gateway routing, and
-            AI synchronization — is available on the Autonomous tier.
-          </p>
-        </div>
-        <button
-          onClick={() => navigate("/dashboard/profile")}
-          className="flex items-center space-x-2 px-5 py-2.5 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/40 rounded text-teal-300 text-sm font-medium transition-colors"
-        >
-          <Sparkles className="w-4 h-4" />
-          <span>Upgrade to Autonomous</span>
-          <ArrowRight className="w-4 h-4" />
-        </button>
-      </div>
-    );
+    return <ClientConnections />;
   }
 
   return (

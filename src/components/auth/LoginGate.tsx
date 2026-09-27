@@ -228,10 +228,11 @@ export default function LoginGate({ children }: LoginGateProps) {
       }
     }
     // One-time per session: claim any broker connections made before
-    // login under the verified identity, and ensure the free subscription
-    // every account holds from signup. Both idempotent server-side.
-    // Skipped when no usable token exists (would just 401): the
-    // session-expired banner above handles re-login, and the next
+    // login under the verified identity, bind a landing-page referral
+    // (?ref=CODE captured into priv_referral_code), and ensure the free
+    // subscription every account holds from signup. All idempotent
+    // server-side. Skipped when no usable token exists (would just 401):
+    // the session-expired banner above handles re-login, and the next
     // successful login retries the claim.
     if (!linkedAnonymousRef.current) {
       linkedAnonymousRef.current = true;
@@ -245,6 +246,28 @@ export default function LoginGate({ children }: LoginGateProps) {
           // anonymous and the user reconnects it manually.
           linkedAnonymousRef.current = false;
         });
+        // Referral bind: first login wins server-side; the stored code
+        // is cleared once the backend accepts or definitively rejects
+        // it (unknown code = cleared too, it will never become valid).
+        try {
+          const ref = (localStorage.getItem("priv_referral_code") || "").trim();
+          if (ref) {
+            apiClient.bindReferral(ref).then(
+              () => {
+                try {
+                  localStorage.removeItem("priv_referral_code");
+                } catch {
+                  /* ignore */
+                }
+              },
+              () => {
+                /* retry next login; backend bind is idempotent */
+              }
+            );
+          }
+        } catch {
+          /* ignore */
+        }
       });
       apiClient.post("/api/v1/payment/subscriptions/ensure-free", {}).catch(() => {
         /* non-fatal: billing page retries on view */

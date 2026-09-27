@@ -267,6 +267,22 @@ export const apiClient = {
     safeFetchRelative(`/api/v1/verify/emotion/checkin/${id}`),
   deleteEmotionCheckin: (id: number) =>
     safeFetchRelative(`/api/v1/verify/emotion/checkin/${id}`, { method: "DELETE" }),
+
+  // Referrals: own code/link/count + one-time bind of a landing ?ref=.
+  getMyReferral: () => safeFetchRelative("/api/v1/referrals/me"),
+  bindReferral: (code: string) =>
+    safeFetchRelative("/api/v1/referrals/bind", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    }),
+
+  // Tax: full eTax country registry + the caller's own country.
+  getTaxCountries: () => safeFetchRelative("/api/v1/tax/supported_countries"),
+  getMyTaxCountry: () => safeFetchRelative("/api/v1/tax/my-country"),
+
+  // Signal broker directory (Deriv OAuth + XM/IFX/FBS affiliate links).
+  getSignalBrokers: () => safeFetchRelative("/api/v1/signals/brokers"),
 };
 
 export default apiClient;
