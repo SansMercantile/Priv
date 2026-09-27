@@ -68,21 +68,13 @@ export default function Billing({ demoMode }: { demoMode?: boolean }) {
   const holdingPaid = holdingActive && myPlan !== null && Number(myPlan.price) > 0;
   const [cancelling, setCancelling] = useState(false);
 
-  const goLive = () => {
-    try {
-      localStorage.setItem("demoMode", "false");
-    } catch (_) {}
-    window.location.reload();
-  };
-
   const subscribeWithPayFast = async (plan: Plan) => {
     setError(null);
-    // Subscribing is a live-mode action; demo mode keeps everything
-    // read-only. Offer the switch inline instead of a dead button.
-    if (demoMode) {
-      setError("Subscriptions need live mode — your demo stays intact. Switch below to continue.");
-      return;
-    }
+    // Billing is a real-money action independent of the trading
+    // demo/live toggle (that toggle only affects simulated vs. real
+    // broker execution). A subscription purchase must never be blocked
+    // by it -- doing so previously left an enabled-looking Subscribe
+    // button that silently refused to work in demo mode.
     // Free tier needs no checkout: grant it directly.
     if (!plan.price || Number(plan.price) <= 0) {
       setRedirecting(plan.plan_id);
@@ -164,14 +156,6 @@ export default function Billing({ demoMode }: { demoMode?: boolean }) {
         <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 text-red-300 text-sm rounded-lg p-3">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
           <span className="flex-1">{error}</span>
-          {demoMode && (
-            <button
-              onClick={goLive}
-              className="shrink-0 px-3 py-1 rounded-lg bg-white text-black font-mono text-xs font-bold"
-            >
-              Go live
-            </button>
-          )}
         </div>
       )}
 
@@ -230,9 +214,7 @@ export default function Billing({ demoMode }: { demoMode?: boolean }) {
                   ? "Your current subscription"
                   : holdingPaid && Number(plan.price) > 0
                     ? `You hold ${myPlan?.name || "a plan"} — cancel it first to switch`
-                    : demoMode
-                      ? "Works in live mode"
-                      : undefined
+                    : undefined
               }
             >
               {redirecting === plan.plan_id ? (
