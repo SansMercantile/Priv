@@ -37,23 +37,54 @@ export function useBrokerConnections(): BrokerConnectionsState {
 
   useEffect(() => {
     let cancelled = false;
+    let retryTimer: number | undefined;
     setLoading(true);
 
     apiClient
       .getBrokerConnections()
       .then(({ data }) => {
         if (cancelled) return;
-        setConnections(data?.data?.connections || []);
+        const list = data?.data?.connections || [];
+        setConnections(list);
+        // Empty on first load often means a race, not absence: the
+        // Auth0 token may not have been renewable yet, or the claim
+        // landed a beat later (the locked screen + "no linked account"
+        // with a populated card is exactly this). One delayed retry.
+        if (list.length === 0) {
+          retryTimer = window.setTimeout(() => {
+            if (cancelled) return;
+            apiClient
+              .getBrokerConnections()
+              .then(({ data: d2 }) => {
+                if (cancelled) return;
+                const l2 = d2?.data?.connections || [];
+                if (l2.length > 0) setConnections(l2);
+              })
+              .catch(() => {
+                /* keep previous state */
+              });
+          }, 3000);
+        }
       })
       .catch(() => {
         if (!cancelled) setConnections([]);
       })
       .finally(() => !cancelled && setLoading(false));
 
+    // Any instance linking an account (DerivConnectCard) broadcasts
+    // priv:deriv-linked -- every hook instance re-fetches so gates and
+    // status text converge without a page reload.
+    const onLinked = () => {
+      if (!cancelled) refresh();
+    };
+    window.addEventListener("priv:deriv-linked", onLinked);
+
     return () => {
       cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+      window.removeEventListener("priv:deriv-linked", onLinked);
     };
-  }, [tick]);
+  }, [tick, refresh]);
 
   const derivConns = connections.filter((c) => c.broker === "deriv");
   const hasRealDeriv = derivConns.some((c) => c.account_type === "live");
