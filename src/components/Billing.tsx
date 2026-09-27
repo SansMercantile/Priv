@@ -93,14 +93,20 @@ export default function Billing({ demoMode }: { demoMode?: boolean }) {
     setRedirecting(plan.plan_id);
     try {
       const origin = window.location.origin;
-      const result = await apiClient.createPayfastSubscription({
+      const result: any = await apiClient.createPayfastSubscription({
         plan_id: plan.plan_id,
         return_url: `${origin}/dashboard/billing?status=success`,
         cancel_url: `${origin}/dashboard/billing?status=cancelled`,
         notify_url: "https://api.priv.sansmercantile.com/api/payfast/itn",
         billing_frequency: "3",
       });
-      const url = result.data?.subscription_url;
+      // createPayfastSubscription calls safeFetchRelative directly, which
+      // returns the parsed body as-is (unlike apiClient.post's {data}
+      // wrapper) -- and the backend puts subscription_url at that body's
+      // top level. Reading result.data?.subscription_url was therefore
+      // always undefined even on a real, successful PayFast response.
+      const body = result?.data ?? result;
+      const url = body?.subscription_url;
       if (!url) throw new Error("PayFast did not return a checkout URL.");
       // Hand the browser off to PayFast's hosted checkout. The backend
       // has already generated and signed the payload server-side; the
