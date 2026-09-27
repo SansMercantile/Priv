@@ -424,16 +424,33 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
     let cancelled = false;
 
     const refreshRealData = async () => {
-      // Real agent status from the backend's actual agent registry.
+      // Real agent status from the backend's actual agent registry --
+      // ONE response drives both numbers so active/total can never
+      // disagree (the old 31/12 came from two endpoints racing).
       try {
         const res = await fetch("/api/v1/agents/status_with_reputation");
         const json = await res.json();
         if (!cancelled && json?.data?.summary) {
-          setStats(prev => ({ ...prev, activeAgents: json.data.summary.active_agents }));
-          setLiveTotalAgents(json.data.summary.total_agents);
+          const s = json.data.summary;
+          setStats(prev => ({ ...prev, activeAgents: s.active_agents }));
+          setLiveTotalAgents(s.total_agents);
+        } else if (!cancelled) {
+          throw new Error("no summary");
         }
       } catch {
-        // leave as-is (null/stale) rather than fabricate a number
+        // Fallback: plain registry count for BOTH numbers, never a
+        // hardcoded denominator.
+        try {
+          const res = await fetch("/api/v1/agents/status");
+          const json = await res.json();
+          const n = json?.data?.agents?.length;
+          if (!cancelled && typeof n === "number") {
+            setStats(prev => ({ ...prev, activeAgents: n }));
+            setLiveTotalAgents(n);
+          }
+        } catch {
+          // leave as-is (null/stale) rather than fabricate a number
+        }
       }
 
       // Real Deriv balance for this mode's account.
@@ -467,24 +484,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
   // feed yet) and stays empty otherwise. A random walk here would be
   // fake P&L on a real-money screen.
 
-  // Sync agent count with the backend registry. Balances come from
-  // the real-data effect above (GET /api/v1/auth/deriv/balances) --
-  // the old token_meta.balance read below it always resolved undefined
-  // (token_meta carries no balance) and is gone.
-  useEffect(() => {
-    // 1. Live agents count from backend
-    fetch("/api/v1/agents/status")
-      .then(res => res.json())
-      .then(result => {
-        if (result && result.data && result.data.agents) {
-          setStats(prev => ({
-            ...prev,
-            activeAgents: result.data.agents.length
-          }));
-        }
-      })
-      .catch(err => console.error("Error pulling live agent stats:", err));
-  }, [demoMode, hasRealDeriv]);
+  // (Removed: a second agent-count effect used to race the one above,
+  // which is how active/total could disagree. One source now.)
 
   const getSovereignGrade = () => {
     if (riskAppetite === "Conservative") return { g: "AAA GRADE", desc: "Capital Shielded", color: "text-emerald-400 border-emerald-900/50 bg-emerald-950/30" };
@@ -570,11 +571,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
             <span className="font-serif italic text-white text-md tracking-wide">Real Data Notice</span>
           </div>
           <span className="font-mono text-[9px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded uppercase font-extrabold tracking-widest animate-pulse">
-            LIVE DERIV FEED
+            {demoMode ? "DEMO DERIV FEED" : "LIVE DERIV FEED"}
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs font-mono">
+          {demoMode && (
           <div className="p-3 bg-white/[0.01] border border-white/5 rounded-lg space-y-1">
             <span className="text-[9.5px] font-bold text-emerald-500 uppercase tracking-wider block">Demo Mode</span>
             <p className="text-zinc-400 font-sans text-[11px] leading-relaxed font-light">
@@ -582,12 +584,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
               real data, zero risk.
             </p>
           </div>
+          )}
+          {!demoMode && (
           <div className="p-3 bg-white/[0.01] border border-white/5 rounded-lg space-y-1">
             <span className="text-[9.5px] font-bold text-emerald-500 uppercase tracking-wider block">Live Mode</span>
             <p className="text-zinc-400 font-sans text-[11px] leading-relaxed font-light">
               Live Mode shows your connected Deriv live account. Connect an account to link it.
             </p>
           </div>
+          )}
           <div className="p-3 bg-white/[0.01] border border-white/5 rounded-lg space-y-1">
             <span className="text-[9.5px] font-bold text-[#FF6B35] uppercase tracking-wider block">No Performance Guarantee</span>
             <p className="text-zinc-400 font-sans text-[11px] leading-relaxed font-light font-normal text-zinc-350">
@@ -618,7 +623,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         />
         <MetricCard
           title="Active Agents"
-          value={stats.activeAgents === null ? "—" : `${stats.activeAgents}/${liveTotalAgents ?? 12}`}
+          value={stats.activeAgents === null ? "—" : `${stats.activeAgents}/${liveTotalAgents ?? stats.activeAgents}`}
           change="Execution cluster"
           icon={Users}
           trend="stable"
