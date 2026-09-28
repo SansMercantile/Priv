@@ -962,18 +962,44 @@ function getSimulationRssXml(feedUrl: string): string {
 }
 
 // Secure RSS proxy feed parser endpoint
+const ALLOWED_RSS_HOSTNAMES = new Set([
+  "feeds.bbci.co.uk",
+  "rss.nytimes.com",
+  "www.reuters.com",
+  "www.cnbc.com",
+  "www.ft.com"
+]);
+
+function getValidatedRssUrl(rawUrl: string): string | null {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    const hostname = parsed.hostname.toLowerCase();
+    if (!ALLOWED_RSS_HOSTNAMES.has(hostname)) return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 app.get("/api/rss", async (req, res) => {
   const url = req.query.url as string;
   if (!url) {
     return res.status(400).json({ error: "Missing url parameter" });
   }
 
+  const validatedUrl = getValidatedRssUrl(url);
+  if (!validatedUrl) {
+    return res.status(400).json({ error: "Invalid or disallowed url parameter" });
+  }
+
   try {
-    const fetchResponse = await fetch(url, {
+    const fetchResponse = await fetch(validatedUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "application/xml, text/xml, application/xhtml+xml, */*"
       },
+      redirect: "error",
       signal: AbortSignal.timeout(6000) // Ensure the request doesn't hang indefinitely
     });
 
@@ -988,7 +1014,7 @@ app.get("/api/rss", async (req, res) => {
     console.log(`[SANS RSS] Active proxy simulated XML resolver engaged for url: ${url}`);
     
     // Serve valid simulated XML instead of throwing hard error, preventing client-side console failures
-    const fallbackXml = getSimulationRssXml(url);
+    const fallbackXml = getSimulationRssXml(validatedUrl);
     res.set("Content-Type", "application/xml");
     res.send(fallbackXml);
   }
