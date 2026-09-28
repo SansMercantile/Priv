@@ -7,10 +7,8 @@ import {
   LayoutDashboard, 
   Brain, 
   Users, 
-  Activity, 
   ShieldCheck, 
   Terminal, 
-  Landmark,
   Newspaper,
   History,
   Link2,
@@ -162,18 +160,19 @@ export const navigationItems: SectionItem[] = [
   { name: "Priv Dashboard", icon: LayoutDashboard, path: "/dashboard" },
   { name: "Identity & Profile", icon: User, path: "/dashboard/profile" },
   { name: "Broker Terminal", icon: Coins, path: "/dashboard/terminal" },
+  { name: "My Signals", icon: Radio, path: "/dashboard/signals" },
+  { name: "News", icon: Newspaper, path: "/dashboard/news" },
+  { name: "Strategies", icon: Terminal, path: "/dashboard/automation" },
   { name: "AGI Core", icon: Brain, path: "/dashboard/agi-core" },
   { name: "Multi-Agent Hub", icon: Users, path: "/dashboard/multi-agent" },
-  { name: "Data Ingest", icon: Activity, path: "/dashboard/data-ingestion" },
-  { name: "Security Check", icon: ShieldCheck, path: "/dashboard/security" },
-  { name: "Automation System", icon: Terminal, path: "/dashboard/automation" },
-  { name: "Tax Intelligence", icon: Landmark, path: "/dashboard/tax" },
-  { name: "Tactical News", icon: Newspaper, path: "/dashboard/news" },
-  { name: "My Signals", icon: Radio, path: "/dashboard/signals" },
   { name: "History & Audit", icon: History, path: "/dashboard/history" },
   { name: "SANS Network Link", icon: Link2, path: "/dashboard/connections" },
   { name: "Billing", icon: CreditCard, path: "/dashboard/billing" }
 ];
+// Removed from the main list (moved elsewhere in the product):
+// - Security Check   -> admin-only slot below (never shown to clients)
+// - Tax Intelligence -> Identity & Profile tab, next to Identity Registry KYC
+// - Data Ingest      -> SANS Network Link tab, admin-only
 
 export default function Sidebar({
   device,
@@ -190,9 +189,9 @@ export default function Sidebar({
     logout({ logoutParams: { returnTo: window.location.origin } });
   };
 
-  // Admin-gated Compliance Desk link: visible only when the signed-in
-  // identity verifies as admin (GET /api/v1/admin/whoami). Hidden on any
-  // failure -- never leaks the route's existence to non-admins.
+  // Admin-gated Compliance Desk + Security Check links: visible only when
+  // the signed-in identity verifies as admin (GET /api/v1/admin/whoami).
+  // Hidden on any failure -- never leaks the routes' existence to clients.
   const [showCompliance, setShowCompliance] = useState(false);
   useEffect(() => {
     let cancelled = false;
@@ -208,11 +207,42 @@ export default function Sidebar({
       cancelled = true;
     };
   }, []);
-  const items: SectionItem[] = showCompliance
-    ? [...navigationItems, { name: "Compliance Desk", icon: ShieldCheck, path: "/dashboard/admin/kyc" }]
-    // Security Check is admin-only; Diagnostics Log now lives inside
-    // History & Audit instead of its own tab.
-    : navigationItems.filter((i) => i.path !== "/dashboard/security");
+
+  // Strategies is a paid-tier surface: visible only once the real
+  // subscription says tier != free (admins always pass). The server-side
+  // route guard (RequirePaying in App.tsx) enforces the same rule on
+  // navigation; fail-closed while the check is in flight.
+  const [isPaying, setIsPaying] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const body: any = await apiClient.getMySubscription();
+        const sub = body?.subscription ?? (body && typeof body === "object" ? body : null);
+        if (!cancelled && sub?.tier && sub.tier !== "free") setIsPaying(true);
+      } catch (_) {
+        /* no subscription / offline: stay hidden */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const items: SectionItem[] = [];
+  for (const item of navigationItems) {
+    // Strategies: paying tiers + admin only.
+    if (item.path === "/dashboard/automation" && !isPaying && !showCompliance) continue;
+    items.push(item);
+    // Security Check keeps its old slot (after Multi-Agent Hub) but is
+    // never present for clients.
+    if (showCompliance && item.path === "/dashboard/multi-agent") {
+      items.push({ name: "Security Check", icon: ShieldCheck, path: "/dashboard/security" });
+    }
+  }
+  if (showCompliance) {
+    items.push({ name: "Compliance Desk", icon: ShieldCheck, path: "/dashboard/admin/kyc" });
+  }
 
   // Mobile Top Bar
   if (isMobile) {

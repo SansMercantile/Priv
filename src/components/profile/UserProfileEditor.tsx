@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import KycVerificationPage from './KycVerificationPage';
 import DerivConnectCard from '../DerivConnectCard';
+import { TaxIntelligence } from '../TaxIntelligence';
 import apiClient from '../../api/apiClient';
 import { 
   User, 
@@ -43,7 +44,7 @@ interface BillingLog {
 
 export default function UserProfileEditor({ demoMode = false }: UserProfileEditorProps) {
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<'profile' | 'billing' | 'kyc' | 'brokers'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'billing' | 'kyc' | 'brokers' | 'tax'>('profile');
   // Node Allocation & Credits is an admin surface (plan pricing, license
   // grants). Regular users never see the tab; admins do. (Effects live
   // below, after kycStatus is declared.)
@@ -87,6 +88,11 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
     const params = new URLSearchParams(location.search);
     if (params.get("triggerKYC") === "true") {
       setActiveTab("kyc");
+    }
+    // Tax Intelligence lives here now (moved from the sidebar); the old
+    // /dashboard/tax route redirects to ?tab=tax.
+    if (params.get("tab") === "tax") {
+      setActiveTab("tax");
     }
   }, [location]);
   
@@ -380,7 +386,8 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
           { id: 'profile', label: 'Sovereign Profile', icon: User },
           { id: 'brokers', label: 'Broker Connections', icon: Link2 },
           ...(isAdmin ? [{ id: 'billing', label: 'Node Allocation & Credits', icon: CreditCard }] : []),
-          { id: 'kyc', label: 'Identity Registry KYC', icon: Shield }
+          { id: 'kyc', label: 'Identity Registry KYC', icon: Shield },
+          { id: 'tax', label: 'Tax Intelligence', icon: Landmark }
         ].map(t => {
           const Icon = t.icon;
           return (
@@ -400,6 +407,12 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
           );
         })}
       </div>
+
+      {activeTab === 'tax' && (
+        <div className="space-y-4">
+          <TaxIntelligence />
+        </div>
+      )}
 
       {activeTab === 'profile' && (
         <div className="space-y-6">

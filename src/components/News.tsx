@@ -413,7 +413,7 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
         <div>
           <h1 className="text-3xl font-serif italic text-white flex items-center">
             <Newspaper className="w-7 h-7 mr-3 text-white/70" />
-            Tactical Briefings & News
+            News
           </h1>
           <p className="text-white/40 text-xs mt-1 font-light">Sovereign alternative data stream and financial intelligence aggregator</p>
         </div>

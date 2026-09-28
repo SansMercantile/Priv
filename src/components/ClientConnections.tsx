@@ -144,7 +144,7 @@ export default function ClientConnections() {
               Matched from your {mine.source === "tax_residency" ? "KYC tax residency" : mine.source === "address" ? "KYC address" : "country of residence"}.
             </p>
             <Link
-              to="/dashboard/tax"
+              to="/dashboard/profile?tab=tax"
               className="inline-block mt-3 px-4 py-2 border border-white/20 rounded-lg font-mono text-xs text-white hover:bg-white/10 transition"
             >
               Open eTax Portal

@@ -8,14 +8,12 @@ import Dashboard from "./components/dashboard/RealTimeDashboard";
 import TradingTerminal from "./components/TradingTerminal";
 import AGICore from "./components/AgiCore";
 import MultiAgent from "./components/MultiAgent";
-import DataIngestion from "./components/DataIngestion";
 import Security from "./components/Security";
 import Automation from "./components/Automation";
-import Tax from "./components/Tax";
 import News from "./components/News";
 import MySignals from "./components/MySignals";
 import History from "./components/History";
-import Connections from "./components/Connections";
+import ConnectionsSection from "./components/ConnectionsSection";
 import Billing from "./components/Billing";
 import Celebrations from "./components/Celebrations";
 import ProfilePage from "./components/profile/ProfilePage";
@@ -24,12 +22,69 @@ import UnifiedAssistant from "./ui/UnifiedAssistant";
 import GuidedWalkthrough from "./components/GuidedWalkthrough";
 import LoginGate from "./components/auth/LoginGate";
 import Landing from "./pages/Landing";
+import apiClient from "./api/apiClient";
 import { useBrokerConnections } from "./lib/useBrokerConnections";
 import { isDerivCallback } from "./lib/derivAuth/oauth";
 import { initDatadog } from "./lib/datadog";
 
 interface AppProps {
   initialDevice?: string;
+}
+
+// Admin-only surface (Security Check): resolves GET /admin/whoami and
+// bounces non-admins to the dashboard. Hidden until proven admin -- the
+// page (and the sidebar entry) never appears for clients.
+function RequireAdmin({ children }: { children: React.ReactNode }) {
+  const [state, setState] = useState<"loading" | "ok" | "deny">("loading");
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res: any = await apiClient.get("/api/v1/admin/whoami");
+        if (!cancelled) setState(res?.data?.data?.admin ? "ok" : "deny");
+      } catch (_) {
+        if (!cancelled) setState("deny");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  if (state === "loading") return null;
+  return state === "ok" ? <>{children}</> : <Navigate to="/dashboard" replace />;
+}
+
+// Paid-tier surface (Strategies): requires a real subscription whose
+// server-derived tier is not free (admins always pass). Free users are
+// sent to Billing -- the sidebar hides the entry the same way.
+function RequirePaying({ children }: { children: React.ReactNode }) {
+  const [state, setState] = useState<"loading" | "ok" | "deny">("loading");
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      let admin = false;
+      let paying = false;
+      try {
+        const res: any = await apiClient.get("/api/v1/admin/whoami");
+        admin = !!res?.data?.data?.admin;
+      } catch (_) {
+        /* not admin */
+      }
+      try {
+        const body: any = await apiClient.getMySubscription();
+        const sub = body?.subscription ?? (body && typeof body === "object" ? body : null);
+        paying = !!sub?.tier && sub.tier !== "free";
+      } catch (_) {
+        /* no subscription */
+      }
+      if (!cancelled) setState(admin || paying ? "ok" : "deny");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  if (state === "loading") return null;
+  return state === "ok" ? <>{children}</> : <Navigate to="/dashboard/billing" replace />;
 }
 
 function GatedApp({ initialDevice = "desktop" }: AppProps) {
@@ -191,17 +246,24 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
                   <Route path="/dashboard/terminal" element={<TradingTerminal />} />
                   <Route path="/dashboard/agi-core" element={<AGICore demoMode={demoMode} />} />
                   <Route path="/dashboard/multi-agent" element={<MultiAgent demoMode={demoMode} />} />
-                  <Route path="/dashboard/data-ingestion" element={<DataIngestion demoMode={demoMode} />} />
-                  <Route path="/dashboard/security" element={<Security demoMode={demoMode} />} />
-                  <Route path="/dashboard/automation" element={<Automation demoMode={demoMode} />} />
-                  <Route path="/dashboard/tax" element={<Tax demoMode={demoMode} />} />
+                  {/* Data Ingest moved under SANS Network Link as an
+                      admin-only tab; old bookmarks follow. */}
+                  <Route path="/dashboard/data-ingestion" element={<Navigate to="/dashboard/connections" replace />} />
+                  {/* Security Check is admin-only (sidebar hides it from
+                      clients; this guard closes the direct-URL path). */}
+                  <Route path="/dashboard/security" element={<RequireAdmin><Security demoMode={demoMode} /></RequireAdmin>} />
+                  {/* Strategies: paying tiers only. */}
+                  <Route path="/dashboard/automation" element={<RequirePaying><Automation demoMode={demoMode} /></RequirePaying>} />
+                  {/* Tax Intelligence moved to Identity & Profile, next to
+                      Identity Registry KYC; old bookmarks follow. */}
+                  <Route path="/dashboard/tax" element={<Navigate to="/dashboard/profile?tab=tax" replace />} />
                   <Route path="/dashboard/news" element={<News demoMode={demoMode} />} />
                   <Route path="/dashboard/signals" element={<MySignals />} />
                   {/* Diagnostics Log merged into History & Audit -- old
                       bookmarked URL redirects there. */}
                   <Route path="/dashboard/analytics" element={<Navigate to="/dashboard/history" replace />} />
                   <Route path="/dashboard/history" element={<History demoMode={demoMode} />} />
-                  <Route path="/dashboard/connections" element={<Connections demoMode={demoMode} />} />
+                  <Route path="/dashboard/connections" element={<ConnectionsSection demoMode={demoMode} />} />
                   <Route path="/dashboard/billing" element={<Billing demoMode={demoMode} />} />
                   <Route path="/dashboard/profile" element={<ProfilePage demoMode={demoMode} />} />
                   <Route path="/dashboard/admin/kyc" element={<KycAdminReviewPage />} />
