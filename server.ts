@@ -2182,7 +2182,21 @@ import { spawn, execSync } from "child_process";
 
 // Proxy `/api/v1/*`, `/api/brokers/*`, `/healthz`, `/readyz`, `/users` requests to the Python FastAPI backend on port 8000
 app.all(["/api/v1/*", "/api/brokers/*", "/healthz", "/readyz", "/users"], async (req, res) => {
-  const targetUrl = `http://127.0.0.1:8000${req.originalUrl}`;
+  const upstreamOrigin = "http://127.0.0.1:8000";
+  const parsedIncomingUrl = new URL(req.originalUrl, "http://localhost");
+  const normalizedPath = parsedIncomingUrl.pathname.replace(/\/{2,}/g, "/").replace(/\/$/, "") || "/";
+  const isAllowedPath =
+    normalizedPath === "/healthz" ||
+    normalizedPath === "/readyz" ||
+    normalizedPath === "/users" ||
+    normalizedPath.startsWith("/api/v1/") ||
+    normalizedPath.startsWith("/api/brokers/");
+
+  if (!isAllowedPath) {
+    return res.status(400).json({ error: "Invalid proxy path." });
+  }
+
+  const targetUrl = new URL(`${normalizedPath}${parsedIncomingUrl.search}`, upstreamOrigin).toString();
   try {
     const headers: Record<string, string> = {};
     for (const [key, value] of Object.entries(req.headers)) {
