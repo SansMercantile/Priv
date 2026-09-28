@@ -168,7 +168,7 @@ async def get_broker_details(broker_id: str) -> Dict[str, Any]:
             try:
                 account = await broker_manager.get_account_info(broker_id)
             except Exception as exc:
-                logger.warning(f"Could not fetch account info for {broker_id}: {exc}")
+                logger.warning(f"Could not fetch account info for {_logsafe(broker_id)}: {_logsafe(exc)}")
 
         return {
             "id": broker_id,
