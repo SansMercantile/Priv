@@ -61,7 +61,9 @@ if (typeof window !== "undefined") {
       // Quietly absorb
       return;
     }
-    originalConsoleWarn.apply(console, args);
+    // Pass a control-char-stripped copy so a tainted message can't forge
+    // extra log lines (CR/LF log injection).
+    originalConsoleWarn(message.replace(/[\r\n\u0000-\u001F\u007F]+/g, " "));
   };
 
   // Error event listener with preventDefault and stopPropagation

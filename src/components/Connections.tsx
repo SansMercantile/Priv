@@ -58,10 +58,11 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
         setTimeout(() => {
           setIsSyncing(false);
           setSyncStep("");
+          // Persist only non-sensitive flags — never anything derived
+          // from the API key itself (clear-text storage rule).
           const newAi = { 
             active: true, 
-            provider: aiProvider, 
-            keyLength: apiKey.length || 16 
+            provider: aiProvider
           };
           setConnectedAi(newAi);
           localStorage.setItem("priv_connected_ai", JSON.stringify(newAi));

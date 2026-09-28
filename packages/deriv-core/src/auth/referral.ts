@@ -74,7 +74,9 @@ export function parseReferralLink(referralLink: string): ReferralInfo | null {
     }
 
     // Format 2: track.deriv.com/_TOKEN_/1/
-    if (url.hostname.includes('track.deriv.com')) {
+    // Exact host (or a true subdomain) — never a bare substring match, so
+    // hosts like eviltrack.deriv.com.attacker.example can't pass.
+    if (url.hostname === 'track.deriv.com' || url.hostname.endsWith('.track.deriv.com')) {
       const pathSegments = url.pathname.split('/').filter(Boolean);
       if (pathSegments.length > 0) {
         // Remove leading/trailing underscores from the token segment
@@ -122,7 +124,9 @@ export function parseLandingParams(): ReferralInfo | null {
 function isScaleoClickLink(referralLink: string): boolean {
   try {
     const url = new URL(referralLink);
-    return url.hostname.endsWith('-tracking.deriv.com') && url.pathname === '/click';
+    // Anchored host pattern: exactly one label before -tracking.deriv.com,
+    // so an arbitrary hostname can't precede the trusted suffix.
+    return /^[a-z0-9-]+-tracking\.deriv\.com$/i.test(url.hostname) && url.pathname === '/click';
   } catch {
     return false;
   }

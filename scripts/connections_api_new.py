@@ -10,10 +10,16 @@ from datetime import datetime
 import logging
 import os
 import json
+import re
 
 from ..trading_engine.broker_api import broker_manager
 
 logger = logging.getLogger(__name__)
+
+
+def _logsafe(value: object) -> str:
+    """Flatten to a single log line — strip CR/LF and other control chars."""
+    return re.sub(r"[\r\n\x00-\x1f\x7f]+", " ", str(value))[:300]
 
 router = APIRouter()
 
@@ -70,7 +76,7 @@ async def save_broker_keys(payload: BrokerKeysPayload) -> Dict[str, Any]:
             "timestamp": datetime.utcnow().isoformat(),
         }
     except Exception as exc:
-        logger.error(f"Error saving broker keys for {payload.broker_name}: {exc}", exc_info=True)
+        logger.error(f"Error saving broker keys for {_logsafe(payload.broker_name)}: {_logsafe(exc)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -100,7 +106,7 @@ async def get_broker_connections() -> Dict[str, Any]:
                 try:
                     account = await broker_manager.get_account_info(broker_id)
                 except Exception as exc:
-                    logger.warning(f"Could not fetch account info for {broker_id}: {exc}")
+                logger.warning(f"Could not fetch account info for {_logsafe(broker_id)}: {_logsafe(exc)}")
                     account = {}
                 if account and "error" not in account:
                     entry["account_id"] = account.get("account_id")

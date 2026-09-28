@@ -9,22 +9,25 @@
 import { Request, Response, NextFunction } from "express";
 
 // ── 1. Known bad User-Agent substrings ───────────────────────────────────────
-const BOT_UA_PATTERNS: RegExp[] = [
+// Matched with String.includes on a lowercased UA (the same case-insensitive
+// substring semantics as the previous regex list, without regexes that could
+// be misapplied to URLs).
+const BOT_UA_SUBSTRINGS: string[] = [
   // Generic crawlers / spiders
-  /bot/i, /spider/i, /crawl/i, /slurp/i, /scraper/i, /fetcher/i,
-  /archiver/i, /wget/i, /curl/i, /python-requests/i, /go-http-client/i,
-  /java\//i, /okhttp/i, /axios/i, /libwww/i, /httpclient/i,
-  /mechanize/i, /scrapy/i, /phantomjs/i, /selenium/i, /playwright/i,
-  /puppeteer/i, /headless/i, /htmlunit/i, /jsdom/i,
+  "bot", "spider", "crawl", "slurp", "scraper", "fetcher",
+  "archiver", "wget", "curl", "python-requests", "go-http-client", "java/",
+  "okhttp", "axios", "libwww", "httpclient",
+  "mechanize", "scrapy", "phantomjs", "selenium", "playwright",
+  "puppeteer", "headless", "htmlunit", "jsdom",
   // Specific named bots
-  /googlebot/i, /bingbot/i, /yandex/i, /baiduspider/i, /duckduckbot/i,
-  /facebot/i, /ia_archiver/i, /wayback/i, /archive\.org/i,
-  /semrushbot/i, /ahrefsbot/i, /mj12bot/i, /dotbot/i, /petalbot/i,
-  /dataforseobot/i, /applebot/i, /twitterbot/i, /linkedinbot/i,
+  "googlebot", "bingbot", "yandex", "baiduspider", "duckduckbot",
+  "facebot", "ia_archiver", "wayback", "archive.org",
+  "semrushbot", "ahrefsbot", "mj12bot", "dotbot", "petalbot",
+  "dataforseobot", "applebot", "twitterbot", "linkedinbot",
   // AI / LLM training harvesters
-  /gptbot/i, /chatgpt/i, /ccbot/i, /anthropic/i, /claude/i,
-  /cohere/i, /perplexity/i, /amazonbot/i, /diffbot/i, /bytespider/i,
-  /google-extended/i, /meta-externalagent/i, /omgili/i, /dataprovider/i,
+  "gptbot", "chatgpt", "ccbot", "anthropic", "claude",
+  "cohere", "perplexity", "amazonbot", "diffbot", "bytespider",
+  "google-extended", "meta-externalagent", "omgili", "dataprovider",
 ];
 
 // ── 2. Headless browser fingerprint check ────────────────────────────────────
@@ -89,7 +92,8 @@ export function antiBotMiddleware(req: Request, res: Response, next: NextFunctio
     return;
   }
   const ua = req.headers["user-agent"] || "";
-  if (!ua || BOT_UA_PATTERNS.some((pattern) => pattern.test(ua))) {
+  const uaLower = ua.toLowerCase();
+  if (!ua || BOT_UA_SUBSTRINGS.some((s) => uaLower.includes(s))) {
     res.status(403).set("X-Blocked-Reason", "bot-ua").end();
     return;
   }

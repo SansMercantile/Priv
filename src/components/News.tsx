@@ -224,7 +224,10 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
           const pubDateStr = item.getElementsByTagName("pubDate")[0]?.textContent || "";
           const creator = item.getElementsByTagName("dc:creator")[0]?.textContent || "Yahoo Finance";
           
-          const summary = descriptionRaw.replace(/<[^>]*>?/gm, "").substring(0, 200) + "...";
+          // Extract plain text via the DOM (no regex sanitizer): React
+          // renders this as text, and textContent strips any markup.
+          const summaryDoc = new DOMParser().parseFromString(descriptionRaw, "text/html");
+          const summary = (summaryDoc.body.textContent || descriptionRaw).substring(0, 200) + "...";
           
           let timeStr = "12m ago";
           if (pubDateStr) {

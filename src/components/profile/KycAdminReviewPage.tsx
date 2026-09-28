@@ -2,6 +2,18 @@ import React, { useState, useEffect } from 'react';
 import apiClient from '../../api/apiClient';
 import { Shield, Check, X, AlertOctagon, UserCheck, RefreshCw, FileText, Globe, Landmark, Download } from 'lucide-react';
 
+// Document links come from stored records — only allow http(s) targets so a
+// javascript: (or similar) URL can never be navigated to from this page.
+function safeHref(raw: string): string {
+  try {
+    const u = new URL(raw, window.location.origin);
+    if (u.protocol === 'https:' || u.protocol === 'http:') return u.href;
+  } catch {
+    /* fall through */
+  }
+  return '#';
+}
+
 interface KycApplication {
   id: string;
   fullName: string;
@@ -364,7 +376,7 @@ export default function KycAdminReviewPage() {
                         </div>
                         
                         <a 
-                          href={doc.url} 
+                          href={safeHref(doc.url)} 
                           target="_blank" 
                           rel="noopener noreferrer" 
                           className="p-1 px-2.5 bg-zinc-900 hover:bg-rose-950/20 hover:text-rose-400 hover:border-rose-500/30 text-[10px] text-zinc-400 border border-zinc-800 rounded flex items-center gap-1 cursor-pointer transition font-bold"

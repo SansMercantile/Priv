@@ -144,29 +144,24 @@ function cleanupUrl(): void {
 }
 
 function validateCallback(params: CallbackParams): string {
+  // The only success gate: our locally-stored CSRF token must match the
+  // state Deriv returned. All other params are interpreted AFTER this check.
+  const storedToken = getCSRFToken();
+  if (!storedToken || !params.state || storedToken !== params.state) {
+    clearAllDerivAuthData();
+    cleanupUrl();
+    const reason = !storedToken
+      ? "Login session expired -- please try connecting again"
+      : !params.state
+      ? "Missing state parameter - possible CSRF attack"
+      : "CSRF token mismatch - possible CSRF attack";
+    throw new DerivOAuthError(reason);
+  }
+  clearCSRFToken();
   if (params.error) {
     cleanupUrl();
     throw new DerivOAuthError(`${params.error}: ${params.error_description || ""}`);
   }
-  if (!params.state) {
-    clearAllDerivAuthData();
-    cleanupUrl();
-    throw new DerivOAuthError("Missing state parameter - possible CSRF attack");
-  }
-  const storedToken = getCSRFToken();
-  if (!storedToken) {
-    // No stored token (expired session, different tab, or storage cleared
-    // mid-flow -- NOT an attack, just stale). Say so plainly.
-    clearAllDerivAuthData();
-    cleanupUrl();
-    throw new DerivOAuthError("Login session expired -- please try connecting again");
-  }
-  if (storedToken !== params.state) {
-    clearAllDerivAuthData();
-    cleanupUrl();
-    throw new DerivOAuthError("CSRF token mismatch - possible CSRF attack");
-  }
-  clearCSRFToken();
   if (!params.code) {
     throw new DerivOAuthError("Missing authorization code");
   }
