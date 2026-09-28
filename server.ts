@@ -307,6 +307,24 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+function sanitizeProxyPath(inputPath: string): string | null {
+  if (!inputPath.startsWith('/')) return null;
+
+  // Allow only expected URL path characters for API routes.
+  if (!/^\/[A-Za-z0-9\-._~/%]*$/.test(inputPath)) return null;
+
+  // Reject encoded or raw backslashes and traversal attempts.
+  const lower = inputPath.toLowerCase();
+  if (lower.includes('%5c') || inputPath.includes('\\')) return null;
+
+  const segments = inputPath.split('/');
+  for (const seg of segments) {
+    if (seg === '..' || seg.toLowerCase() === '%2e%2e') return null;
+  }
+
+  return inputPath;
+}
+
 // Proxy /api/v1 routes to Python backend on port 8000
 app.use("/api/v1", async (req, res) => {
   // Skip proxy for routes already defined in Express
@@ -316,7 +334,12 @@ app.use("/api/v1", async (req, res) => {
   }
   
   try {
-    const pythonBackendUrl = `http://localhost:8000/api/v1${req.path}`;
+    const sanitizedPath = sanitizeProxyPath(req.path);
+    if (!sanitizedPath) {
+      return res.status(400).json({ error: "Invalid proxy path" });
+    }
+
+    const pythonBackendUrl = `http://localhost:8000/api/v1${sanitizedPath}`;
     console.log(`Proxying ${req.method} ${req.path} to Python backend: ${pythonBackendUrl}`);
     
     const response = await fetch(pythonBackendUrl, {
