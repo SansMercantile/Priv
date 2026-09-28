@@ -106,7 +106,7 @@ async def get_broker_connections() -> Dict[str, Any]:
                 try:
                     account = await broker_manager.get_account_info(broker_id)
                 except Exception as exc:
-                logger.warning(f"Could not fetch account info for {_logsafe(broker_id)}: {_logsafe(exc)}")
+                    logger.warning(f"Could not fetch account info for {_logsafe(broker_id)}: {_logsafe(exc)}")
                     account = {}
                 if account and "error" not in account:
                     entry["account_id"] = account.get("account_id")
