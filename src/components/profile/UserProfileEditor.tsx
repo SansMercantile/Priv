@@ -4,6 +4,7 @@ import KycVerificationPage from './KycVerificationPage';
 import DerivConnectCard from '../DerivConnectCard';
 import { TaxIntelligence } from '../TaxIntelligence';
 import apiClient from '../../api/apiClient';
+import ContactVerifier, { VerifiedEntry } from './ContactVerifier';
 import { 
   User, 
   CreditCard, 
@@ -223,6 +224,101 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
     localStorage.setItem("xm_node_tier_display", nodeTier);
   }, [nodeTier]);
 
+  // ── Server-side persistence ─────────────────────────────────────────
+  // The account row on the server is the source of truth; localStorage
+  // above is only a fast-paint cache. Without this, everything a user
+  // entered lived in one browser and vanished on any other device.
+  const [verifiedList, setVerifiedList] = useState<VerifiedEntry[]>([]);
+  const [emailLocked, setEmailLocked] = useState(false);
+  const [serverHydrated, setServerHydrated] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [meRes, verRes]: any[] = await Promise.all([
+          apiClient.getMyProfile(),
+          apiClient.getVerifiedContacts().catch(() => null),
+        ]);
+        const d = meRes?.data?.data ?? meRes?.data;
+        if (cancelled || !d) return;
+
+        const vd = verRes?.data?.data ?? verRes?.data ?? {};
+        setVerifiedList(vd.verified || []);
+        setEmailLocked(!!d.email);
+
+        const nothingOnServer =
+          !d.phone && !d.country && !d.experience && !d.trading_goal &&
+          !d.risk_appetite && d.leverage == null;
+
+        if (nothingOnServer) {
+          // First visit since server-side storage shipped: push whatever
+          // this browser already holds up to the account (once), so
+          // existing users don't lose what they entered before.
+          const hasLocal = profile.phone || profile.country || profile.tradingGoal;
+          if (hasLocal) {
+            try {
+              await apiClient.updateMyProfile({
+                phone: profile.phone || undefined,
+                country: profile.country || undefined,
+                experience: profile.experience || undefined,
+                trading_goal: profile.tradingGoal || undefined,
+                risk_appetite: profile.riskAppetite || undefined,
+                leverage,
+              });
+            } catch (_) {
+              /* keep local; will retry on next Save */
+            }
+          }
+        } else {
+          setProfile((prev: any) => ({
+            ...prev,
+            firstName: d.given_name ?? prev.firstName,
+            lastName: d.family_name ?? prev.lastName,
+            email: d.email ?? prev.email,
+            phone: d.phone ?? prev.phone,
+            country: d.country ?? prev.country,
+            experience: d.experience ?? prev.experience,
+            tradingGoal: d.trading_goal ?? prev.tradingGoal,
+            riskAppetite: d.risk_appetite ?? prev.riskAppetite,
+          }));
+          if (d.leverage != null) setLeverage(d.leverage);
+          if (d.node_tier) setNodeTier(d.node_tier as any);
+        }
+        // Name/email always come from the account when present, even on
+        // the very first visit (LoginGate prefills them from the login).
+        if (nothingOnServer) {
+          setProfile((prev: any) => ({
+            ...prev,
+            firstName: d.given_name ?? prev.firstName,
+            lastName: d.family_name ?? prev.lastName,
+            email: d.email ?? prev.email,
+          }));
+        }
+        setServerHydrated(true);
+      } catch (_) {
+        /* offline / unauthenticated: stay on the local cache */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Leverage slider / tier are changed outside the form, so persist them
+  // (debounced) once we've loaded the server copy -- never before, or a
+  // default value could overwrite what's stored on the account.
+  useEffect(() => {
+    if (!serverHydrated) return;
+    const t = window.setTimeout(() => {
+      apiClient.updateMyProfile({ leverage, node_tier: nodeTier }).catch(() => {});
+    }, 800);
+    return () => window.clearTimeout(t);
+  }, [leverage, nodeTier, serverHydrated]);
+
   // Real-time synchronization
   useEffect(() => {
     const handleStatusSync = () => {
@@ -269,18 +365,44 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
     return () => clearInterval(interval);
   }, [isPilotRunning]);
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Local cache first (instant UI), then the account on the server --
+    // the server write is what makes this survive a device change.
     localStorage.setItem("xm_user_profile", JSON.stringify(profile));
     localStorage.setItem("xm_user_risk_appetite", profile.riskAppetite);
-    
-    // Dispatch custom event to let other parts of application know about instantaneous updates
     window.dispatchEvent(new Event('storage'));
-    
-    setProfileSuccessMessage("Sovereign risk constraints & legal profile variables synchronized across SANS Node 04.");
-    setTimeout(() => {
-      setProfileSuccessMessage("");
-    }, 4000);
+
+    setProfileSaving(true);
+    setProfileError("");
+    setProfileSuccessMessage("");
+    try {
+      await apiClient.updateMyProfile({
+        given_name: profile.firstName,
+        family_name: profile.lastName,
+        phone: profile.phone,
+        country: profile.country,
+        experience: profile.experience,
+        trading_goal: profile.tradingGoal,
+        risk_appetite: profile.riskAppetite,
+        leverage,
+        node_tier: nodeTier,
+        // Only sent when the account has no email yet (e.g. Twitter login).
+        ...(!emailLocked && profile.email ? { email: profile.email } : {}),
+      });
+      if (!emailLocked && profile.email) setEmailLocked(true);
+      setProfileSuccessMessage("Profile saved to your account. It will be here on any device you sign in from.");
+      setTimeout(() => setProfileSuccessMessage(""), 4000);
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setProfileError(
+        typeof detail === "string"
+          ? detail
+          : detail?.message || err?.message || "Could not save your profile. Please try again."
+      );
+    } finally {
+      setProfileSaving(false);
+    }
   };
 
   const handleSponsorBoost = (amount: number) => {
@@ -513,9 +635,14 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
                     type="email" 
                     value={profile.email} 
                     id="profile-email"
+                    readOnly={emailLocked}
                     onChange={e => setProfile({...profile, email: e.target.value})}
-                    className="w-full p-2.5 bg-zinc-950/80 text-white rounded border border-zinc-800 font-mono text-xs focus:outline-none focus:border-rose-500 transition"
+                    className={`w-full p-2.5 bg-zinc-950/80 text-white rounded border border-zinc-800 font-mono text-xs focus:outline-none focus:border-rose-500 transition ${emailLocked ? 'opacity-70 cursor-not-allowed' : ''}`}
                   />
+                  {emailLocked && (
+                    <p className="mt-1 text-[9px] font-mono text-zinc-500">Tied to your login and can't be changed here.</p>
+                  )}
+                  <ContactVerifier kind="email" contact={profile.email} verified={verifiedList} onVerified={setVerifiedList} />
                 </div>
 
                 <div>
@@ -525,8 +652,10 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
                     value={profile.phone} 
                     id="profile-phone"
                     onChange={e => setProfile({...profile, phone: e.target.value})}
+                    placeholder="+27 82 000 0000"
                     className="w-full p-2.5 bg-zinc-955 text-white rounded border border-zinc-800 font-mono text-xs focus:outline-none focus:border-rose-500 transition"
                   />
+                  <ContactVerifier kind="phone" contact={profile.phone} verified={verifiedList} onVerified={setVerifiedList} />
                 </div>
 
                 <div>
@@ -616,6 +745,17 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
                 </div>
               </div>
 
+              {profileError && (
+                <div className="text-[10px] font-mono text-rose-400 bg-rose-950/30 border border-rose-900/50 rounded px-3 py-2">
+                  {profileError}
+                </div>
+              )}
+              {profileSuccessMessage && (
+                <div className="text-[10px] font-mono text-emerald-400 bg-emerald-950/30 border border-emerald-900/50 rounded px-3 py-2">
+                  {profileSuccessMessage}
+                </div>
+              )}
+
               <div className="flex justify-between items-center pt-3 text-right">
                 <p className="text-[9px] font-mono text-zinc-500 leading-snug text-left max-w-sm">
                   * Synchronizing this deck auto-adjusts systemic leverage factors across the Broker Terminal and limits trade sizing margins.
@@ -623,9 +763,10 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
                 <button 
                   type="submit"
                   id="btn-sync-profile"
-                  className="px-5 py-2.5 bg-gradient-to-r from-rose-700 to-rose-600 hover:from-rose-600 hover:to-rose-500 text-white font-mono text-xs font-bold rounded-lg transition-all shadow-[0_4px_12px_rgba(225,29,72,0.15)] cursor-pointer"
+                  disabled={profileSaving}
+                  className="px-5 py-2.5 bg-gradient-to-r from-rose-700 to-rose-600 hover:from-rose-600 hover:to-rose-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-mono text-xs font-bold rounded-lg transition-all shadow-[0_4px_12px_rgba(225,29,72,0.15)] cursor-pointer"
                 >
-                  Sync Systemic Risk Constraints
+                  {profileSaving ? "Syncing…" : "Sync Systemic Risk Constraints"}
                 </button>
               </div>
             </form>

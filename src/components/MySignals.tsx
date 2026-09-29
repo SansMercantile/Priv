@@ -45,31 +45,17 @@ export default function MySignals() {
   const [cat, setCat] = useState("synthetics");
   const [picked, setPicked] = useState<string[]>([]);
   const [channel, setChannel] = useState("email");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saveErr, setSaveErr] = useState<string | null>(null);
 
-  // OTP verification state: which contacts are proven-owned. Delivery
-  // is gated server-side on this -- unverified contacts are stored but
-  // never delivered to (the engine holds the signal and says why).
+  // Delivery is gated server-side on Profile-verified contacts only --
+  // this tab no longer collects or verifies email/phone itself (see
+  // UserProfileEditor.tsx / ContactVerifier.tsx). We just read what's
+  // already verified so the person knows where signals will go.
   const [verified, setVerified] = useState<{ channel: string; contact: string }[]>([]);
-  const [otpContact, setOtpContact] = useState<"email" | "phone">("email");
-  const [otpCode, setOtpCode] = useState("");
-  const [otpBusy, setOtpBusy] = useState(false);
-  const [otpMsg, setOtpMsg] = useState<string | null>(null);
-  const [otpErr, setOtpErr] = useState<string | null>(null);
-
-  // Same normalization as the backend (_normalize_contact): email
-  // lowercased, phones stripped of visual separators.
-  const normContact = (ch: string, s: string) => {
-    const t = s.trim();
-    return ch === "email" ? t.toLowerCase() : t.replace(/[\s\-().]/g, "");
-  };
-  const isVerified = (ch: string, contact: string) =>
-    !!contact.trim() &&
-    verified.some((v) => v.channel === ch && normContact(ch, v.contact) === normContact(ch, contact));
+  const verifiedEmail = verified.find((v) => v.channel === "email")?.contact || "";
+  const verifiedPhone = verified.find((v) => v.channel === "sms" || v.channel === "whatsapp")?.contact || "";
 
   const load = async () => {
     setLoading(true);
@@ -107,8 +93,6 @@ export default function MySignals() {
           setCat(p.category || "synthetics");
           setPicked(p.instruments || []);
           setChannel(p.delivery_channel || "email");
-          setEmail(p.contact_email || "");
-          setPhone(p.contact_phone || "");
         }
       }
       if (histRes.status === "fulfilled") {
@@ -159,8 +143,6 @@ export default function MySignals() {
         category: cat,
         instruments: picked,
         delivery_channel: channel,
-        contact_email: email.trim() || undefined,
-        contact_phone: phone.trim() || undefined,
         broker: "deriv",
       });
       const p: Prefs | null = res?.data?.data?.preferences ?? res?.data?.preferences ?? null;
@@ -185,60 +167,11 @@ export default function MySignals() {
   const maxInstr = limits?.max_instruments ?? 3;
   const allowedCats = limits?.categories ?? ["synthetics"];
 
-  const sendCode = async () => {
-    const contact = otpContact === "email" ? email.trim() : phone.trim();
-    const ch = otpContact === "email" ? "email" : channel === "whatsapp" ? "whatsapp" : "sms";
-    if (!contact) {
-      setOtpErr("Enter the address/number first.");
-      return;
-    }
-    setOtpBusy(true);
-    setOtpMsg(null);
-    setOtpErr(null);
-    try {
-      await apiClient.requestOtp(ch, contact);
-      setOtpMsg(`Code sent via ${ch} — expires in 10 minutes.`);
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail;
-      setOtpErr(typeof detail === "string" ? detail : detail?.message || e?.message || "Could not send code.");
-    } finally {
-      setOtpBusy(false);
-    }
-  };
-
-  const confirmCode = async () => {
-    const contact = otpContact === "email" ? email.trim() : phone.trim();
-    const ch = otpContact === "email" ? "email" : channel === "whatsapp" ? "whatsapp" : "sms";
-    if (!otpCode.trim()) {
-      setOtpErr("Enter the 6-digit code.");
-      return;
-    }
-    setOtpBusy(true);
-    setOtpMsg(null);
-    setOtpErr(null);
-    try {
-      const res: any = await apiClient.confirmOtp(ch, contact, otpCode.trim());
-      const d = res?.data?.data ?? res?.data ?? {};
-      setVerified(d.verified || []);
-      setOtpCode("");
-      setOtpMsg("Verified. Signals will now deliver to this contact.");
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail;
-      setOtpErr(typeof detail === "string" ? detail : detail?.message || e?.message || "Verification failed.");
-    } finally {
-      setOtpBusy(false);
-    }
-  };
-
-  const VerifyBadge = ({ ch, contact }: { ch: string; contact: string }) => {
-    if (!contact.trim()) return null;
-    const ok = isVerified(ch, contact);
-    return (
-      <span className={`ml-2 text-[9px] uppercase px-1.5 py-0.5 rounded font-mono ${ok ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"}`}>
-        {ok ? "verified" : "unverified — no delivery"}
-      </span>
-    );
-  };
+  const ContactBadge = ({ label, contact }: { label: string; contact: string }) => (
+    <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded font-mono ${contact ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"}`}>
+      {contact ? `${label}: ${contact}` : `${label}: not verified`}
+    </span>
+  );
 
   const SignalRow = ({ s }: { s: any }) => (
     <div className="flex items-center justify-between gap-2 p-2 rounded-lg border border-white/10 bg-black/40 text-xs font-mono">
@@ -362,67 +295,24 @@ export default function MySignals() {
               ))}
             </select>
           </div>
-          <div>
-            <label className="text-[11px] font-mono text-zinc-400 uppercase">Contact email{channel === "email" ? " *" : ""}<VerifyBadge ch="email" contact={email} /></label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="mt-1 w-full bg-black border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
-            />
-          </div>
-          <div>
-            <label className="text-[11px] font-mono text-zinc-400 uppercase">Phone{(channel === "sms" || channel === "whatsapp") ? " *" : ""}<VerifyBadge ch={channel === "whatsapp" ? "whatsapp" : "sms"} contact={phone} /></label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+27…"
-              className="mt-1 w-full bg-black border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
-            />
+          <div className="sm:col-span-2">
+            <label className="text-[11px] font-mono text-zinc-400 uppercase">Delivery contact</label>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <ContactBadge label="Email" contact={verifiedEmail} />
+              <ContactBadge label="Phone" contact={verifiedPhone} />
+              <button
+                type="button"
+                onClick={() => navigate("/dashboard/profile")}
+                className="text-[10px] font-mono text-white/60 hover:text-white underline underline-offset-2"
+              >
+                verify or change in Profile →
+              </button>
+            </div>
           </div>
         </div>
-        <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
-          <p className="text-[11px] font-mono text-zinc-300">
-            Verify ownership to receive signals — unverified contacts are stored but never delivered to.
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={otpContact}
-              onChange={(e) => setOtpContact(e.target.value as "email" | "phone")}
-              className="bg-black border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white font-mono"
-            >
-              <option value="email">email</option>
-              <option value="phone">phone (sms{channel === "whatsapp" ? "/whatsapp" : ""})</option>
-            </select>
-            <button
-              type="button"
-              onClick={sendCode}
-              disabled={otpBusy}
-              className="px-3 py-1.5 border border-white/20 rounded-lg font-mono text-xs text-white hover:bg-white/10 transition disabled:opacity-50"
-            >
-              {otpBusy ? "SENDING…" : "SEND CODE"}
-            </button>
-            <input
-              value={otpCode}
-              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              placeholder="6-digit code"
-              inputMode="numeric"
-              className="w-28 bg-black border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white font-mono"
-            />
-            <button
-              type="button"
-              onClick={confirmCode}
-              disabled={otpBusy}
-              className="px-3 py-1.5 bg-white text-black rounded-lg font-mono text-xs hover:bg-zinc-200 transition disabled:opacity-50"
-            >
-              VERIFY
-            </button>
-          </div>
-          {otpMsg && <p className="text-[11px] font-mono text-emerald-300">{otpMsg}</p>}
-          {otpErr && <p className="text-[11px] font-mono text-red-300">{otpErr}</p>}
-        </div>
+        <p className="text-[10px] font-mono text-zinc-500">
+          Signals deliver only to email/phone verified once in your Profile — not here. Unverified contacts hold the signal instead of sending it.
+        </p>
         {saveMsg && (
           <div className="p-2 rounded border border-emerald-500/20 bg-emerald-500/5 text-emerald-300 text-xs font-mono flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" /> {saveMsg}

@@ -275,6 +275,27 @@ export const apiClient = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ channel, contact, code }),
     }),
+  // Server-side profile (client_profiles row + verified contacts). The
+  // single source of truth so data follows the account across devices;
+  // localStorage is only a fast-paint cache (backend/api/identity_sync_api.py).
+  getMyProfile: () => safeFetchRelative("/api/v1/identity/me"),
+  updateMyProfile: (fields: {
+    email?: string; // accepted only when the account has no email yet
+    given_name?: string;
+    family_name?: string;
+    phone?: string;
+    country?: string;
+    experience?: string;
+    trading_goal?: string;
+    risk_appetite?: string;
+    leverage?: number;
+    node_tier?: string;
+  }) =>
+    safeFetchRelative("/api/v1/identity/profile", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fields),
+    }),
   getEmotionHistory: (days: number = 30) =>
     safeFetchRelative(`/api/v1/verify/emotion/history?days=${days}`),
   getEmotionCheckin: (id: number) =>
