@@ -18,6 +18,7 @@ import Billing from "./components/Billing";
 import Celebrations from "./components/Celebrations";
 import ProfilePage from "./components/profile/ProfilePage";
 import KycAdminReviewPage from "./components/profile/KycAdminReviewPage";
+import CrmPage from "./components/CrmPage";
 import UnifiedAssistant from "./ui/UnifiedAssistant";
 import GuidedWalkthrough from "./components/GuidedWalkthrough";
 import LoginGate from "./components/auth/LoginGate";
@@ -267,6 +268,9 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
                   <Route path="/dashboard/billing" element={<Billing demoMode={demoMode} />} />
                   <Route path="/dashboard/profile" element={<ProfilePage demoMode={demoMode} />} />
                   <Route path="/dashboard/admin/kyc" element={<KycAdminReviewPage />} />
+                  {/* Client CRM is admin-only (sidebar hides it from
+                      clients; this guard closes the direct-URL path). */}
+                  <Route path="/dashboard/crm" element={<RequireAdmin><CrmPage /></RequireAdmin>} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </Routes>
                 )}

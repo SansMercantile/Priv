@@ -21,7 +21,8 @@ import {
   Laptop,
   Coins,
   User,
-  Radio
+  Radio,
+  Contact
 } from "lucide-react";
 import logo from "../assets/images/logo_1779280505672.png";
 
@@ -235,9 +236,10 @@ export default function Sidebar({
     if (item.path === "/dashboard/automation" && !isPaying && !showCompliance) continue;
     items.push(item);
     // Security Check keeps its old slot (after Multi-Agent Hub) but is
-    // never present for clients.
+    // never present for clients. Client CRM rides the same admin gate.
     if (showCompliance && item.path === "/dashboard/multi-agent") {
       items.push({ name: "Security Check", icon: ShieldCheck, path: "/dashboard/security" });
+      items.push({ name: "Client CRM", icon: Contact, path: "/dashboard/crm" });
     }
   }
   if (showCompliance) {

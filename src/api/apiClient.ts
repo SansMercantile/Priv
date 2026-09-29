@@ -86,6 +86,11 @@ export const apiClient = {
     return { data };
   },
 
+  delete: async (url: string) => {
+    const data = await safeFetch(url, { method: "DELETE" });
+    return { data };
+  },
+
   // KYC handlers (relative: served by kyc_compat_api.py, mounted at
   // /api/kyc in main.py -- confirmed live: GET /api/kyc/status -> 401
   // (route exists, needs auth), not 404. Do NOT change these to
