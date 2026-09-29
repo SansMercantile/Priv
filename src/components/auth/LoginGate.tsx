@@ -269,6 +269,20 @@ export default function LoginGate({ children }: LoginGateProps) {
           /* ignore */
         }
       });
+      // Persist name/email server-side so the admin CRM shows real names
+      // (previously only ever stored in this browser's localStorage).
+      // Server reads the authoritative profile from Auth0 /userinfo; the body
+      // is a fallback. Idempotent.
+      apiClient
+        .post("/api/v1/identity/sync", {
+          name: user?.name ?? null,
+          given_name: user?.given_name ?? null,
+          family_name: user?.family_name ?? null,
+          picture: user?.picture ?? null,
+        })
+        .catch(() => {
+          /* non-fatal: retried on next login */
+        });
       apiClient.post("/api/v1/payment/subscriptions/ensure-free", {}).catch(() => {
         /* non-fatal: billing page retries on view */
       });

@@ -18,6 +18,8 @@ import apiClient from "../api/apiClient";
 
 interface ClientSub {
   user_id: string;
+  name?: string | null;
+  email?: string | null;
   subscription_id?: string | null;
   plan_id?: string | null;
   plan_name?: string | null;
@@ -200,8 +202,9 @@ export default function CrmPage() {
     for (const c of clients) byId.set(c.user_id, { ...c });
     for (const u of overview) {
       const r: MergedRow = byId.get(u.user_id) ?? { user_id: u.user_id };
-      r.name = u.name ?? r.name ?? null;
-      r.email = u.email ?? r.email ?? null;
+      // Server-persisted profile (clients endpoint) wins; overview fills gaps.
+      r.name = r.name ?? u.name ?? null;
+      r.email = r.email ?? u.email ?? null;
       r.kyc = u.kyc_status ?? null;
       if (!r.plan_name && u.plan) r.plan_name = u.plan;
       if (!r.status && u.subscription_status) r.status = u.subscription_status;
@@ -499,10 +502,19 @@ export default function CrmPage() {
                   >
                     <td className="py-2.5 px-3">
                       <div className="text-xs font-mono font-bold text-white">
-                        {r.name || <span className="text-zinc-500">{r.user_id}</span>}
+                        {r.name || r.email || (
+                          <span className="text-amber-400/80 font-normal italic">
+                            Name pending (syncs at next login)
+                          </span>
+                        )}
                       </div>
-                      <div className="text-[10px] text-zinc-500 truncate max-w-[260px]">
-                        {r.email || r.user_id}
+                      <div
+                        className="text-[10px] text-zinc-500 truncate max-w-[260px]"
+                        title={r.user_id}
+                      >
+                        {r.name && r.email
+                          ? r.email
+                          : `${r.user_id.split("|")[0]} · ${r.user_id.split("|").pop()?.slice(-6)}`}
                       </div>
                     </td>
                     <td className="py-2.5 px-3">
