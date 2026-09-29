@@ -97,7 +97,9 @@ export default function Billing({ demoMode }: { demoMode?: boolean }) {
         plan_id: plan.plan_id,
         return_url: `${origin}/dashboard/billing?status=success`,
         cancel_url: `${origin}/dashboard/billing?status=cancelled`,
-        notify_url: "https://api.priv.sansmercantile.com/api/payfast/itn",
+        // api.priv.sansmercantile.com is dead (DNS/CDN rejects the double
+        // label) and the ITN route lives under the /api/v1/payment prefix.
+        notify_url: "https://priv.sansmercantile.com/api/v1/payment/payfast/itn",
         billing_frequency: "3",
       });
       // createPayfastSubscription calls safeFetchRelative directly, which
