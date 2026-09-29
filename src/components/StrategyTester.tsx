@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { FlaskConical, Play, RefreshCw, CheckCircle2, XCircle, Square } from "lucide-react";
+import { FlaskConical, Play, RefreshCw, CheckCircle2, XCircle, Square, Star, History, ChevronDown } from "lucide-react";
 import apiClient from "../api/apiClient";
 
 interface StratStats {
@@ -23,6 +23,34 @@ interface LiveResult {
   reason?: string;
 }
 
+// Sandbox board row: pin/label/note come from the persisted meta file,
+// test stats are derived server-side from stored BacktestRun rows.
+interface BoardRow {
+  strategy: string;
+  description?: string | null;
+  category?: string | null;
+  pinned?: boolean;
+  label?: string | null;
+  note?: string | null;
+  last_tested_at?: string | null;
+  tests?: number;
+  best_return_pct?: number | null;
+  avg_sharpe?: number | null;
+}
+
+// One persisted backtest row from GET /api/v1/backtest/runs.
+interface RunRow {
+  run_id: string;
+  strategy: string;
+  symbol: string;
+  timeframe: string;
+  total_return_pct?: number | null;
+  sharpe?: number | null;
+  win_rate?: number | null;
+  num_trades?: number | null;
+  created_at?: string | null;
+}
+
 const fmtPct = (v?: number) =>
   v === undefined || v === null || Number.isNaN(v) ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(v >= 100 ? 0 : 2)}%`;
 const fmtNum = (v?: number, d = 2) =>
@@ -33,6 +61,23 @@ const fmtWin = (v?: number) => {
   if (v === undefined || v === null || Number.isNaN(v)) return "—";
   const pct = v <= 1 ? v * 100 : v;
   return `${pct.toFixed(1)}%`;
+};
+
+// Backend timestamps are naive UTC -- assume Z when no zone present.
+const parseUtc = (iso: string) =>
+  new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`);
+
+// "just now" / "12m ago" / "3h ago" / "2d ago" / date for last-tested.
+const fmtWhen = (iso?: string | null) => {
+  if (!iso) return "never";
+  const t = parseUtc(iso);
+  if (Number.isNaN(t.getTime())) return "never";
+  const sec = Math.max(0, (Date.now() - t.getTime()) / 1000);
+  if (sec < 60) return "just now";
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  if (sec < 604800) return `${Math.floor(sec / 86400)}d ago`;
+  return t.toLocaleDateString();
 };
 
 // Strategy Tester -- the Strategies page's testing bench. Built on the
@@ -61,16 +106,39 @@ export default function StrategyTester() {
   const [actionError, setActionError] = useState<string | null>(null);
   const abortRef = useRef(false);
 
+  // Sandbox board: pins/labels/notes + real last-tested stats.
+  const [boards, setBoards] = useState<BoardRow[]>([]);
+  const [boardOpen, setBoardOpen] = useState(false);
+  const [showAllBoards, setShowAllBoards] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editNote, setEditNote] = useState("");
+  const [metaSaving, setMetaSaving] = useState(false);
+  // Filterable persisted run history (shown while the board is open).
+  const [histStrategy, setHistStrategy] = useState("all");
+  const [histOutcome, setHistOutcome] = useState("all");
+  const [history, setHistory] = useState<RunRow[] | null>(null);
+  const [histLoading, setHistLoading] = useState(false);
+  const [histError, setHistError] = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const [prof, sess, uni] = await Promise.allSettled([
+      const [prof, sess, uni, brd] = await Promise.allSettled([
         apiClient.get("/api/v1/profile/strategies"),
         apiClient.get("/api/v1/backtest/session-results"),
         apiClient.get("/api/v1/backtest/universe"),
+        apiClient.get("/api/v1/backtest/sandbox/boards"),
       ]);
       if (cancelled) return;
+
+      if (brd.status === "fulfilled") {
+        const bs: BoardRow[] = brd.value?.data?.data?.boards ?? [];
+        setBoards(bs);
+        // Open the board by default only when something is pinned.
+        if (bs.some((b) => b.pinned)) setBoardOpen(true);
+      }
 
       let cat: Record<string, { description?: string; category?: string }> = {};
       if (prof.status === "fulfilled") {
@@ -140,6 +208,9 @@ export default function StrategyTester() {
       });
       const d = res?.data?.data;
       setLive((prev) => ({ ...prev, [name]: d ?? { ok: false, reason: "empty result" } }));
+      // A persisted run bumps this strategy's real last-tested stat.
+      loadBoards();
+      if (boardOpen) loadHistory();
     } catch (e: any) {
       setLive((prev) => ({ ...prev, [name]: { ok: false, reason: e?.message || "run failed" } }));
     } finally {
@@ -178,6 +249,55 @@ export default function StrategyTester() {
     setProgress(null);
     setTesting(false);
   };
+
+  const loadBoards = async () => {
+    try {
+      const res: any = await apiClient.get("/api/v1/backtest/sandbox/boards");
+      setBoards(res?.data?.data?.boards ?? []);
+    } catch {
+      // Older backend without the boards endpoint: board stays hidden.
+    }
+  };
+
+  const saveMeta = async (
+    name: string,
+    patch: { pinned?: boolean; label?: string; note?: string }
+  ) => {
+    setMetaSaving(true);
+    setActionError(null);
+    try {
+      await apiClient.put("/api/v1/backtest/sandbox/meta", { strategy: name, ...patch });
+      setEditing(null);
+      await loadBoards();
+    } catch (e: any) {
+      setActionError(`Could not save sandbox meta: ${e?.message || "network error"}`);
+    } finally {
+      setMetaSaving(false);
+    }
+  };
+
+  const loadHistory = async () => {
+    setHistLoading(true);
+    setHistError(null);
+    try {
+      const params = new URLSearchParams({ limit: "100" });
+      if (histStrategy !== "all") params.set("strategy", histStrategy);
+      if (histOutcome !== "all") params.set("outcome", histOutcome);
+      const res: any = await apiClient.get(`/api/v1/backtest/runs?${params.toString()}`);
+      setHistory(res?.data?.data ?? []);
+    } catch (e: any) {
+      setHistory(null);
+      setHistError(e?.message || "could not load run history");
+    } finally {
+      setHistLoading(false);
+    }
+  };
+
+  // Refetch whenever the board opens or a filter changes.
+  useEffect(() => {
+    if (boardOpen) loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boardOpen, histStrategy, histOutcome]);
 
   const toggleUse = async (name: string) => {
     const already = selected.includes(name);
@@ -330,6 +450,297 @@ export default function StrategyTester() {
           <p className="text-[11px] font-mono text-rose-400">{actionError}</p>
         )}
       </div>
+
+      {/* Sandbox board: pinned/labelled strategies + real last-tested stats */}
+      {boards.length > 0 && (
+        <div className="space-y-3">
+          <button
+            onClick={() => setBoardOpen((o) => !o)}
+            className="w-full flex items-center justify-between px-4 py-2.5 border border-white/10 rounded-xl bg-white/5 hover:bg-white/[0.08] transition cursor-pointer"
+          >
+            <span className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-zinc-400 font-bold">
+              <Star className="w-3.5 h-3.5 text-amber-400" />
+              Sandbox board
+              <span className="text-zinc-600 normal-case font-normal">
+                · {boards.filter((b) => b.pinned).length} pinned · {boards.length} strategies
+              </span>
+            </span>
+            <ChevronDown
+              className={`w-4 h-4 text-zinc-500 transition-transform ${boardOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          {boardOpen && (
+            <>
+              <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {(() => {
+                  const pinned = boards.filter((b) => b.pinned);
+                  const unpinned = boards.filter((b) => !b.pinned);
+                  const visible = showAllBoards
+                    ? boards
+                    : [...pinned, ...unpinned.slice(0, Math.max(0, 12 - pinned.length))];
+                  return visible.map((b) => (
+                    <div
+                      key={b.strategy}
+                      className={`p-3 border rounded-xl ${
+                        b.pinned
+                          ? "border-amber-500/40 bg-amber-500/[0.05]"
+                          : "border-white/10 bg-black/30"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className="text-xs font-mono font-bold text-white truncate"
+                              title={b.description ?? undefined}
+                            >
+                              {b.strategy}
+                            </span>
+                            {b.category && (
+                              <span className="text-[8.5px] font-mono uppercase px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-zinc-500">
+                                {b.category}
+                              </span>
+                            )}
+                            {b.label && (
+                              <span className="text-[8.5px] font-mono uppercase px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-300">
+                                {b.label}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] font-mono text-zinc-500 mt-1">
+                            <span
+                              title={
+                                b.last_tested_at
+                                  ? `Last tested ${parseUtc(b.last_tested_at).toLocaleString()}`
+                                  : "No stored runs yet"
+                              }
+                              className={b.last_tested_at ? "" : "text-zinc-600"}
+                            >
+                              tested {fmtWhen(b.last_tested_at)}
+                            </span>
+                            <span className="text-zinc-600"> · {b.tests ?? 0} runs</span>
+                            {b.best_return_pct != null && (
+                              <span className={b.best_return_pct >= 0 ? "text-emerald-500/80" : "text-rose-400/80"}>
+                                {" "}· best {fmtPct(b.best_return_pct)}
+                              </span>
+                            )}
+                            {b.avg_sharpe != null && (
+                              <span className="text-zinc-600"> · sh {fmtNum(b.avg_sharpe)}</span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => saveMeta(b.strategy, { pinned: !b.pinned })}
+                          disabled={metaSaving}
+                          title={b.pinned ? "Unpin from board" : "Pin to board"}
+                          className="shrink-0 p-1 rounded hover:bg-white/10 transition disabled:opacity-40 cursor-pointer"
+                        >
+                          <Star
+                            className={`w-4 h-4 ${b.pinned ? "text-amber-400 fill-amber-400" : "text-zinc-600"}`}
+                          />
+                        </button>
+                      </div>
+
+                      {editing === b.strategy ? (
+                        <div className="mt-2 space-y-1.5">
+                          <input
+                            value={editLabel}
+                            onChange={(e) => setEditLabel(e.target.value)}
+                            maxLength={60}
+                            placeholder="Label (e.g. A-grade trend)"
+                            className="w-full bg-neutral-950 border border-white/15 rounded px-2 py-1.5 text-[11px] font-mono text-white focus:outline-none focus:border-white/40"
+                          />
+                          <textarea
+                            value={editNote}
+                            onChange={(e) => setEditNote(e.target.value)}
+                            maxLength={2000}
+                            rows={3}
+                            placeholder="Notes: why it works, market conditions, what to watch..."
+                            className="w-full bg-neutral-950 border border-white/15 rounded px-2 py-1.5 text-[11px] font-mono text-white focus:outline-none focus:border-white/40 resize-y"
+                          />
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => saveMeta(b.strategy, { label: editLabel, note: editNote })}
+                              disabled={metaSaving}
+                              className="px-2.5 py-1 rounded border border-emerald-500/40 bg-emerald-500/15 text-emerald-300 text-[9.5px] font-mono font-bold disabled:opacity-40 cursor-pointer"
+                            >
+                              {metaSaving ? "SAVING..." : "SAVE"}
+                            </button>
+                            <button
+                              onClick={() => setEditing(null)}
+                              className="px-2.5 py-1 rounded border border-white/15 text-zinc-400 text-[9.5px] font-mono font-bold hover:bg-white/10 cursor-pointer"
+                            >
+                              CANCEL
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-2 flex items-start justify-between gap-2">
+                          <p
+                            className="text-[10.5px] text-zinc-500 font-mono leading-snug truncate flex-1"
+                            title={b.note ?? ""}
+                          >
+                            {b.note || <span className="text-zinc-600">no notes</span>}
+                          </p>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => {
+                                setEditing(b.strategy);
+                                setEditLabel(b.label ?? "");
+                                setEditNote(b.note ?? "");
+                              }}
+                              className="px-2 py-1 rounded border border-white/15 bg-white/5 hover:bg-white/10 text-[9.5px] font-mono font-bold text-zinc-300 transition cursor-pointer"
+                            >
+                              EDIT
+                            </button>
+                            <button
+                              onClick={() => runOne(b.strategy)}
+                              disabled={testing || singleRunning !== null}
+                              title={`Run on ${symbol} ${timeframe}`}
+                              className="px-2 py-1 rounded border border-white/15 bg-white/5 hover:bg-white/10 text-[9.5px] font-mono font-bold text-white transition disabled:opacity-40 cursor-pointer"
+                            >
+                              {singleRunning === b.strategy ? "..." : "TEST"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ));
+                })()}
+              </div>
+
+              {boards.length > 12 && (
+                <button
+                  onClick={() => setShowAllBoards((v) => !v)}
+                  className="w-full py-2 rounded border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-mono font-bold text-zinc-400 transition cursor-pointer"
+                >
+                  {showAllBoards ? "SHOW FEWER" : `SHOW ALL ${boards.length} STRATEGIES`}
+                </button>
+              )}
+
+              {/* Filterable persisted test history */}
+              <div className="border border-white/10 rounded-xl overflow-hidden">
+                <div className="px-4 py-2.5 bg-white/5 flex flex-wrap items-center gap-2">
+                  <span className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-bold">
+                    <History className="w-3.5 h-3.5" />
+                    Test history
+                    <span className="text-zinc-600 normal-case font-normal">
+                      (stored backtests)
+                    </span>
+                  </span>
+                  <div className="ml-auto flex items-center gap-2">
+                    <select
+                      value={histStrategy}
+                      onChange={(e) => setHistStrategy(e.target.value)}
+                      className="bg-neutral-950 border border-white/10 rounded px-2 py-1 text-[10px] font-mono text-white focus:outline-none focus:border-white/30 cursor-pointer"
+                      title="Filter by strategy"
+                    >
+                      <option value="all">All strategies</option>
+                      {boards.map((b) => (
+                        <option key={b.strategy} value={b.strategy}>
+                          {b.strategy}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={histOutcome}
+                      onChange={(e) => setHistOutcome(e.target.value)}
+                      className="bg-neutral-950 border border-white/10 rounded px-2 py-1 text-[10px] font-mono text-white focus:outline-none focus:border-white/30 cursor-pointer"
+                      title="Filter by outcome"
+                    >
+                      <option value="all">Any outcome</option>
+                      <option value="profit">Profit only</option>
+                      <option value="loss">Loss only</option>
+                    </select>
+                    <button
+                      onClick={loadHistory}
+                      disabled={histLoading}
+                      title="Refresh history"
+                      className="p-1.5 rounded border border-white/10 bg-white/5 hover:bg-white/10 transition disabled:opacity-40 cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3 h-3 text-zinc-400 ${histLoading ? "animate-spin" : ""}`} />
+                    </button>
+                  </div>
+                </div>
+                {histError && (
+                  <p className="px-4 py-2 text-[11px] font-mono text-rose-400">{histError}</p>
+                )}
+                <div className="max-h-80 overflow-y-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-white/[0.03] text-zinc-600 uppercase text-[9px] font-mono">
+                        <th className="py-1.5 px-3">When</th>
+                        <th className="py-1.5 px-3">Strategy</th>
+                        <th className="py-1.5 px-3">Symbol</th>
+                        <th className="py-1.5 px-3">TF</th>
+                        <th className="py-1.5 px-3 text-right">Return</th>
+                        <th className="py-1.5 px-3 text-right">Sharpe</th>
+                        <th className="py-1.5 px-3 text-right">Win</th>
+                        <th className="py-1.5 px-3 text-right">Trades</th>
+                        <th className="py-1.5 px-3">Run</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {history?.map((r) => (
+                        <tr key={r.run_id} className="border-t border-white/5 hover:bg-white/[0.03]">
+                          <td
+                            className="py-1.5 px-3 text-[9.5px] font-mono text-zinc-500 whitespace-nowrap"
+                            title={r.created_at ? parseUtc(r.created_at).toLocaleString() : ""}
+                          >
+                            {r.created_at ? fmtWhen(r.created_at) : "—"}
+                          </td>
+                          <td className="py-1.5 px-3 text-[10px] font-mono font-bold text-white">
+                            {r.strategy}
+                          </td>
+                          <td className="py-1.5 px-3 text-[10px] font-mono text-zinc-400">{r.symbol}</td>
+                          <td className="py-1.5 px-3 text-[10px] font-mono text-zinc-500">{r.timeframe}</td>
+                          <td
+                            className={`py-1.5 px-3 text-right text-[10px] font-mono ${
+                              (r.total_return_pct ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
+                            }`}
+                          >
+                            {fmtPct(r.total_return_pct)}
+                          </td>
+                          <td className="py-1.5 px-3 text-right text-[10px] font-mono text-zinc-400">
+                            {fmtNum(r.sharpe)}
+                          </td>
+                          <td className="py-1.5 px-3 text-right text-[10px] font-mono text-zinc-400">
+                            {fmtWin(r.win_rate)}
+                          </td>
+                          <td className="py-1.5 px-3 text-right text-[10px] font-mono text-zinc-400">
+                            {r.num_trades ?? "—"}
+                          </td>
+                          <td
+                            className="py-1.5 px-3 text-[9px] font-mono text-zinc-600 truncate max-w-[160px]"
+                            title={r.run_id}
+                          >
+                            {r.run_id}
+                          </td>
+                        </tr>
+                      ))}
+                      {histLoading && !history && !histError && (
+                        <tr>
+                          <td colSpan={9} className="py-6 text-center text-[10px] font-mono text-zinc-500">
+                            LOADING HISTORY...
+                          </td>
+                        </tr>
+                      )}
+                      {history?.length === 0 && !histLoading && (
+                        <tr>
+                          <td colSpan={9} className="py-6 text-center text-[10px] font-mono text-zinc-500">
+                            No runs match these filters — press TEST on a card to create one.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Results table */}
       <div className="border border-white/10 rounded-xl overflow-hidden">

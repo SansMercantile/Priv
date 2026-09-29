@@ -77,6 +77,15 @@ export const apiClient = {
     return { data };
   },
 
+  put: async (url: string, bodyData?: any) => {
+    const data = await safeFetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: bodyData ? JSON.stringify(bodyData) : undefined,
+    });
+    return { data };
+  },
+
   // KYC handlers (relative: served by kyc_compat_api.py, mounted at
   // /api/kyc in main.py -- confirmed live: GET /api/kyc/status -> 401
   // (route exists, needs auth), not 404. Do NOT change these to
