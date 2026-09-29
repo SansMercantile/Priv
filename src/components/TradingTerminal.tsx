@@ -10,6 +10,9 @@ import {
   X,
   Calculator,
   Maximize2,
+  Bot,
+  Lock,
+  Sparkles,
 } from "lucide-react";
 
 // Rise & Fall mini app (Deriv "Priv Core mini" app id 34vzk..., served
@@ -26,6 +29,8 @@ const RISE_FALL_MINI_APP_URL = "https://privcoremini.sansmercantile.com";
 // other-mode account.
 
 import { getAuthToken } from "../lib/authToken";
+import { Link } from "react-router-dom";
+import apiClient from "../api/apiClient";
 
 // Authenticated headers for every backend call: the verified Bearer
 // token (when signed in) plus the browser id. The old version sent
@@ -64,6 +69,16 @@ interface AccountInfo {
   balance: number;
   currency: string;
   account_type: string;
+}
+
+interface AutonomousAnalysis {
+  reasoning: string;
+  action: string;
+  confidence: number;
+  stopLoss: number;
+  takeProfit: number;
+  lotSize: number;
+  rationale: string;
 }
 
 const SYMBOLS = [
@@ -129,6 +144,82 @@ function TradingTerminalInner() {
   const [showMiniApp, setShowMiniApp] = useState(false);
   const [miniAppSrc, setMiniAppSrc] = useState<string>(RISE_FALL_MINI_APP_URL);
   const [miniAppLoading, setMiniAppLoading] = useState(false);
+
+  // ── SANS Autonomous Desk ─────────────────────────────────────────────
+  // Tier gate comes from the real subscription (GET /subscriptions/me ->
+  // tier, derived server-side), never localStorage -- same rule as
+  // Connections.tsx. Admin accounts pass every gate. Sovereign gets the
+  // AI analyze/suggest desk without auto-execution; Autonomous (or
+  // admin) gets the full agent.
+  const [nodeTier, setNodeTier] = useState<string>("free");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAutoTrading, setIsAutoTrading] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("priv_auto_trading") === "true";
+    } catch (_) {
+      return false;
+    }
+  });
+  const [autoLogs, setAutoLogs] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("priv_auto_logs") || "[]");
+    } catch (_) {
+      return [];
+    }
+  });
+  const [autoAnalysis, setAutoAnalysis] = useState<AutonomousAnalysis | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const isRunningTradeCycleRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const syncTier = async () => {
+      try {
+        const res: any = await apiClient.getMySubscription();
+        const body = res?.data ?? res;
+        const sub = body?.subscription ?? (body && typeof body === "object" ? body : null);
+        if (!cancelled) setNodeTier(sub?.tier || "free");
+      } catch (_) {
+        /* offline/unauthenticated: stay on last known tier (defaults free) */
+      }
+    };
+    syncTier();
+    const interval = setInterval(syncTier, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res: any = await apiClient.get("/api/v1/admin/whoami");
+        if (!cancelled && res?.data?.data?.admin) setIsAdmin(true);
+      } catch (_) {
+        /* stay non-admin */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const canAutoExecute = isAdmin || nodeTier === "autonomous";
+  const canUseDesk = canAutoExecute || nodeTier === "sovereign";
+
+  const pushAutoLog = (msg: string) => {
+    setAutoLogs((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 100));
+  };
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("priv_auto_logs", JSON.stringify(autoLogs.slice(0, 100)));
+    } catch (_) {
+      /* quota/private-mode: logs stay in memory only */
+    }
+  }, [autoLogs]);
 
   // SSO handoff: fetch THIS user's own Deriv session from the backend
   // (verified Bearer required server-side) and pass it to the mini app
@@ -262,6 +353,7 @@ function TradingTerminalInner() {
   const [orderSide, setOrderSide] = useState<"BUY" | "SELL">("BUY");
   const [stake, setStake] = useState<number>(10);
   const [duration, setDuration] = useState<number>(5);
+  const [riskPct, setRiskPct] = useState<number>(1);
   const [placingOrder, setPlacingOrder] = useState(false);
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
@@ -329,6 +421,200 @@ function TradingTerminalInner() {
       pushLog(`Close failed: ${err.message || err}`);
     }
   };
+
+  // ── Autonomous desk pipelines (ported from the original SANS desk) ───
+  // Reference spot price used ONLY as the AI analysis input -- the same
+  // static table the original desk shipped with. Stake sizing for real
+  // orders never depends on it.
+  const getAssetRefPrice = (s: string): number => {
+    if (s.includes("EURUSD")) return 1.0825;
+    if (s.includes("GBPUSD")) return 1.2643;
+    if (s.includes("USDJPY")) return 156.425;
+    if (s.includes("XAU") || s.includes("GOLD")) return 2420.5;
+    if (s.includes("BTC")) return 91245;
+    return 1.152;
+  };
+
+  const deskProfile = () => {
+    let riskAppetite = "Aggressive";
+    let tradingGoal = "Capital Expansion & Systematic Arbitrage";
+    let userIdentity = "Priv Desk Operator";
+    for (const key of ["priv_profile", "xm_user_profile"]) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        const p = JSON.parse(raw);
+        if (p?.riskAppetite) riskAppetite = p.riskAppetite;
+        if (p?.tradingGoal) tradingGoal = p.tradingGoal;
+        if (p?.firstName) userIdentity = `${p.firstName} ${p.lastName || ""}`.trim();
+        break;
+      } catch (_) {
+        /* try the next legacy key */
+      }
+    }
+    return { riskAppetite, tradingGoal, userIdentity, leverage: 20 };
+  };
+
+  const runAutonomousAnalysis = async () => {
+    if (!brokerId) {
+      pushAutoLog("Link a Deriv account before running analysis.");
+      return;
+    }
+    setIsAnalyzing(true);
+    setAutoAnalysis(null);
+    try {
+      const profile = deskProfile();
+      const res = await fetch("/api/autonomous/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: selectedSymbol,
+          price: getAssetRefPrice(selectedSymbol),
+          balance: account?.balance || 0,
+          news: [],
+          technicalIndicators: { screener: "Terminal desk", sentiment: "Live session" },
+          ...profile,
+        }),
+      });
+      if (!res.ok) throw new Error("Sovereign analyst node offline.");
+      const result: AutonomousAnalysis = await res.json();
+      setAutoAnalysis(result);
+      pushAutoLog(
+        `Analysis complete: ${result.action} ${result.lotSize} lots at ${result.confidence}% confidence.`
+      );
+    } catch (err: any) {
+      pushAutoLog(`Analysis failed: ${err.message || err}`);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const runAutonomousTradeCycle = async () => {
+    if (isRunningTradeCycleRef.current) return;
+    if (!canAutoExecute) {
+      setIsAutoTrading(false);
+      pushAutoLog("Auto-execution gate: the Autonomous tier (or an admin account) is required. Agent disarmed.");
+      return;
+    }
+    if (!brokerId || !isConnected) {
+      pushAutoLog(`Waiting for a live Deriv ${activeMode} connection -- cycle skipped.`);
+      return;
+    }
+    if (!account) {
+      pushAutoLog("Account balance unavailable -- cycle skipped.");
+      return;
+    }
+    isRunningTradeCycleRef.current = true;
+    pushAutoLog("Initiating SANS autonomous market verification sweep...");
+    try {
+      const profile = deskProfile();
+      const res = await fetch("/api/autonomous/trade", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: selectedSymbol,
+          price: getAssetRefPrice(selectedSymbol),
+          balance: account.balance,
+          news: [],
+          existingPositions: positions.map((p) => ({
+            symbol: p.symbol,
+            contract_type: p.contract_type,
+            buy_price: p.buy_price,
+          })),
+          ...profile,
+        }),
+      });
+      if (!res.ok) throw new Error("Synchronisation failure on the autonomous endpoint.");
+      const result = await res.json();
+
+      if (Array.isArray(result.logs)) {
+        const stamp = new Date().toLocaleTimeString();
+        const fresh = [...result.logs].reverse().map((m: string) => `[${stamp}] ${m}`);
+        setAutoLogs((prev) => [...fresh, ...prev].slice(0, 100));
+      }
+
+      if (result.execute && result.trade) {
+        const dup = positions.some(
+          (p) => p.symbol === selectedSymbol || p.symbol === result.trade.symbol
+        );
+        if (dup) {
+          pushAutoLog(`Risk ceiling reached -- an open ${selectedSymbol} position already exists; duplicate skipped.`);
+          return;
+        }
+        const lots = parseFloat(result.trade.lots) || 0.01;
+        // Deriv stake sizing: the AI lot suggestion is read as a
+        // percent-of-balance risk unit, clamped between0.35 (Deriv's
+        // minimum stake) and 5% of balance. Never risk the whole book.
+        const stake = Math.min(
+          Math.max(account.balance * lots * 0.01, 0.35),
+          Math.max(0.35, account.balance * 0.05)
+        );
+        if (!isFinite(stake) || stake <= 0) {
+          pushAutoLog("Stake sizing failed -- cycle aborted.");
+          return;
+        }
+        const side = String(result.trade.side || "BUY").toUpperCase().includes("SELL") ? "SELL" : "BUY";
+        const tradeRes = await fetch("/api/brokers/trade", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(await userHeader()) },
+          body: JSON.stringify({
+            broker_id: brokerId,
+            order_type: side,
+            symbol: selectedSymbol,
+            volume: Math.round(stake * 100) / 100,
+            duration: 5,
+            duration_unit: "m",
+          }),
+        });
+        const tradeData = await tradeRes.json();
+        if (tradeRes.ok && tradeData.success) {
+          pushAutoLog(
+            `AUTONOMOUS PLACEMENT: ${side} ${selectedSymbol}, stake ${stake.toFixed(2)} ` +
+              `${account.currency || "USD"}. Contract #${tradeData.order_id?.order_id}. ` +
+              `AI exit levels: SL ${result.trade.sl} / TP ${result.trade.tp}.`
+          );
+          fetchAccount(brokerId);
+          fetchPositions(brokerId);
+        } else {
+          pushAutoLog(`Broker rejected autonomous order: ${tradeData.detail || tradeData.error || "unknown error"}`);
+        }
+      } else {
+        pushAutoLog(`SANS Core assessment: HOLD. ${result.reasoning || "market equilibrium"}`);
+      }
+    } catch (err: any) {
+      pushAutoLog(`Cycle interrupted: ${err.message || err}`);
+    } finally {
+      isRunningTradeCycleRef.current = false;
+    }
+  };
+
+  // Autonomous scheduling: first cycle at 2s, then every 28s while armed.
+  // Tier/broker deps restart the timers so an in-session upgrade or a
+  // reconnect takes effect without a reload.
+  useEffect(() => {
+    try {
+      localStorage.setItem("priv_auto_trading", isAutoTrading ? "true" : "false");
+    } catch (_) {
+      /* ignore */
+    }
+    if (!isAutoTrading) return;
+    if (!canAutoExecute) {
+      setIsAutoTrading(false);
+      pushAutoLog("Autonomous agent disarmed: this tier does not include auto-execution.");
+      return;
+    }
+    const bootTimer = setTimeout(() => {
+      void runAutonomousTradeCycle();
+    }, 2000);
+    const intervalTimer = setInterval(() => {
+      void runAutonomousTradeCycle();
+    }, 28000);
+    return () => {
+      clearTimeout(bootTimer);
+      clearInterval(intervalTimer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAutoTrading, canAutoExecute, selectedSymbol, account?.balance, brokerId, isConnected]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const activeTv = SYMBOLS.find((s) => s.symbol === selectedSymbol)?.tv || "BINANCE:BTCUSDT";
@@ -556,6 +842,41 @@ function TradingTerminalInner() {
                 </div>
               </div>
 
+              <div className="space-y-1">
+                <label className="block text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+                  Quick sizing — risk % of balance
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min={0.1}
+                    max={100}
+                    step={0.1}
+                    value={riskPct}
+                    onChange={(e) => setRiskPct(parseFloat(e.target.value) || 0)}
+                    className="flex-1 bg-neutral-950 border border-white/10 rounded p-2.5 text-xs text-white font-mono"
+                  />
+                  <button
+                    type="button"
+                    disabled={!account}
+                    onClick={() => {
+                      if (!account) return;
+                      const s = Math.round(account.balance * riskPct) / 100;
+                      setStake(Math.max(0.35, s));
+                      pushLog(`Risk sizing applied: ${riskPct}% of balance = stake ${Math.max(0.35, s).toFixed(2)} ${account.currency || "USD"}.`);
+                    }}
+                    className="px-3 py-2.5 rounded border border-white/10 bg-white/5 hover:bg-white/10 text-white font-mono text-xs disabled:opacity-50"
+                  >
+                    APPLY
+                  </button>
+                </div>
+                {account && (
+                  <span className="block text-[9px] font-mono text-zinc-600">
+                    {riskPct}% of {account.currency} {account.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                )}
+              </div>
+
               <button
                 type="submit"
                 disabled={placingOrder}
@@ -615,6 +936,145 @@ function TradingTerminalInner() {
       </div>
 
       <div className="xl:col-span-3 flex flex-col gap-6">
+        <div className="metric-card p-5 rounded border border-white/10 bg-neutral-950/5">
+          <div className="flex items-center justify-between pb-3 border-b border-white/5 mb-3">
+            <span className="font-mono text-[10px] text-zinc-500 tracking-wider flex items-center gap-1.5">
+              <Bot className="w-3.5 h-3.5" /> SANS AUTONOMOUS DESK
+            </span>
+            <span
+              className={`font-mono text-[9px] px-2 py-0.5 rounded border ${
+                canAutoExecute
+                  ? "bg-emerald-500/5 text-emerald-400 border-emerald-500/30"
+                  : canUseDesk
+                  ? "bg-amber-500/5 text-amber-400 border-amber-500/30"
+                  : "bg-zinc-500/5 text-zinc-400 border-zinc-500/30"
+              }`}
+            >
+              {canAutoExecute ? "AUTONOMOUS" : canUseDesk ? "SOVEREIGN" : "LOCKED"}
+            </span>
+          </div>
+
+          {!canUseDesk ? (
+            <div className="space-y-3">
+              <div className="p-4 text-center rounded border border-white/5 bg-neutral-900/10 font-mono text-[11px] text-stone-500 flex flex-col items-center gap-2">
+                <Lock className="w-4 h-4 text-zinc-500" />
+                AI analysis and autonomous execution are reserved for the Sovereign and Autonomous tiers.
+              </div>
+              <Link
+                to="/dashboard/billing"
+                className="block w-full text-center bg-white hover:bg-neutral-200 text-neutral-950 font-bold text-xs py-2.5 rounded font-mono"
+              >
+                VIEW PLANS
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => void runAutonomousAnalysis()}
+                disabled={isAnalyzing}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded text-xs font-mono font-bold border border-white/10 bg-white/5 hover:bg-white/10 text-white disabled:opacity-60"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> ANALYZING...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" /> AI ANALYZE
+                  </>
+                )}
+              </button>
+
+              {autoAnalysis && (
+                <div className="p-3 border border-white/5 bg-neutral-950/40 rounded space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`font-mono text-xs font-bold ${
+                        autoAnalysis.action === "BUY"
+                          ? "text-emerald-400"
+                          : autoAnalysis.action === "SELL"
+                          ? "text-red-400"
+                          : "text-zinc-300"
+                      }`}
+                    >
+                      {autoAnalysis.action}
+                    </span>
+                    <span className="font-mono text-[10px] text-zinc-500">
+                      CONFIDENCE {autoAnalysis.confidence}%
+                    </span>
+                  </div>
+                  <div className="h-1 rounded bg-white/5 overflow-hidden">
+                    <div
+                      className={`h-full ${autoAnalysis.action === "SELL" ? "bg-red-500" : "bg-emerald-500"}`}
+                      style={{ width: `${Math.min(100, Math.max(0, autoAnalysis.confidence || 0))}%` }}
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 font-mono text-[10px]">
+                    <div>
+                      <span className="text-zinc-500 block">LOTS</span>
+                      <span className="text-white">{autoAnalysis.lotSize}</span>
+                    </div>
+                    <div>
+                      <span className="text-zinc-500 block">SL</span>
+                      <span className="text-white">{autoAnalysis.stopLoss}</span>
+                    </div>
+                    <div>
+                      <span className="text-zinc-500 block">TP</span>
+                      <span className="text-white">{autoAnalysis.takeProfit}</span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-zinc-400 leading-relaxed whitespace-pre-wrap">
+                    {autoAnalysis.reasoning}
+                  </p>
+                </div>
+              )}
+
+              <button
+                type="button"
+                disabled={!canAutoExecute || !brokerId || !isConnected}
+                onClick={() => {
+                  const next = !isAutoTrading;
+                  setIsAutoTrading(next);
+                  pushAutoLog(
+                    next
+                      ? "Autonomous agent ARMED -- 28s cycle started."
+                      : "Autonomous agent DISARMED."
+                  );
+                }}
+                className={`w-full py-2.5 rounded text-xs font-mono font-bold border disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isAutoTrading
+                    ? "bg-red-500/10 text-red-400 border-red-500/40 hover:bg-red-500/20"
+                    : "bg-emerald-500 text-black border-emerald-500 hover:bg-emerald-400"
+                }`}
+              >
+                {isAutoTrading ? "DISABLE AGENT" : "AUTONOMOUS TRADE"}
+              </button>
+              {!canAutoExecute && (
+                <p className="text-[9px] text-zinc-600 font-mono">
+                  Auto-execution requires the Autonomous tier (admins pass). Analysis remains available.
+                </p>
+              )}
+              {canAutoExecute && (!brokerId || !isConnected) && (
+                <p className="text-[9px] text-zinc-600 font-mono">
+                  Link and connect a Deriv account to arm the agent.
+                </p>
+              )}
+
+              <div className="pt-2 border-t border-white/5">
+                <span className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">Cycle Log</span>
+                <div className="space-y-1 max-h-[160px] overflow-y-auto font-mono text-[10px] text-zinc-400 mt-1.5">
+                  {autoLogs.length === 0 ? (
+                    <div className="text-zinc-600">Agent idle.</div>
+                  ) : (
+                    autoLogs.map((l, i) => <div key={i}>{l}</div>)
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="metric-card p-5 rounded border border-white/10 bg-neutral-950/5">
           <div className="flex items-center justify-between pb-3 border-b border-white/5 mb-3">
             <span className="font-mono text-[10px] text-zinc-500 tracking-wider">EXECUTION LOG</span>
