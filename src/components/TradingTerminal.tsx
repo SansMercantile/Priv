@@ -751,7 +751,7 @@ function TradingTerminalInner() {
                 <div className="p-3 border border-white/5 bg-neutral-950/40 rounded">
                   <span className="block text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Balance</span>
                   <span className="text-lg font-mono text-white font-bold">
-                    {account ? `${account.currency} ${account.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"}
+                    {account && typeof account.balance === "number" ? `${account.currency} ${account.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"}
                   </span>
                 </div>
                 <div className="p-3 border border-white/5 bg-neutral-950/40 rounded">
@@ -860,7 +860,7 @@ function TradingTerminalInner() {
                     type="button"
                     disabled={!account}
                     onClick={() => {
-                      if (!account) return;
+                      if (!account || typeof account.balance !== "number") return;
                       const s = Math.round(account.balance * riskPct) / 100;
                       setStake(Math.max(0.35, s));
                       pushLog(`Risk sizing applied: ${riskPct}% of balance = stake ${Math.max(0.35, s).toFixed(2)} ${account.currency || "USD"}.`);
@@ -870,7 +870,7 @@ function TradingTerminalInner() {
                     APPLY
                   </button>
                 </div>
-                {account && (
+                {account && typeof account.balance === "number" && (
                   <span className="block text-[9px] font-mono text-zinc-600">
                     {riskPct}% of {account.currency} {account.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>

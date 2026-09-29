@@ -7,6 +7,10 @@ export interface ActiveDerivAccount {
   currency: string;
   broker_id: string;
   adapter_live: boolean;
+  // Live lookup via the registered broker adapter; null (never 0) when
+  // unavailable -- a missing balance must read as "unavailable", not
+  // "empty account". Always guard with typeof === "number" before display.
+  balance: number | null;
 }
 
 // Resolves which Deriv account drives the given mode (demo toggle state):
