@@ -61,6 +61,7 @@ interface SupportResponse {
     harmonic_patterns?: HarmonicPattern[];
     double_triple_patterns?: DoubleTriplePattern[];
     bullish_bearish_power?: PowerScore;
+    fourier_forecast?: number[];
     fuzzy_signal_strength?: number;
   };
   fundamentals?: {
@@ -198,6 +199,52 @@ const PowerScoreBar: React.FC<{ power?: PowerScore }> = ({ power }) => {
   );
 };
 
+// Fourier-based short-term price forecast (real FFT-extrapolated closes
+// from analytics_engine -- never a fabricated projection). Shown as a
+// small forward-looking line so it's clear whether the projected path
+// curls up or down from here, with the direction/magnitude called out.
+const FourierForecastChart: React.FC<{ forecast?: number[] }> = ({ forecast }) => {
+  if (!forecast || forecast.length < 2) return null;
+  const w = 300;
+  const h = 90;
+  const padding = 20;
+  const minV = Math.min(...forecast);
+  const maxV = Math.max(...forecast);
+  const range = maxV - minV || 1;
+  const getX = (i: number) => padding + (i / (forecast.length - 1)) * (w - 2 * padding);
+  const getY = (v: number) => h - padding - ((v - minV) / range) * (h - 2 * padding);
+  const first = forecast[0];
+  const last = forecast[forecast.length - 1];
+  const pctChange = first ? ((last - first) / Math.abs(first)) * 100 : 0;
+  const up = last >= first;
+
+  return (
+    <div className="p-2 bg-neutral-950 border border-white/5 rounded">
+      <div className="flex items-center justify-between text-[9px] text-zinc-500 font-mono uppercase mb-1">
+        <span>Fourier Forecast (next {forecast.length})</span>
+        <span className={up ? "text-emerald-400" : "text-red-400"}>
+          {up ? "+" : ""}
+          {pctChange.toFixed(2)}%
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-auto">
+        <polyline
+          points={forecast.map((v, i) => `${getX(i)},${getY(v)}`).join(" ")}
+          fill="none"
+          stroke={up ? "#34d399" : "#f87171"}
+          strokeWidth="1.5"
+        />
+        {forecast.map((v, i) => (
+          <circle key={i} cx={getX(i)} cy={getY(v)} r="1.5" fill={up ? "#34d399" : "#f87171"} />
+        ))}
+      </svg>
+      <div className="mt-1 text-[9px] font-mono text-zinc-500">
+        Extrapolated from recent price cycles -- not a guarantee.
+      </div>
+    </div>
+  );
+};
+
 const BlackSwanAlerts: React.FC<{ events?: BlackSwanEvent[] }> = ({ events }) => {
   if (!events || events.length === 0) return null;
   return (
@@ -232,6 +279,7 @@ const SignalCard: React.FC<{ data: SupportResponse }> = ({ data }) => {
       )}
       <PowerScoreBar power={data.technical_analysis?.bullish_bearish_power} />
       <PatternSignalChart pattern={pattern} signal={data.trading_signal} />
+      <FourierForecastChart forecast={data.technical_analysis?.fourier_forecast} />
       <DoubleTriplePatternsList patterns={data.technical_analysis?.double_triple_patterns} />
       <BlackSwanAlerts events={data.fundamentals?.black_swan_events} />
       {events.length > 0 && (
