@@ -297,11 +297,27 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
   const patch = (section: string, field: string, value: any) =>
     setForm(f => ({ ...f, [section]: { ...(f as any)[section], [field]: value } }));
 
+  // Shape uploads for draft/submit: metadata always, byte payload when the
+  // server should offload it to encrypted S3 (never in demo/localStorage).
+  const serializableUploads = (includeBytes: boolean) =>
+    Object.entries(uploads).map(([type, d]) => ({
+      type,
+      url: d.url || '#',
+      filename: d.filename,
+      ...(includeBytes && d.base64
+        ? {
+            dataUrl: `data:${d.mimeType || 'image/jpeg'};base64,${d.base64}`,
+            mime_type: d.mimeType || 'image/jpeg',
+            ai_verdict: docVerifyResults[type],
+          }
+        : {}),
+    }));
+
   const saveDraft = useCallback(async () => {
     if (demoMode) { localStorage.setItem('kyc_draft_demo', JSON.stringify(form)); return; }
     setSaving(true);
-    try { await apiClient.saveKycDraft(form); } catch (e) { console.warn(e); } finally { setSaving(false); }
-  }, [demoMode, form]);
+    try { await apiClient.saveKycDraft({ ...(form as any), documents: serializableUploads(true) }); } catch (e) { console.warn(e); } finally { setSaving(false); }
+  }, [demoMode, form, uploads, docVerifyResults]);
 
   const handleUpload = async (file: File | null, docKey: string) => {
     if (!file) return;
@@ -374,7 +390,7 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
       netWorthRange: form.financial.net_worth_range || '< R50k',
       tradingExperience: form.trading.years_trading_experience || 'None',
       selfieBase64: selfieBase64 || undefined,
-      documents: Object.entries(uploads).map(([type, d]) => ({ type, url: d.url || '#', filename: d.filename })),
+      documents: serializableUploads(!demoMode),
     };
     if (demoMode) {
       localStorage.setItem('xm_kyc_status', 'submitted');
