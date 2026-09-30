@@ -23,6 +23,12 @@ import UnifiedAssistant from "./ui/UnifiedAssistant";
 import GuidedWalkthrough from "./components/GuidedWalkthrough";
 import LoginGate from "./components/auth/LoginGate";
 import Landing from "./pages/Landing";
+import LegalTerms from "./pages/legal/Terms";
+import LegalPolicy from "./pages/legal/Policy";
+import LegalCookie from "./pages/legal/Cookie";
+import LegalEula from "./pages/legal/Eula";
+import LegalLiability from "./pages/legal/Liability";
+import LegalDataDeletion from "./pages/legal/DataDeletion";
 import apiClient from "./api/apiClient";
 import { useBrokerConnections } from "./lib/useBrokerConnections";
 import { isDerivCallback } from "./lib/derivAuth/oauth";
@@ -309,6 +315,16 @@ function App({ initialDevice = "desktop" }: AppProps) {
         path="/"
         element={isDerivCallback() ? <GatedApp initialDevice={initialDevice} /> : <Landing />}
       />
+      {/* Legal pages -- were standalone public/legal/*.html files that
+          bypassed the app entirely (own <head>, missing favicon, a
+          css/img path that never existed post-deploy). Public routes so
+          they stay reachable without login, same as before. */}
+      <Route path="/legal/terms" element={<LegalTerms />} />
+      <Route path="/legal/policy" element={<LegalPolicy />} />
+      <Route path="/legal/cookie" element={<LegalCookie />} />
+      <Route path="/legal/eula" element={<LegalEula />} />
+      <Route path="/legal/liability" element={<LegalLiability />} />
+      <Route path="/legal/data-deletion" element={<LegalDataDeletion />} />
       {/* Everything else behind the login gate */}
       <Route path="/*" element={<GatedApp initialDevice={initialDevice} />} />
     </Routes>

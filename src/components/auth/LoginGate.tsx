@@ -130,11 +130,11 @@ function LoginScreen({ derivError }: {
 
         <p className="text-xs text-white/30 mt-8 text-center">
           By continuing you agree to Sans Mercantile's{' '}
-          <a href="/legal/terms.html" target="_blank" rel="noreferrer" className="underline hover:text-white/60">
+          <a href="/legal/terms" target="_blank" rel="noreferrer" className="underline hover:text-white/60">
             Terms of Service
           </a>{' '}
           and{' '}
-          <a href="/legal/policy.html" target="_blank" rel="noreferrer" className="underline hover:text-white/60">
+          <a href="/legal/policy" target="_blank" rel="noreferrer" className="underline hover:text-white/60">
             Privacy Policy
           </a>
           .
