@@ -709,6 +709,14 @@ export default function Landing() {
           <div>
             <p className="text-[13px] text-white/40">A Sans Mercantile fintech product</p>
             <p className="text-[13px] text-white/60 font-semibold mt-1.5">Intelligent Trading. Limitless Potential.™</p>
+            <nav className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-white/45">
+              <a className="hover:text-white/90 transition-colors" href="/legal/policy.html">Privacy Policy</a>
+              <a className="hover:text-white/90 transition-colors" href="/legal/terms.html">Terms of Use</a>
+              <a className="hover:text-white/90 transition-colors" href="/legal/cookie.html">Cookie Notice</a>
+              <a className="hover:text-white/90 transition-colors" href="/legal/eula.html">EULA</a>
+              <a className="hover:text-white/90 transition-colors" href="/legal/liability.html">Liability</a>
+              <a className="hover:text-white/90 transition-colors" href="/legal/data-deletion.html">Data Deletion</a>
+            </nav>
           </div>
           <p className="text-xs text-white/30">© 2026 Sans Mercantile. All rights reserved.</p>
         </div>
