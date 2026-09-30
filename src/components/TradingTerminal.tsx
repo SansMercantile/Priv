@@ -1,4 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useAutotrader } from "./terminal/useAutotrader";
+import { useDerivSymbols, tvSymbolFor } from "./terminal/derivSymbols";
+import SymbolPicker from "./terminal/SymbolPicker";
+import NativeChart from "./terminal/NativeChart";
 import { getAppUserId } from "../lib/appUserId";
 import {
   Activity,
@@ -81,13 +85,11 @@ interface AutonomousAnalysis {
   rationale: string;
 }
 
-const SYMBOLS = [
-  { title: "EUR/USD", symbol: "frxEURUSD", tv: "FX_IDC:EURUSD" },
-  { title: "GBP/USD", symbol: "frxGBPUSD", tv: "FX_IDC:GBPUSD" },
-  { title: "USD/JPY", symbol: "frxUSDJPY", tv: "FX_IDC:USDJPY" },
-  { title: "Volatility 100", symbol: "R_100", tv: "BINANCE:BTCUSDT" },
-  { title: "Volatility 75", symbol: "R_75", tv: "BINANCE:BTCUSDT" },
-];
+// Default symbol only; the full, searchable Deriv universe now comes
+// from useDerivSymbols()/SymbolPicker (GET /api/brokers/deriv/symbols) --
+// this hardcoded 5-symbol list previously WAS the entire Order Dispatch
+// and Signals selector.
+const DEFAULT_SYMBOL = "R_100";
 
 // ── Error Boundary — prevents blank screen on any runtime crash ──────────
 class TerminalErrorBoundary extends React.Component<
@@ -153,13 +155,13 @@ function TradingTerminalInner() {
   // admin) gets the full agent.
   const [nodeTier, setNodeTier] = useState<string>("free");
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isAutoTrading, setIsAutoTrading] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem("priv_auto_trading") === "true";
-    } catch (_) {
-      return false;
-    }
-  });
+  // Server-side autotrader: arms/disarms a backend loop that keeps
+  // running after this tab closes, the user logs out, or the laptop
+  // sleeps. Replaces the old client-side isAutoTrading/setInterval
+  // mechanism, which died the moment the tab did and only ever
+  // evaluated the single symbol on Dispatch.
+  const autotrader = useAutotrader(userHeader);
+  const [scanAllMarkets, setScanAllMarkets] = useState(false);
   const [autoLogs, setAutoLogs] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem("priv_auto_logs") || "[]");
@@ -169,7 +171,6 @@ function TradingTerminalInner() {
   });
   const [autoAnalysis, setAutoAnalysis] = useState<AutonomousAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const isRunningTradeCycleRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -346,10 +347,12 @@ function TradingTerminalInner() {
     }, 8000);
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
   }, []);
 
-  const [selectedSymbol, setSelectedSymbol] = useState(SYMBOLS[3].symbol);
+  const [selectedSymbol, setSelectedSymbol] = useState(DEFAULT_SYMBOL);
+  const { symbols: derivSymbols, loading: symbolsLoading, error: symbolsError } = useDerivSymbols(userHeader);
   const [orderSide, setOrderSide] = useState<"BUY" | "SELL">("BUY");
   const [stake, setStake] = useState<number>(10);
   const [duration, setDuration] = useState<number>(5);
@@ -489,137 +492,11 @@ function TradingTerminalInner() {
     }
   };
 
-  const runAutonomousTradeCycle = async () => {
-    if (isRunningTradeCycleRef.current) return;
-    if (!canAutoExecute) {
-      setIsAutoTrading(false);
-      pushAutoLog("Auto-execution gate: the Autonomous tier (or an admin account) is required. Agent disarmed.");
-      return;
-    }
-    if (!brokerId || !isConnected) {
-      pushAutoLog(`Waiting for a live Deriv ${activeMode} connection -- cycle skipped.`);
-      return;
-    }
-    if (!account) {
-      pushAutoLog("Account balance unavailable -- cycle skipped.");
-      return;
-    }
-    isRunningTradeCycleRef.current = true;
-    pushAutoLog("Initiating SANS autonomous market verification sweep...");
-    try {
-      const profile = deskProfile();
-      const res = await fetch("/api/autonomous/trade", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          symbol: selectedSymbol,
-          price: getAssetRefPrice(selectedSymbol),
-          balance: account.balance,
-          news: [],
-          existingPositions: positions.map((p) => ({
-            symbol: p.symbol,
-            contract_type: p.contract_type,
-            buy_price: p.buy_price,
-          })),
-          ...profile,
-        }),
-      });
-      if (!res.ok) throw new Error("Synchronisation failure on the autonomous endpoint.");
-      const result = await res.json();
-
-      if (Array.isArray(result.logs)) {
-        const stamp = new Date().toLocaleTimeString();
-        const fresh = [...result.logs].reverse().map((m: string) => `[${stamp}] ${m}`);
-        setAutoLogs((prev) => [...fresh, ...prev].slice(0, 100));
-      }
-
-      if (result.execute && result.trade) {
-        const dup = positions.some(
-          (p) => p.symbol === selectedSymbol || p.symbol === result.trade.symbol
-        );
-        if (dup) {
-          pushAutoLog(`Risk ceiling reached -- an open ${selectedSymbol} position already exists; duplicate skipped.`);
-          return;
-        }
-        const lots = parseFloat(result.trade.lots) || 0.01;
-        // Deriv stake sizing: the AI lot suggestion is read as a
-        // percent-of-balance risk unit, clamped between0.35 (Deriv's
-        // minimum stake) and 5% of balance. Never risk the whole book.
-        const stake = Math.min(
-          Math.max(account.balance * lots * 0.01, 0.35),
-          Math.max(0.35, account.balance * 0.05)
-        );
-        if (!isFinite(stake) || stake <= 0) {
-          pushAutoLog("Stake sizing failed -- cycle aborted.");
-          return;
-        }
-        const side = String(result.trade.side || "BUY").toUpperCase().includes("SELL") ? "SELL" : "BUY";
-        const tradeRes = await fetch("/api/brokers/trade", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...(await userHeader()) },
-          body: JSON.stringify({
-            broker_id: brokerId,
-            order_type: side,
-            symbol: selectedSymbol,
-            volume: Math.round(stake * 100) / 100,
-            duration: 5,
-            duration_unit: "m",
-          }),
-        });
-        const tradeData = await tradeRes.json();
-        if (tradeRes.ok && tradeData.success) {
-          pushAutoLog(
-            `AUTONOMOUS PLACEMENT: ${side} ${selectedSymbol}, stake ${stake.toFixed(2)} ` +
-              `${account.currency || "USD"}. Contract #${tradeData.order_id?.order_id}. ` +
-              `AI exit levels: SL ${result.trade.sl} / TP ${result.trade.tp}.`
-          );
-          fetchAccount(brokerId);
-          fetchPositions(brokerId);
-        } else {
-          pushAutoLog(`Broker rejected autonomous order: ${tradeData.detail || tradeData.error || "unknown error"}`);
-        }
-      } else {
-        pushAutoLog(`SANS Core assessment: HOLD. ${result.reasoning || "market equilibrium"}`);
-      }
-    } catch (err: any) {
-      pushAutoLog(`Cycle interrupted: ${err.message || err}`);
-    } finally {
-      isRunningTradeCycleRef.current = false;
-    }
-  };
-
-  // Autonomous scheduling: first cycle at 2s, then every 28s while armed.
-  // Tier/broker deps restart the timers so an in-session upgrade or a
-  // reconnect takes effect without a reload.
-  useEffect(() => {
-    try {
-      localStorage.setItem("priv_auto_trading", isAutoTrading ? "true" : "false");
-    } catch (_) {
-      /* ignore */
-    }
-    if (!isAutoTrading) return;
-    if (!canAutoExecute) {
-      setIsAutoTrading(false);
-      pushAutoLog("Autonomous agent disarmed: this tier does not include auto-execution.");
-      return;
-    }
-    const bootTimer = setTimeout(() => {
-      void runAutonomousTradeCycle();
-    }, 2000);
-    const intervalTimer = setInterval(() => {
-      void runAutonomousTradeCycle();
-    }, 28000);
-    return () => {
-      clearTimeout(bootTimer);
-      clearInterval(intervalTimer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAutoTrading, canAutoExecute, selectedSymbol, account?.balance, brokerId, isConnected]);
-
   const containerRef = useRef<HTMLDivElement>(null);
-  const activeTv = SYMBOLS.find((s) => s.symbol === selectedSymbol)?.tv || "BINANCE:BTCUSDT";
+  const activeTv = tvSymbolFor(selectedSymbol);
 
   useEffect(() => {
+    if (!activeTv) return; // synthetic index: NativeChart handles rendering instead
     if (containerRef.current) {
       containerRef.current.innerHTML = "";
       const script = document.createElement("script");
@@ -780,17 +657,13 @@ function TradingTerminalInner() {
             <form onSubmit={handlePlaceOrder} className="space-y-4">
               <div className="space-y-1">
                 <label className="block text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Symbol</label>
-                <select
+                <SymbolPicker
+                  symbols={derivSymbols}
                   value={selectedSymbol}
-                  onChange={(e) => setSelectedSymbol(e.target.value)}
-                  className="w-full bg-neutral-950 border border-white/10 rounded p-2.5 text-xs text-white font-mono"
-                >
-                  {SYMBOLS.map((s) => (
-                    <option key={s.symbol} value={s.symbol}>
-                      {s.title} ({s.symbol})
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedSymbol}
+                  loading={symbolsLoading}
+                  error={symbolsError}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -897,7 +770,11 @@ function TradingTerminalInner() {
 
       <div className="xl:col-span-5 flex flex-col gap-6">
         <div className="metric-card rounded border border-white/10 bg-neutral-950/5 h-[420px] overflow-hidden">
-          <div ref={containerRef} id="tradingview_chart_frame" className="w-full h-full" />
+          {activeTv ? (
+            <div ref={containerRef} id="tradingview_chart_frame" className="w-full h-full" />
+          ) : (
+            <NativeChart symbol={selectedSymbol} getHeaders={userHeader} />
+          )}
         </div>
 
         <div className="metric-card p-5 rounded border border-white/10 bg-neutral-950/5">
@@ -1030,26 +907,56 @@ function TradingTerminalInner() {
                 </div>
               )}
 
+              <label className="flex items-center gap-2 text-[9px] font-mono text-zinc-400 uppercase tracking-wider select-none">
+                <input
+                  type="checkbox"
+                  checked={scanAllMarkets}
+                  disabled={autotrader.status.armed}
+                  onChange={(e) => setScanAllMarkets(e.target.checked)}
+                  className="accent-emerald-500"
+                />
+                Scan all markets (rotate the full Deriv universe instead of only {selectedSymbol})
+              </label>
+
               <button
                 type="button"
-                disabled={!canAutoExecute || !brokerId || !isConnected}
+                disabled={!canAutoExecute || !brokerId || !isConnected || autotrader.busy}
                 onClick={() => {
-                  const next = !isAutoTrading;
-                  setIsAutoTrading(next);
+                  if (autotrader.status.armed) {
+                    void autotrader.disarm();
+                    pushAutoLog("Autonomous agent DISARMED.");
+                    return;
+                  }
+                  const profile = deskProfile();
+                  void autotrader.arm({
+                    broker_id: brokerId,
+                    symbol: selectedSymbol,
+                    scan_all_markets: scanAllMarkets,
+                    risk_appetite: profile.riskAppetite,
+                    trading_goal: profile.tradingGoal,
+                    user_identity: profile.userIdentity,
+                    leverage: profile.leverage,
+                    risk_pct: riskPct,
+                    duration,
+                    duration_unit: "m",
+                  });
                   pushAutoLog(
-                    next
-                      ? "Autonomous agent ARMED -- 28s cycle started."
-                      : "Autonomous agent DISARMED."
+                    scanAllMarkets
+                      ? "Autonomous agent ARMED -- scanning all Deriv markets server-side. Stays live across tab close/logout; only Disable Agent stops it."
+                      : `Autonomous agent ARMED on ${selectedSymbol} -- runs server-side, stays live across tab close/logout; only Disable Agent stops it.`
                   );
                 }}
                 className={`w-full py-2.5 rounded text-xs font-mono font-bold border disabled:opacity-50 disabled:cursor-not-allowed ${
-                  isAutoTrading
+                  autotrader.status.armed
                     ? "bg-red-500/10 text-red-400 border-red-500/40 hover:bg-red-500/20"
                     : "bg-emerald-500 text-black border-emerald-500 hover:bg-emerald-400"
                 }`}
               >
-                {isAutoTrading ? "DISABLE AGENT" : "AUTONOMOUS TRADE"}
+                {autotrader.busy ? "..." : autotrader.status.armed ? "DISABLE AGENT" : "AUTONOMOUS TRADE"}
               </button>
+              {autotrader.error && (
+                <p className="text-[9px] text-red-400 font-mono">{autotrader.error}</p>
+              )}
               {!canAutoExecute && (
                 <p className="text-[9px] text-zinc-600 font-mono">
                   Auto-execution requires the Autonomous tier (admins pass). Analysis remains available.
@@ -1062,12 +969,23 @@ function TradingTerminalInner() {
               )}
 
               <div className="pt-2 border-t border-white/5">
-                <span className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">Cycle Log</span>
+                <span className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">
+                  Cycle Log
+                  {autotrader.status.armed && (
+                    <span className="text-zinc-600 normal-case tracking-normal">
+                      {" "}
+                      &middot; {autotrader.status.cycles} cycles &middot; {autotrader.status.placements} placements
+                      {autotrader.status.scan_all_markets && autotrader.status.universe_size
+                        ? ` \u00b7 scanning ${autotrader.status.universe_size} markets`
+                        : ""}
+                    </span>
+                  )}
+                </span>
                 <div className="space-y-1 max-h-[160px] overflow-y-auto font-mono text-[10px] text-zinc-400 mt-1.5">
-                  {autoLogs.length === 0 ? (
+                  {autotrader.status.logs.length === 0 ? (
                     <div className="text-zinc-600">Agent idle.</div>
                   ) : (
-                    autoLogs.map((l, i) => <div key={i}>{l}</div>)
+                    autotrader.status.logs.map((l, i) => <div key={i}>{l}</div>)
                   )}
                 </div>
               </div>
