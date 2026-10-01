@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Radio, RefreshCw, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Radio, RefreshCw, AlertTriangle, CheckCircle2, BellRing } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../api/apiClient";
 import { getAuthToken } from "../lib/authToken";
@@ -8,6 +8,8 @@ import { getAuthToken } from "../lib/authToken";
 // - Today's ticket (GET /api/signals/current, stale-flagged archive when live budgets out)
 // - Instrument preferences per tier (GET/POST /api/v1/signals/preferences + /categories + /tiers)
 // - Personal + global history (GET /api/v1/signals/history)
+// - In-app notification feed (GET /api/v1/signals/notifications + /read):
+//   unread badge + banner on arrival, new rows highlighted, auto-read ack.
 // Tier gates (category allow-list, max instruments, Sovereign-only events,
 // contact required per channel) are enforced server-side; backend 4xx text
 // is shown inline so the user knows exactly what their tier allows.
@@ -40,6 +42,29 @@ export default function MySignals() {
   const [current, setCurrent] = useState<any>(null);
   const [mine, setMine] = useState<any[]>([]);
   const [global, setGlobal] = useState<any[]>([]);
+  // In-app notification state: unread = signals issued since the last
+  // feed open (backend marker); lastSeen also drives row highlighting.
+  const [unread, setUnread] = useState(0);
+  const [lastSeen, setLastSeen] = useState<string | null>(null);
+
+  const loadNotifications = async (ackRead: boolean) => {
+    try {
+      const res: any = await apiClient.getSignalNotifications(50);
+      const d = res?.data?.data ?? res?.data ?? {};
+      const n = d.unread || 0;
+      setUnread(n);
+      setLastSeen(typeof d.last_seen === "string" ? d.last_seen : null);
+      if (ackRead && n > 0) {
+        // Ack after the banner has had time to render; keeps the sidebar
+        // badge and this banner in sync on the next poll.
+        window.setTimeout(() => {
+          apiClient.markSignalNotificationsRead().catch(() => {});
+        }, 2500);
+      }
+    } catch {
+      /* feed unreachable: no badge, no ack -- never block the page */
+    }
+  };
 
   // Preference form state
   const [cat, setCat] = useState("synthetics");
@@ -107,6 +132,7 @@ export default function MySignals() {
         const d = verRes.value?.data?.data ?? verRes.value?.data ?? {};
         setVerified(d.verified || []);
       }
+      await loadNotifications(true);
     } catch (e: any) {
       setError(e?.message || "Could not load signals.");
     } finally {
@@ -116,6 +142,10 @@ export default function MySignals() {
 
   useEffect(() => {
     load();
+    // Keep the unread badge live while the tab is open (new signals can
+    // land any minute the scheduler runs).
+    const interval = window.setInterval(() => loadNotifications(true), 60000);
+    return () => window.clearInterval(interval);
   }, []);
 
   // When the category changes, keep only instruments that exist in it.
@@ -173,14 +203,18 @@ export default function MySignals() {
     </span>
   );
 
-  const SignalRow = ({ s }: { s: any }) => (
-    <div className="flex items-center justify-between gap-2 p-2 rounded-lg border border-white/10 bg-black/40 text-xs font-mono">
+  const SignalRow = ({ s, isNew }: { s: any; isNew?: boolean }) => (
+    <div className={`flex items-center justify-between gap-2 p-2 rounded-lg border text-xs font-mono ${
+      isNew ? "border-rose-500/40 bg-rose-500/5" : "border-white/10 bg-black/40"}`}>
       <div className="min-w-0">
         <span className="text-white font-bold truncate">{s.display_name || s.symbol}</span>{" "}
         <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded ${s.direction === "BUY" ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
           {s.direction}
         </span>{" "}
         {s.status && <span className="text-zinc-500 text-[10px]">{s.status}</span>}
+        {isNew && (
+          <span className="ml-1.5 text-[9px] uppercase px-1.5 py-0.5 rounded bg-[#e11d48]/20 text-rose-300">new</span>
+        )}
       </div>
       <div className="text-right text-[10px] text-zinc-400 whitespace-nowrap">
         <div>IN {s.entry}</div>
@@ -189,6 +223,11 @@ export default function MySignals() {
       </div>
     </div>
   );
+
+  // A signal counts as "new" until the feed's read marker passes it.
+  // Never opened the feed (no marker) -> everything is new.
+  const isNewSignal = (s: any) =>
+    Boolean(s?.created_at) && (!lastSeen || String(s.created_at) > lastSeen);
 
   return (
     <div className="space-y-6">
@@ -227,6 +266,14 @@ export default function MySignals() {
 
       {error && (
         <div className="p-3 rounded border border-red-500/20 bg-red-500/5 text-red-400 text-xs font-mono">{error}</div>
+      )}
+
+      {unread > 0 && (
+        <div className="p-3 rounded border border-rose-500/20 bg-rose-500/5 text-rose-300 text-xs font-mono flex items-center gap-2">
+          <BellRing className="w-4 h-4 shrink-0" />
+          {unread} new signal{unread === 1 ? "" : "s"} since your last visit
+          {mine.some((s) => isNewSignal(s)) && " — highlighted below"}
+        </div>
       )}
 
       {/* Today's ticket */}
@@ -338,7 +385,7 @@ export default function MySignals() {
           <h2 className="text-sm font-semibold text-white mb-2">My issued signals</h2>
           {mine.length === 0 && <p className="text-xs text-zinc-500 font-mono">None issued to you yet.</p>}
           {mine.map((s: any) => (
-            <SignalRow key={s.id || `${s.symbol}-${s.created_at}`} s={s} />
+            <SignalRow key={s.id || `${s.symbol}-${s.created_at}`} s={s} isNew={isNewSignal(s)} />
           ))}
         </div>
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-1.5">

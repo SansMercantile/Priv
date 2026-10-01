@@ -260,6 +260,12 @@ export const apiClient = {
   getSignalHistory: (limit: number = 50) =>
     safeFetchRelative(`/api/v1/signals/history?limit=${limit}`),
   getCurrentSignal: () => safeFetchRelative("/api/signals/current"),
+  // In-app signal notifications: items + unread count (signals issued
+  // after the last read), and the read-ack that advances the marker.
+  getSignalNotifications: (limit: number = 25) =>
+    safeFetchRelative(`/api/v1/signals/notifications?limit=${limit}`),
+  markSignalNotificationsRead: () =>
+    safeFetchRelative("/api/v1/signals/notifications/read", { method: "POST" }),
 
   // Contact OTP verification + emotion check-in log (backend/api/verify_api.py).
   getVerifiedContacts: () => safeFetchRelative("/api/v1/verify/contacts"),

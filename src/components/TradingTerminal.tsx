@@ -469,7 +469,7 @@ function TradingTerminalInner() {
       const profile = deskProfile();
       const res = await fetch("/api/autonomous/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await userHeader()) },
         body: JSON.stringify({
           symbol: selectedSymbol,
           price: getAssetRefPrice(selectedSymbol),

@@ -209,6 +209,29 @@ export default function Sidebar({
     };
   }, []);
 
+  // Unread in-app signal notifications, surfaced as a badge on the
+  // My Signals entry (feed itself lives in MySignals.tsx). Polled, not
+  // streamed -- the backend issues signals on a 15-min schedule.
+  const [sigUnread, setSigUnread] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res: any = await apiClient.getSignalNotifications(1);
+        const d = res?.data?.data ?? res?.data ?? {};
+        if (!cancelled) setSigUnread(Number(d.unread) || 0);
+      } catch {
+        /* feed unreachable: keep the last known count */
+      }
+    };
+    poll();
+    const interval = window.setInterval(poll, 60000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
   // Strategies is a paid-tier surface: visible only once the real
   // subscription says tier != free (admins always pass). The server-side
   // route guard (RequirePaying in App.tsx) enforces the same rule on
@@ -266,7 +289,7 @@ export default function Sidebar({
                 key={item.path}
                 to={item.path}
                 end={item.path === "/dashboard"}
-                className={({ isActive }) => `p-1.5 rounded transition ${
+                className={({ isActive }) => `relative p-1.5 rounded transition ${
                   isActive 
                     ? "bg-white/10 text-white border border-white/25" 
                     : "text-zinc-500 hover:text-white"
@@ -274,6 +297,9 @@ export default function Sidebar({
                 title={item.name}
               >
                 <Icon className="w-4 h-4" />
+                {item.path === "/dashboard/signals" && sigUnread > 0 && (
+                  <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-[#e11d48]" />
+                )}
               </NavLink>
             );
           })}
@@ -331,6 +357,17 @@ export default function Sidebar({
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
               {!isMinimized && <span>{item.name}</span>}
+              {!isMinimized && item.path === "/dashboard/signals" && sigUnread > 0 && (
+                <span
+                  data-testid="signals-unread-badge"
+                  className="ml-auto mr-6 min-w-[18px] px-1 text-center text-[9px] font-bold rounded-full bg-[#e11d48] text-white"
+                >
+                  {sigUnread > 99 ? "99+" : sigUnread}
+                </span>
+              )}
+              {isMinimized && item.path === "/dashboard/signals" && sigUnread > 0 && (
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#e11d48]" />
+              )}
               {!isMinimized && (
                 <div className="absolute right-2 text-[8px] font-mono text-zinc-600 opacity-0 group-hover:opacity-100 transition duration-200">
                   EXEC

@@ -599,7 +599,7 @@ export default function Landing() {
                 onClick={startFree}
                 className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#ff4b72] to-[#e11d48] font-semibold text-[15px] shadow-[0_8px_30px_rgba(225,29,72,0.35)] hover:brightness-110"
               >
-                Start free — 3 signals
+                Start free — 4 signals a day
               </button>
               <a
                 href="#how-it-works"
@@ -657,7 +657,7 @@ export default function Landing() {
               onClick={startFree}
               className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#ff4b72] to-[#e11d48] font-semibold text-[15px] hover:brightness-110"
             >
-              Start free — 3 signals
+              Start free — 4 signals a day
             </button>
             <Link to="/dashboard" className="px-6 py-3 rounded-xl border border-white/15 text-white/80 hover:text-white text-[15px]">
               Open the app
