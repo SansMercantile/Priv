@@ -140,12 +140,39 @@ export default function MySignals() {
     }
   };
 
+  // Light refresh for the polling tick: signal lists + current ticket +
+  // unread count, without re-fetching tiers/categories/prefs.
+  const refreshFeed = async () => {
+    const [histRes, curRes] = await Promise.allSettled([
+      apiClient.getSignalHistory(50),
+      apiClient.getCurrentSignal(),
+    ]);
+    if (histRes.status === "fulfilled") {
+      const d = histRes.value?.data?.data ?? histRes.value?.data ?? {};
+      setMine(d.mine || []);
+      setGlobal(d.global || []);
+    }
+    if (curRes.status === "fulfilled") {
+      setCurrent(curRes.value?.data?.data ?? curRes.value?.data ?? null);
+    }
+    await loadNotifications(true);
+  };
+
   useEffect(() => {
     load();
-    // Keep the unread badge live while the tab is open (new signals can
-    // land any minute the scheduler runs).
-    const interval = window.setInterval(() => loadNotifications(true), 60000);
-    return () => window.clearInterval(interval);
+    // Signals rotate every 15 minutes server-side: keep the lists, the
+    // current ticket and the unread badge live while the tab is open.
+    const interval = window.setInterval(() => {
+      refreshFeed();
+    }, 60000);
+    const onVisible = () => {
+      if (!document.hidden) refreshFeed();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
 
   // When the category changes, keep only instruments that exist in it.

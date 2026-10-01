@@ -50,6 +50,7 @@ interface LiveSignal {
   timeframe: string;
   slot_start_utc: string;
   app_id?: string;
+  stale?: boolean;
 }
 
 const STATIC_SIGNAL: LiveSignal = {
@@ -77,6 +78,24 @@ function useLiveSignal() {
   const [signal, setSignal] = useState<LiveSignal | null>(null);
   const [live, setLive] = useState(false);
   const [sentLocal, setSentLocal] = useState("");
+  const [refreshTick, setRefreshTick] = useState(0);
+  const fetchedOnce = useRef(false);
+
+  // The backend cycles signals every 15 minutes, so the ticket must not
+  // be a one-shot fetch: refetch on a 60s tick and whenever the tab
+  // regains focus. localStorage is only a <5min-old fallback for a
+  // failed fetch -- never a permanent pin.
+  useEffect(() => {
+    const onVisible = () => {
+      if (!document.hidden) setRefreshTick((t) => t + 1);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    const iv = window.setInterval(() => setRefreshTick((t) => t + 1), 60000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(iv);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,19 +107,27 @@ function useLiveSignal() {
         const data = (body?.data || body) as LiveSignal;
         if (!data || !data.entry) throw new Error("bad payload");
         if (cancelled) return;
+        fetchedOnce.current = true;
         setSignal(data);
-        setLive(true);
+        setLive(!data.stale);
         try {
-          localStorage.setItem("priv_live_signal", JSON.stringify(data));
+          localStorage.setItem(
+            "priv_live_signal",
+            JSON.stringify({ cached_at: Date.now(), signal: data })
+          );
         } catch (_) {}
       } catch (_) {
-        if (cancelled) return;
+        if (cancelled || fetchedOnce.current) return;
         try {
-          const cached = localStorage.getItem("priv_live_signal");
-          if (cached) {
-            const data = JSON.parse(cached) as LiveSignal;
-            if (data && data.entry) {
-              setSignal(data);
+          const raw = localStorage.getItem("priv_live_signal");
+          if (raw) {
+            const parsed = JSON.parse(raw) as { cached_at?: number; signal?: LiveSignal };
+            const cached = parsed?.signal;
+            const fresh =
+              typeof parsed?.cached_at === "number" &&
+              Date.now() - parsed.cached_at < 5 * 60 * 1000;
+            if (cached && cached.entry && fresh) {
+              setSignal(cached);
               setLive(false);
               return;
             }
@@ -113,7 +140,7 @@ function useLiveSignal() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshTick]);
 
   useEffect(() => {
     if (!signal?.slot_start_utc) {
@@ -127,7 +154,8 @@ function useLiveSignal() {
     }
   }, [signal]);
 
-  return { signal: signal || STATIC_SIGNAL, live, sentLocal };
+  const stale = !!signal?.stale;
+  return { signal: signal || STATIC_SIGNAL, live, stale, sentLocal };
 }
 
 function useSignalToasts(signal: LiveSignal | null, live: boolean) {
@@ -233,6 +261,18 @@ interface HistSignal {
 
 function useSignalHistory() {
   const [history, setHistory] = useState<HistSignal[]>([]);
+  const [refreshTick, setRefreshTick] = useState(0);
+  useEffect(() => {
+    const onVisible = () => {
+      if (!document.hidden) setRefreshTick((t) => t + 1);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    const iv = window.setInterval(() => setRefreshTick((t) => t + 1), 60000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(iv);
+    };
+  }, []);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -249,7 +289,7 @@ function useSignalHistory() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshTick]);
   return history;
 }
 
@@ -409,8 +449,8 @@ function HistorySlide({ item, active, appId }: { item: HistSignal; active: boole
   );
 }
 
-function SignalCarousel({ signal, live, sentLocal, isBuy, rows, history, appId }: {
-  signal: LiveSignal; live: boolean; sentLocal: string; isBuy: boolean;
+function SignalCarousel({ signal, live, stale, sentLocal, isBuy, rows, history, appId }: {
+  signal: LiveSignal; live: boolean; stale: boolean; sentLocal: string; isBuy: boolean;
   rows: Array<[string, number, string?]>; history: HistSignal[]; appId: string;
 }) {
   const [index, setIndex] = useState(0);
@@ -432,7 +472,7 @@ function SignalCarousel({ signal, live, sentLocal, isBuy, rows, history, appId }
         <div>
           <div className="flex items-center justify-between mb-3">
             <div className="text-[10px] font-mono tracking-widest text-rose-200/70">
-              {live ? "LIVE SIGNAL" : "SAMPLE SIGNAL"}
+              {live ? "LIVE SIGNAL" : stale ? "ARCHIVED SIGNAL" : "SAMPLE SIGNAL"}
             </div>
             {live && <div className="flex items-center gap-1.5 text-[10px] text-emerald-300"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />LIVE</div>}
           </div>
@@ -508,7 +548,7 @@ function SignalCarousel({ signal, live, sentLocal, isBuy, rows, history, appId }
 
 export default function Landing() {
   const { isAuthenticated, isLoading, loginWithRedirect } = useAuth0();
-  const { signal, live, sentLocal } = useLiveSignal();
+  const { signal, live, stale, sentLocal } = useLiveSignal();
   const history = useSignalHistory();
   const { toasts, dismiss } = useSignalToasts(live ? signal : null, live);
 
@@ -621,6 +661,7 @@ export default function Landing() {
             <SignalCarousel
               signal={signal}
               live={live}
+              stale={stale}
               sentLocal={sentLocal}
               isBuy={isBuy}
               rows={rows}
