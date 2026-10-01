@@ -68,6 +68,30 @@ interface OpenPosition {
   longcode: string;
 }
 
+interface WorkingOrder {
+  id: string;
+  symbol: string;
+  side: "BUY" | "SELL";
+  kind: "LIMIT" | "STOP";
+  trigger_price: number;
+  volume: number;
+  status: string;
+  created_at: string;
+  contract_id: string | null;
+  fill_error: string | null;
+}
+
+interface PositionMonitor {
+  id: string;
+  contract_id: string;
+  symbol: string;
+  side: string;
+  sl: number | null;
+  tp: number | null;
+  entry_price: number;
+  status: string;
+}
+
 interface AccountInfo {
   account_id: string;
   balance: number;
@@ -330,6 +354,18 @@ function TradingTerminalInner() {
     } catch {}
   };
 
+  const fetchWorking = async (_bid: string | null) => {
+    try {
+      const res = await fetch("/api/brokers/pending-orders", { headers: await userHeader() });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success) {
+        setWorkingOrders(data.working || []);
+        setMonitors(data.monitors || []);
+      }
+    } catch {}
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -338,12 +374,14 @@ function TradingTerminalInner() {
       fetchStatus(bid);
       fetchAccount(bid);
       fetchPositions(bid);
+      fetchWorking(bid);
     })();
     const interval = setInterval(async () => {
       const bid = await resolveBroker();
       if (cancelled) return;
       fetchAccount(bid);
       fetchPositions(bid);
+      fetchWorking(bid);
     }, 8000);
     return () => {
       cancelled = true;
@@ -358,9 +396,19 @@ function TradingTerminalInner() {
   const [duration, setDuration] = useState<number>(5);
   const [riskPct, setRiskPct] = useState<number>(1);
   const [placingOrder, setPlacingOrder] = useState(false);
+  // MT5-style ticket: order kind, trigger price, optional SL/TP levels.
+  const [orderKind, setOrderKind] = useState<"INSTANT" | "LIMIT" | "STOP">("INSTANT");
+  const [triggerPrice, setTriggerPrice] = useState<number>(0);
+  const [useSL, setUseSL] = useState<boolean>(false);
+  const [useTP, setUseTP] = useState<boolean>(false);
+  const [stopLoss, setStopLoss] = useState<number>(0);
+  const [takeProfit, setTakeProfit] = useState<number>(0);
+  const [workingOrders, setWorkingOrders] = useState<WorkingOrder[]>([]);
+  const [monitors, setMonitors] = useState<PositionMonitor[]>([]);
 
-  const handlePlaceOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlePlaceOrder = async (e: React.FormEvent | null, forcedSide?: "BUY" | "SELL") => {
+    e?.preventDefault();
+    const side = forcedSide ?? orderSide;
     if (!brokerId) {
       pushLog(`No Deriv ${activeMode} account linked — connect one first.`);
       return;
@@ -373,27 +421,51 @@ function TradingTerminalInner() {
       pushLog("Stake must be greater than 0.");
       return;
     }
+    if (orderKind !== "INSTANT" && !(triggerPrice > 0)) {
+      pushLog(`${orderKind} orders need a trigger price.`);
+      return;
+    }
+    if (useSL && !(stopLoss > 0)) {
+      pushLog("Stop Loss is enabled — enter a level or untick it.");
+      return;
+    }
+    if (useTP && !(takeProfit > 0)) {
+      pushLog("Take Profit is enabled — enter a level or untick it.");
+      return;
+    }
     setPlacingOrder(true);
     try {
+      const orderType = orderKind === "INSTANT" ? side : `${side}_${orderKind}`;
+      const body: Record<string, unknown> = {
+        broker_id: brokerId,
+        order_type: orderType,
+        symbol: selectedSymbol,
+        volume: stake,
+        duration,
+        duration_unit: "m",
+      };
+      if (orderKind !== "INSTANT") body.price = triggerPrice;
+      if (useSL && stopLoss > 0) body.stop_loss = stopLoss;
+      if (useTP && takeProfit > 0) body.take_profit = takeProfit;
       const res = await fetch("/api/brokers/trade", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(await userHeader()) },
-        body: JSON.stringify({
-          broker_id: brokerId,
-          order_type: orderSide,
-          symbol: selectedSymbol,
-          volume: stake,
-          duration,
-          duration_unit: "m",
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        pushLog(
-          `Order placed: ${orderSide} ${selectedSymbol}, stake ${stake} ${account?.currency || "USD"}, ${duration}m. Contract ID: ${data.order_id?.order_id}.`
-        );
+        if (data.pending) {
+          pushLog(
+            `Working order placed: ${side} ${orderKind} ${selectedSymbol} @ ${triggerPrice} · vol ${stake} ${account?.currency || "USD"}. Id ${data.working_order?.id}.`
+          );
+        } else {
+          pushLog(
+            `Order placed: ${side} ${selectedSymbol}, stake ${stake} ${account?.currency || "USD"}, ${duration}m.${data.monitor_armed ? " SL/TP armed." : ""} Contract ID: ${data.order_id?.order_id}.`
+          );
+        }
         fetchAccount(brokerId);
         fetchPositions(brokerId);
+        fetchWorking(brokerId);
       } else {
         pushLog(`Order failed: ${data.detail || data.error || "Unknown error"}`);
       }
@@ -401,6 +473,44 @@ function TradingTerminalInner() {
       pushLog(`Order failed: ${err.message || err}`);
     } finally {
       setPlacingOrder(false);
+    }
+  };
+
+  const handleCancelWorking = async (order: WorkingOrder) => {
+    try {
+      const res = await fetch("/api/brokers/pending-orders/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await userHeader()) },
+        body: JSON.stringify({ order_id: order.id }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        pushLog(`Working order ${order.id} (${order.side} ${order.kind} ${order.symbol}) cancelled.`);
+        fetchWorking(brokerId);
+      } else {
+        pushLog(`Cancel failed: ${data.detail || "Unknown error"}`);
+      }
+    } catch (err: any) {
+      pushLog(`Cancel failed: ${err.message || err}`);
+    }
+  };
+
+  const handleRemoveMonitor = async (monitor: PositionMonitor) => {
+    try {
+      const res = await fetch("/api/brokers/position-monitors/remove", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await userHeader()) },
+        body: JSON.stringify({ monitor_id: monitor.id }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        pushLog(`SL/TP removed from contract ${monitor.contract_id} (position stays open).`);
+        fetchWorking(brokerId);
+      } else {
+        pushLog(`Remove failed: ${data.detail || "Unknown error"}`);
+      }
+    } catch (err: any) {
+      pushLog(`Remove failed: ${err.message || err}`);
     }
   };
 
@@ -666,26 +776,42 @@ function TradingTerminalInner() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setOrderSide("BUY")}
-                  className={`py-3 rounded text-xs font-mono font-bold flex items-center justify-center gap-1 border ${
-                    orderSide === "BUY" ? "bg-emerald-500 text-black border-emerald-500" : "bg-neutral-950 text-emerald-500 border-white/5"
-                  }`}
-                >
-                  <TrendingUp className="w-4 h-4" /> CALL
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setOrderSide("SELL")}
-                  className={`py-3 rounded text-xs font-mono font-bold flex items-center justify-center gap-1 border ${
-                    orderSide === "SELL" ? "bg-red-500 text-black border-red-500" : "bg-neutral-950 text-red-500 border-white/5"
-                  }`}
-                >
-                  <TrendingDown className="w-4 h-4" /> PUT
-                </button>
+              <div className="grid grid-cols-3 gap-2">
+                {(["INSTANT", "LIMIT", "STOP"] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setOrderKind(k)}
+                    className={`py-2.5 rounded text-[10px] font-mono font-bold border ${
+                      orderKind === k
+                        ? "bg-white text-neutral-950 border-white"
+                        : "bg-neutral-950 text-zinc-400 border-white/5 hover:border-white/20"
+                    }`}
+                  >
+                    {k === "INSTANT" ? "INSTANT" : k}
+                  </button>
+                ))}
               </div>
+
+              {orderKind !== "INSTANT" && (
+                <div className="space-y-1">
+                  <label className="block text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+                    {orderKind} trigger price
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="any"
+                    value={triggerPrice || ""}
+                    placeholder="0.0000"
+                    onChange={(e) => setTriggerPrice(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-neutral-950 border border-amber-500/30 rounded p-2.5 text-xs text-white font-mono"
+                  />
+                  <span className="block text-[9px] font-mono text-amber-500/70">
+                    Rests server-side until the market reaches this price; direction comes from the SELL/BUY button below.
+                  </span>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3.5">
                 <div className="space-y-1">
@@ -711,6 +837,51 @@ function TradingTerminalInner() {
                     value={duration}
                     onChange={(e) => setDuration(parseInt(e.target.value) || 1)}
                     className="w-full bg-neutral-950 border border-white/10 rounded p-2.5 text-xs text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3.5">
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={useSL}
+                      onChange={(e) => setUseSL(e.target.checked)}
+                      className="accent-red-500"
+                    />
+                    S/L
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="any"
+                    disabled={!useSL}
+                    value={stopLoss || ""}
+                    placeholder="—"
+                    onChange={(e) => setStopLoss(parseFloat(e.target.value) || 0)}
+                    className="flex-1 min-w-0 bg-neutral-950 border border-white/10 rounded p-2.5 text-xs text-white font-mono disabled:opacity-40"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={useTP}
+                      onChange={(e) => setUseTP(e.target.checked)}
+                      className="accent-emerald-500"
+                    />
+                    T/P
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="any"
+                    disabled={!useTP}
+                    value={takeProfit || ""}
+                    placeholder="—"
+                    onChange={(e) => setTakeProfit(parseFloat(e.target.value) || 0)}
+                    className="flex-1 min-w-0 bg-neutral-950 border border-white/10 rounded p-2.5 text-xs text-white font-mono disabled:opacity-40"
                   />
                 </div>
               </div>
@@ -750,20 +921,71 @@ function TradingTerminalInner() {
                 )}
               </div>
 
-              <button
-                type="submit"
-                disabled={placingOrder}
-                className="w-full bg-white hover:bg-neutral-200 text-neutral-950 font-bold text-xs py-3 rounded flex items-center justify-center gap-2"
-              >
-                {placingOrder ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> SUBMITTING...
-                  </>
-                ) : (
-                  "PLACE ORDER"
-                )}
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={placingOrder}
+                  onClick={() => {
+                    setOrderSide("SELL");
+                    handlePlaceOrder(null, "SELL");
+                  }}
+                  className="py-3 rounded text-xs font-mono font-bold flex items-center justify-center gap-1 border bg-red-500 text-black border-red-500 hover:bg-red-400 disabled:opacity-50"
+                >
+                  {placingOrder ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <TrendingDown className="w-4 h-4" />} SELL
+                </button>
+                <button
+                  type="button"
+                  disabled={placingOrder}
+                  onClick={() => {
+                    setOrderSide("BUY");
+                    handlePlaceOrder(null, "BUY");
+                  }}
+                  className="py-3 rounded text-xs font-mono font-bold flex items-center justify-center gap-1 border bg-emerald-500 text-black border-emerald-500 hover:bg-emerald-400 disabled:opacity-50"
+                >
+                  {placingOrder ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <TrendingUp className="w-4 h-4" />} BUY
+                </button>
+              </div>
             </form>
+          )}
+
+          {isConnected && workingOrders.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-white/5 space-y-2">
+              <span className="block font-mono text-[10px] text-zinc-500 tracking-wider">
+                WORKING ORDERS ({workingOrders.filter((o) => o.status === "PENDING").length} pending / {workingOrders.length} total)
+              </span>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                {workingOrders.slice(0, 20).map((o) => (
+                  <div
+                    key={o.id}
+                    className="flex items-center justify-between p-2 border border-white/5 bg-neutral-950/40 rounded text-[10px] font-mono"
+                  >
+                    <div className="min-w-0">
+                      <span className={o.side === "BUY" ? "text-emerald-400 font-bold" : "text-red-400 font-bold"}>
+                        {o.side} {o.kind}
+                      </span>{" "}
+                      <span className="text-white">{o.symbol}</span>{" "}
+                      <span className="text-amber-400">@ {o.trigger_price}</span>
+                      <span className="text-zinc-600"> · vol {o.volume}</span>
+                      {o.status === "PENDING" && <span className="text-amber-500/70"> · WORKING</span>}
+                      {o.status === "FILLED" && <span className="text-emerald-500/70"> · FILLED #{o.contract_id}</span>}
+                      {o.status === "CANCELLED" && <span className="text-zinc-600"> · CANCELLED</span>}
+                      {o.status === "REJECTED" && (
+                        <span className="text-red-500/70"> · REJECTED {o.fill_error ? `(${o.fill_error})` : ""}</span>
+                      )}
+                    </div>
+                    {o.status === "PENDING" && (
+                      <button
+                        onClick={() => handleCancelWorking(o)}
+                        className="ml-2 p-1.5 bg-white/5 rounded hover:bg-red-500/10 hover:text-red-400 shrink-0"
+                        title="Cancel working order"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -785,28 +1007,44 @@ function TradingTerminalInner() {
             <div className="py-8 text-center font-mono text-[11px] text-zinc-600">No open positions.</div>
           ) : (
             <div className="space-y-2">
-              {positions.map((pos) => (
-                <div
-                  key={pos.order_id}
-                  className="flex items-center justify-between p-3 border border-white/5 bg-neutral-950/40 rounded text-xs font-mono"
-                >
-                  <div>
-                    <div className="text-white font-bold">
-                      {pos.symbol || "—"} · {pos.contract_type}
-                    </div>
-                    <div className="text-zinc-500 text-[10px]">
-                      Stake {pos.buy_price} · Payout {pos.payout} · #{pos.order_id}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleClosePosition(pos)}
-                    className="p-2 bg-white/5 rounded hover:bg-red-500/10 hover:text-red-400"
-                    title="Close position"
+              {positions.map((pos) => {
+                const mon = monitors.find((m) => m.status === "ACTIVE" && m.contract_id === pos.order_id);
+                return (
+                  <div
+                    key={pos.order_id}
+                    className="flex items-center justify-between p-3 border border-white/5 bg-neutral-950/40 rounded text-xs font-mono"
                   >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
+                    <div className="min-w-0">
+                      <div className="text-white font-bold">
+                        {pos.symbol || "—"} · {pos.contract_type}
+                      </div>
+                      <div className="text-zinc-500 text-[10px]">
+                        Stake {pos.buy_price} · Payout {pos.payout} · #{pos.order_id}
+                      </div>
+                      {mon && (mon.sl || mon.tp) && (
+                        <div className="flex items-center gap-2 mt-1 text-[9px]">
+                          {mon.sl ? <span className="text-red-400">SL {mon.sl}</span> : null}
+                          {mon.tp ? <span className="text-emerald-400">TP {mon.tp}</span> : null}
+                          <button
+                            onClick={() => handleRemoveMonitor(mon)}
+                            className="p-0.5 rounded hover:bg-white/10 text-zinc-500"
+                            title="Remove SL/TP (position stays open)"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleClosePosition(pos)}
+                      className="p-2 bg-white/5 rounded hover:bg-red-500/10 hover:text-red-400"
+                      title="Close position"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
