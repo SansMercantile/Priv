@@ -590,16 +590,28 @@ export const MultiAgent: React.FC<{ demoMode?: boolean }> = () => {
           const fetchedAgents: any[] = result.data.agents;
           const merged = REAL_PRIV_AGENTS_BACKUP.map((backupAgent) => {
             const matchedFetched = fetchedAgents.find(
-              (fa) => fa.id === backupAgent.id || fa.id.split("-")[0] === backupAgent.type
+              (fa) =>
+                fa.id === backupAgent.id ||
+                fa.type === backupAgent.type ||
+                String(fa.id || "").split("-")[0] === backupAgent.type
             );
             if (matchedFetched) {
+              const acc = matchedFetched.performance?.accuracy;
+              const rep = matchedFetched.reputation;
               return {
                 ...backupAgent,
                 status: matchedFetched.status || backupAgent.status,
-                decisions: matchedFetched.tasks_completed || backupAgent.decisions,
-                accuracy: matchedFetched.performance?.accuracy || backupAgent.accuracy,
-                performance: matchedFetched.performance?.accuracy || backupAgent.performance,
-                reputation: matchedFetched.reputation ? matchedFetched.reputation * 100 : backupAgent.reputation
+                // Real counters only -- `??` (not `||`) so a live 0/0.5 is
+                // shown as-is instead of silently snapping back to the
+                // static backup numbers. Unknown (null) falls back.
+                decisions:
+                  typeof matchedFetched.tasks_completed === "number"
+                    ? matchedFetched.tasks_completed
+                    : backupAgent.decisions,
+                accuracy: typeof acc === "number" ? acc : backupAgent.accuracy,
+                performance: typeof acc === "number" ? acc : backupAgent.performance,
+                reputation:
+                  typeof rep === "number" ? Math.round(rep * 100) : backupAgent.reputation,
               };
             }
             return backupAgent;
@@ -623,21 +635,10 @@ export const MultiAgent: React.FC<{ demoMode?: boolean }> = () => {
     };
   }, []);
 
-  // Periodically update some micro fluctuations to maintain life-like visual movement in dashboard
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setAgents(prev => 
-        prev.map(agent => ({
-          ...agent,
-          decisions: agent.decisions + (Math.random() > 0.8 ? 1 : 0),
-          performance: Math.max(88, Math.min(100, agent.performance + (Math.random() - 0.5) * 0.08)),
-          reputation: Math.max(90, Math.min(100, agent.reputation + (Math.random() - 0.5) * 0.05))
-        }))
-      );
-    }, 5000);
-
-    return () => clearInterval(timer);
-  }, []);
+  // (removed) The old 5s "micro fluctuation" interval randomly bumped
+  // decisions/performance/reputation to fake life-like movement. Now that
+  // the hub merges real tasks_completed + reputation from the backend
+  // every 10s, random drift would overwrite live counters with noise.
 
   // Update Peer debating logs asynchronously mimicking live inter-agent trust communication
   useEffect(() => {

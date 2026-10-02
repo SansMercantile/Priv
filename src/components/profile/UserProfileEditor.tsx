@@ -101,7 +101,27 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
   const [profile, setProfile] = useState(() => {
     const saved = localStorage.getItem("xm_user_profile");
     if (saved) {
-      try { return JSON.parse(saved); } catch (_) {}
+      try {
+        const parsed = JSON.parse(saved);
+        // Saved profiles written by older builds (or a partially-failed
+        // hydrate) can miss fields entirely; a missing email/phone used
+        // to reach <ContactVerifier contact={profile.email}> and crash
+        // the whole page on `undefined.trim()`. Merge over the empty
+        // shell so every field is always a string.
+        return {
+          firstName: '',
+          lastName: '',
+          email: '',
+          phone: '',
+          country: '',
+          experience: '< 1 year',
+          riskAppetite: 'Moderate',
+          tradingGoal: '',
+          ...parsed,
+          ...(typeof parsed?.email === 'string' ? {} : { email: '' }),
+          ...(typeof parsed?.phone === 'string' ? {} : { phone: '' }),
+        };
+      } catch (_) {}
     }
     // FIX: this used to fall back to a fabricated identity (name
     // "Alistair Sterling", a South African phone number) that every

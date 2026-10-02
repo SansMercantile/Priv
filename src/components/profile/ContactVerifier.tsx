@@ -55,7 +55,7 @@ export default function ContactVerifier({ kind, contact, verified, onVerified }:
   const ok = isContactVerified(verified, kind, contact);
   const channel = kind === 'email' ? 'email' : phoneChannel;
 
-  if (!contact.trim()) return null;
+  if (!contact || !contact.trim()) return null;
 
   if (ok) {
     return (
