@@ -106,6 +106,15 @@ export default function StrategyTester() {
   const [actionError, setActionError] = useState<string | null>(null);
   const abortRef = useRef(false);
 
+  // Main strategy (drives the server-side autotrader) + saved param tweaks.
+  const [mainStrategy, setMainStrategy] = useState<string | null>(null);
+  const [paramsMap, setParamsMap] = useState<Record<string, Record<string, any>>>({});
+  const [paramDefaults, setParamDefaults] = useState<Record<string, Record<string, any>>>({});
+  const [mainSaving, setMainSaving] = useState<string | null>(null);
+  const [tweakFor, setTweakFor] = useState<string | null>(null);
+  const [tweakDraft, setTweakDraft] = useState<Record<string, any>>({});
+  const [tweakSaving, setTweakSaving] = useState(false);
+
   // Sandbox board: pins/labels/notes + real last-tested stats.
   const [boards, setBoards] = useState<BoardRow[]>([]);
   const [boardOpen, setBoardOpen] = useState(false);
@@ -125,11 +134,12 @@ export default function StrategyTester() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const [prof, sess, uni, brd] = await Promise.allSettled([
+      const [prof, sess, uni, brd, defs] = await Promise.allSettled([
         apiClient.get("/api/v1/profile/strategies"),
         apiClient.get("/api/v1/backtest/session-results"),
         apiClient.get("/api/v1/backtest/universe"),
         apiClient.get("/api/v1/backtest/sandbox/boards"),
+        apiClient.get("/api/v1/backtest/strategies"),
       ]);
       if (cancelled) return;
 
@@ -146,6 +156,14 @@ export default function StrategyTester() {
         cat = d?.catalog ?? {};
         setCatalog(cat);
         setSelected(d?.selected ?? []);
+        setMainStrategy(d?.main ?? null);
+        setParamsMap(d?.params ?? {});
+      }
+      if (defs.status === "fulfilled") {
+        const raw: Record<string, { defaults?: Record<string, any> }> = defs.value?.data?.data ?? {};
+        const dm: Record<string, Record<string, any>> = {};
+        for (const [name, spec] of Object.entries(raw)) dm[name] = spec?.defaults ?? {};
+        setParamDefaults(dm);
       }
       if (sess.status === "fulfilled") {
         setSession(sess.value?.data?.data ?? null);
@@ -197,6 +215,13 @@ export default function StrategyTester() {
     return Array.from(map, ([name, stats]) => ({ name, stats }));
   }, [session, catalog]);
 
+  // Saved param tweaks travel with every run, so TEST / TEST ALL / the
+  // sandbox bench exercise exactly what the autotrader will trade.
+  const runParams = (name: string) => {
+    const p = paramsMap[name];
+    return p && Object.keys(p).length ? p : undefined;
+  };
+
   const runOne = async (name: string) => {
     setSingleRunning(name);
     setActionError(null);
@@ -204,7 +229,8 @@ export default function StrategyTester() {
       const res: any = await apiClient.post("/api/v1/backtest/run", {
         symbol,
         timeframe,
-        strategy: name
+        strategy: name,
+        params: runParams(name)
       });
       const d = res?.data?.data;
       setLive((prev) => ({ ...prev, [name]: d ?? { ok: false, reason: "empty result" } }));
@@ -236,7 +262,8 @@ export default function StrategyTester() {
         const res: any = await apiClient.post("/api/v1/backtest/run", {
           symbol,
           timeframe,
-          strategy: name
+          strategy: name,
+          params: runParams(name)
         });
         setLive((prev) => ({ ...prev, [name]: res?.data?.data ?? { ok: false, reason: "empty result" } }));
       } catch (e: any) {
@@ -303,16 +330,105 @@ export default function StrategyTester() {
     const already = selected.includes(name);
     const next = already ? selected.filter((s) => s !== name) : [...selected, name];
     const previous = selected;
+    const previousMain = mainStrategy;
     setSelected(next);
+    // Un-USEing the main strategy also clears MAIN (it no longer applies).
+    if (already && mainStrategy === name) setMainStrategy(null);
     setSaving(name);
     setActionError(null);
     try {
       await apiClient.post("/api/v1/profile/strategies", { preferred_strategies: next });
+      if (already && previousMain === name) {
+        await apiClient.put("/api/v1/profile/strategies/main", { strategy: null });
+      }
     } catch (e: any) {
       setSelected(previous);
+      setMainStrategy(previousMain);
       setActionError(`Could not save your selection: ${e?.message || "network error"}`);
     } finally {
       setSaving(null);
+    }
+  };
+
+  // Star a strategy as MAIN: the autotrader follows it while armed (and it
+  // joins the selection pool server-side). Clicking the active star clears it.
+  const setMain = async (name: string) => {
+    const next = mainStrategy === name ? null : name;
+    const previous = mainStrategy;
+    setMainStrategy(next);
+    setMainSaving(name);
+    setActionError(null);
+    try {
+      await apiClient.put("/api/v1/profile/strategies/main", { strategy: next });
+      if (next && !selected.includes(next)) setSelected((prev) => [...prev, next]);
+    } catch (e: any) {
+      setMainStrategy(previous);
+      setActionError(`Could not save the main strategy: ${e?.message || "network error"}`);
+    } finally {
+      setMainSaving(null);
+    }
+  };
+
+  // Param tweak editor: seeded from declared defaults + saved overrides.
+  const openTweak = (name: string) => {
+    setTweakDraft({ ...(paramDefaults[name] || {}), ...(paramsMap[name] || {}) });
+    setTweakFor(name);
+  };
+
+  const saveTweak = async (name: string) => {
+    const defaults = paramDefaults[name] || {};
+    const cleaned: Record<string, any> = {};
+    for (const [key, defVal] of Object.entries(defaults)) {
+      const raw = tweakDraft[key];
+      if (raw === undefined || raw === "") continue; // back to default
+      if (typeof defVal === "number") {
+        const n = Number(raw);
+        if (!Number.isFinite(n)) {
+          setActionError(`'${key}' must be a number.`);
+          return;
+        }
+        cleaned[key] = Number.isInteger(defVal) ? Math.round(n) : n;
+      } else {
+        cleaned[key] = String(raw);
+      }
+    }
+    setTweakSaving(true);
+    setActionError(null);
+    try {
+      const res: any = await apiClient.put("/api/v1/profile/strategies/params", {
+        strategy: name,
+        params: cleaned
+      });
+      const saved = res?.data?.data?.params ?? cleaned;
+      setParamsMap((prev) => {
+        const next = { ...prev };
+        if (Object.keys(saved).length) next[name] = saved;
+        else delete next[name];
+        return next;
+      });
+      setTweakFor(null);
+    } catch (e: any) {
+      setActionError(`Could not save tweaks: ${e?.message || "network error"}`);
+    } finally {
+      setTweakSaving(false);
+    }
+  };
+
+  const clearTweak = async (name: string) => {
+    setTweakSaving(true);
+    setActionError(null);
+    try {
+      await apiClient.put("/api/v1/profile/strategies/params", { strategy: name, params: {} });
+      setParamsMap((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+      setTweakFor(null);
+    } catch (e: any) {
+      setActionError(`Could not reset tweaks: ${e?.message || "network error"}`);
+    } finally {
+      setTweakSaving(false);
     }
   };
 
@@ -345,8 +461,9 @@ export default function StrategyTester() {
             Strategy Tester
           </h1>
           <p className="text-white/40 text-xs mt-1 font-light">
-            Test every strategy from our engineering sessions against stored real market data, then USE
-            the ones you are happy with -- your selection stays active across Priv.
+            Test every strategy from our engineering sessions against stored real market data, tweak
+            their parameters, then USE the ones you are happy with. Star one as MAIN and the
+            autotrader takes its trades exactly as tested.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -438,13 +555,42 @@ export default function StrategyTester() {
             {selected.map((s) => (
               <span
                 key={s}
-                className="inline-flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                className={`inline-flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1 rounded-full border ${
+                  mainStrategy === s
+                    ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
+                    : "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                }`}
               >
-                <CheckCircle2 className="w-3 h-3" />
+                {mainStrategy === s ? (
+                  <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                ) : (
+                  <CheckCircle2 className="w-3 h-3" />
+                )}
                 {s}
+                {mainStrategy === s && <span className="font-bold">MAIN</span>}
+                {paramsMap[s] && (
+                  <span
+                    title={`Tweaked params: ${JSON.stringify(paramsMap[s])}`}
+                    className="text-[8.5px] px-1 rounded bg-white/10 text-zinc-300"
+                  >
+                    ~
+                  </span>
+                )}
               </span>
             ))}
           </div>
+        )}
+        {mainStrategy && (
+          <p className="text-[10px] font-mono text-amber-300/80">
+            ★ {mainStrategy} is MAIN — the autotrader follows this strategy (with your saved tweaks)
+            while armed. Star another to switch, or click the star again to clear.
+          </p>
+        )}
+        {!mainStrategy && selected.length > 0 && (
+          <p className="text-[10px] font-mono text-zinc-500">
+            No MAIN starred yet — the autotrader will use the first strategy in use (or the
+            multi-agent desk). Star one below to pin it explicitly.
+          </p>
         )}
         {actionError && (
           <p className="text-[11px] font-mono text-rose-400">{actionError}</p>
@@ -762,20 +908,39 @@ export default function StrategyTester() {
                 const res = live[r.name];
                 const isSelected = selected.includes(r.name);
                 const isTesting = singleRunning === r.name;
+                const isMain = mainStrategy === r.name;
+                const isTweaked = !!paramsMap[r.name];
+                const defs = paramDefaults[r.name] || {};
                 return (
+                  <React.Fragment key={r.name}>
                   <tr
-                    key={r.name}
                     className={`border-t border-white/5 hover:bg-white/[0.03] ${
-                      isSelected ? "bg-emerald-500/[0.04]" : ""
+                      isMain ? "bg-amber-500/[0.05]" : isSelected ? "bg-emerald-500/[0.04]" : ""
                     }`}
                   >
                     <td className="py-2.5 px-3 text-[10px] font-mono text-zinc-600">{idx + 1}</td>
                     <td className="py-2.5 px-3">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-mono font-bold text-white">{r.name}</span>
+                        {isMain && (
+                          <span
+                            title="MAIN — the autotrader follows this strategy"
+                            className="inline-flex items-center gap-1 text-[8.5px] font-mono uppercase px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-300 font-bold"
+                          >
+                            <Star className="w-2.5 h-2.5 fill-amber-400" /> MAIN
+                          </span>
+                        )}
                         {r.stats?.category && (
                           <span className="text-[8.5px] font-mono uppercase px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-zinc-500">
                             {r.stats.category}
+                          </span>
+                        )}
+                        {isTweaked && (
+                          <span
+                            title={`Param tweaks saved: ${JSON.stringify(paramsMap[r.name])}`}
+                            className="text-[8.5px] font-mono uppercase px-1.5 py-0.5 rounded border border-sky-500/40 bg-sky-500/10 text-sky-300"
+                          >
+                            tweaked
                           </span>
                         )}
                       </div>
@@ -827,6 +992,18 @@ export default function StrategyTester() {
                           {isTesting ? "RUNNING..." : "TEST"}
                         </button>
                         <button
+                          onClick={() => (tweakFor === r.name ? setTweakFor(null) : openTweak(r.name))}
+                          disabled={tweakSaving}
+                          title="Tweak this strategy's parameters (saved and used by TEST runs + the autotrader)"
+                          className={`px-2.5 py-1 rounded border text-[9.5px] font-mono font-bold transition disabled:opacity-40 cursor-pointer ${
+                            tweakFor === r.name
+                              ? "border-sky-500/40 bg-sky-500/15 text-sky-300"
+                              : "border-white/15 bg-white/5 hover:bg-white/10 text-white"
+                          }`}
+                        >
+                          {isTweaked ? "PARAMS ~" : "PARAMS"}
+                        </button>
+                        <button
                           onClick={() => toggleUse(r.name)}
                           disabled={saving !== null}
                           className={`px-2.5 py-1 rounded border text-[9.5px] font-mono font-bold transition disabled:opacity-40 cursor-pointer ${
@@ -837,9 +1014,100 @@ export default function StrategyTester() {
                         >
                           {saving === r.name ? "SAVING..." : isSelected ? "✓ IN USE" : "USE"}
                         </button>
+                        <button
+                          onClick={() => setMain(r.name)}
+                          disabled={mainSaving !== null || (!isSelected && !isMain)}
+                          title={
+                            isMain
+                              ? "MAIN — click to clear (autotrader falls back to first in use / multi-agent desk)"
+                              : isSelected
+                              ? "Star as MAIN — the autotrader follows this strategy"
+                              : "Press USE first, then star as MAIN"
+                          }
+                          className={`px-2.5 py-1 rounded border text-[9.5px] font-mono font-bold transition disabled:opacity-40 cursor-pointer ${
+                            isMain
+                              ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
+                              : "border-white/15 bg-white/5 hover:bg-white/10 text-zinc-300"
+                          }`}
+                        >
+                          {mainSaving === r.name ? "..." : isMain ? "★ MAIN" : "☆ MAIN"}
+                        </button>
                       </div>
                     </td>
                   </tr>
+
+                  {/* Param tweak editor (expandable row) */}
+                  {tweakFor === r.name && (
+                    <tr className="border-t border-white/5 bg-white/[0.02]">
+                      <td colSpan={7} className="px-3 py-3">
+                        <div className="space-y-2.5">
+                          <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-bold">
+                            Tweak params — {r.name}
+                            <span className="text-zinc-600 normal-case font-normal">
+                              {" "}· saved tweaks drive TEST runs and the autotrader; blank = default
+                            </span>
+                          </div>
+                          {Object.keys(defs).length > 0 ? (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                              {Object.entries(defs).map(([key, defVal]) => (
+                                <label
+                                  key={key}
+                                  className="flex flex-col gap-1 text-[9.5px] font-mono text-zinc-400"
+                                >
+                                  <span className="flex items-center justify-between">
+                                    {key}
+                                    {String(tweakDraft[key] ?? "") !== String(defVal) && (
+                                      <span className="text-sky-400">edited</span>
+                                    )}
+                                  </span>
+                                  <input
+                                    value={String(tweakDraft[key] ?? "")}
+                                    onChange={(e) =>
+                                      setTweakDraft((d) => ({ ...d, [key]: e.target.value }))
+                                    }
+                                    placeholder={`default: ${String(defVal)}`}
+                                    className="bg-neutral-950 border border-white/15 rounded px-2 py-1 text-[11px] font-mono text-white focus:outline-none focus:border-white/40"
+                                  />
+                                </label>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-[10px] font-mono text-zinc-500">
+                              No tunable params declared for this strategy.
+                            </p>
+                          )}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              onClick={() => saveTweak(r.name)}
+                              disabled={tweakSaving}
+                              className="px-2.5 py-1 rounded border border-emerald-500/40 bg-emerald-500/15 text-emerald-300 text-[9.5px] font-mono font-bold disabled:opacity-40 cursor-pointer"
+                            >
+                              {tweakSaving ? "SAVING..." : "SAVE TWEAKS"}
+                            </button>
+                            <button
+                              onClick={() => clearTweak(r.name)}
+                              disabled={tweakSaving || !isTweaked}
+                              className="px-2.5 py-1 rounded border border-white/15 text-zinc-400 text-[9.5px] font-mono font-bold hover:bg-white/10 disabled:opacity-40 cursor-pointer"
+                            >
+                              RESET TO DEFAULTS
+                            </button>
+                            <button
+                              onClick={() => setTweakFor(null)}
+                              className="px-2.5 py-1 rounded border border-white/15 text-zinc-400 text-[9.5px] font-mono font-bold hover:bg-white/10 cursor-pointer"
+                            >
+                              CLOSE
+                            </button>
+                            {isTweaked && (
+                              <span className="text-[9.5px] font-mono text-sky-300">
+                                active: {JSON.stringify(paramsMap[r.name])}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 );
               })}
               {rows.length === 0 && (

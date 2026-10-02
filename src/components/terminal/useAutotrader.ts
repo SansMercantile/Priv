@@ -9,6 +9,8 @@ export interface AgentStatus {
   universe_size?: number | null;
   last_symbol_traded?: string | null;
   tier?: string;
+  strategy?: string | null;
+  strategy_params?: Record<string, unknown>;
   cycles: number;
   placements: number;
   last_contract?: string | null;

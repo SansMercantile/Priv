@@ -3,7 +3,7 @@ import { useAutotrader } from "./terminal/useAutotrader";
 import { useDerivSymbols, tvSymbolFor } from "./terminal/derivSymbols";
 import SymbolPicker from "./terminal/SymbolPicker";
 import NativeChart from "./terminal/NativeChart";
-import { getAppUserId } from "../lib/appUserId";
+import { userHeader } from "../lib/userHeader";
 import {
   Activity,
   Wifi,
@@ -32,30 +32,8 @@ const RISE_FALL_MINI_APP_URL = "https://privcoremini.sansmercantile.com";
 // linked -- the UI prompts to connect instead of showing any shared or
 // other-mode account.
 
-import { getAuthToken } from "../lib/authToken";
 import { Link } from "react-router-dom";
 import apiClient from "../api/apiClient";
-
-// Authenticated headers for every backend call: the verified Bearer
-// token (when signed in) plus the browser id. The old version sent
-// X-User-Id only, so every call resolved the anonymous key -- whose
-// records were claimed away at login -- and the terminal fell back to
-// the shared desk (a LIVE account) in every mode, including demo.
-async function userHeader(): Promise<Record<string, string>> {
-  const headers: Record<string, string> = {};
-  try {
-    headers["X-User-Id"] = getAppUserId();
-  } catch (_) {
-    /* ignore */
-  }
-  try {
-    const token = await getAuthToken();
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-  } catch (_) {
-    /* ignore */
-  }
-  return headers;
-}
 
 interface OpenPosition {
   order_id: string;
@@ -66,6 +44,19 @@ interface OpenPosition {
   purchase_time: number;
   date_expiry: number;
   longcode: string;
+  broker_id?: string;
+}
+
+// One linked Deriv account from GET /api/v1/auth/deriv/accounts
+// (platform is derived server-side from the loginid: options/mt5/other).
+interface DerivAccountRow {
+  loginid: string;
+  broker_id: string;
+  account_type: string;
+  currency?: string;
+  platform?: string;
+  adapter_live?: boolean;
+  is_default?: boolean;
 }
 
 interface WorkingOrder {
@@ -341,16 +332,35 @@ function TradingTerminalInner() {
   };
 
   const fetchPositions = async (bid: string | null) => {
-    if (!bid) {
+    // Merge rows from the primary account plus every ticked fan-out
+    // target (ref stays fresh across the 8s interval closure). Each
+    // row is tagged with the account it came from so close/monitor
+    // actions can be routed correctly.
+    const targets: string[] = [];
+    const seen = new Set<string>();
+    const push = (b: string | null | undefined) => {
+      if (b && !seen.has(b)) {
+        seen.add(b);
+        targets.push(b);
+      }
+    };
+    push(bid);
+    positionTargetsRef.current.forEach(push);
+    if (!targets.length) {
       setPositions([]);
       return;
     }
     try {
-      const res = await fetch(`/api/brokers/positions?broker_id=${bid}`, { headers: await userHeader() });
-      if (res.ok) {
+      const merged: OpenPosition[] = [];
+      for (const t of targets) {
+        const res = await fetch(`/api/brokers/positions?broker_id=${encodeURIComponent(t)}`, {
+          headers: await userHeader(),
+        });
+        if (!res.ok) continue;
         const data = await res.json();
-        if (Array.isArray(data)) setPositions(data);
+        if (Array.isArray(data)) merged.push(...data.map((p: OpenPosition) => ({ ...p, broker_id: t })));
       }
+      setPositions(merged);
     } catch {}
   };
 
@@ -366,11 +376,22 @@ function TradingTerminalInner() {
     } catch {}
   };
 
+  const fetchAccounts = async () => {
+    try {
+      const res = await fetch("/api/v1/auth/deriv/accounts", { headers: await userHeader() });
+      if (!res.ok) return;
+      const body = await res.json();
+      const list = body?.data?.accounts;
+      if (Array.isArray(list)) setDerivAccounts(list);
+    } catch {}
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const bid = await resolveBroker();
       if (cancelled) return;
+      fetchAccounts();
       fetchStatus(bid);
       fetchAccount(bid);
       fetchPositions(bid);
@@ -406,6 +427,29 @@ function TradingTerminalInner() {
   const [workingOrders, setWorkingOrders] = useState<WorkingOrder[]>([]);
   const [monitors, setMonitors] = useState<PositionMonitor[]>([]);
 
+  // Multi-account switcher: every linked Deriv account (platform-tagged
+  // server-side). The user ticks which accounts a manual order goes to
+  // (All = every account in the current demo/live mode) -- selection is
+  // theirs, no automatic splitting. effectiveTargets falls back to the
+  // mode's active account, so an empty/stale selection can never fire
+  // at nobody or across modes.
+  const [derivAccounts, setDerivAccounts] = useState<DerivAccountRow[]>([]);
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
+  const positionTargetsRef = useRef<string[]>([]);
+
+  // Current-mode accounts and the final target list. Selection is
+  // pruned to the active mode every render; an empty selection falls
+  // back to the mode's active account (never an empty target list).
+  const modeAccounts = derivAccounts.filter((a) => a.account_type === activeMode);
+  const effectiveTargets: string[] =
+    selectedAccounts.filter((id) => modeAccounts.some((a) => a.broker_id === id)).length > 0
+      ? selectedAccounts.filter((id) => modeAccounts.some((a) => a.broker_id === id))
+      : brokerId
+        ? [brokerId]
+        : [];
+  const allModeSelected = modeAccounts.length > 1 && effectiveTargets.length === modeAccounts.length;
+  positionTargetsRef.current = effectiveTargets;
+
   const handlePlaceOrder = async (e: React.FormEvent | null, forcedSide?: "BUY" | "SELL") => {
     e?.preventDefault();
     const side = forcedSide ?? orderSide;
@@ -437,13 +481,21 @@ function TradingTerminalInner() {
     try {
       const orderType = orderKind === "INSTANT" ? side : `${side}_${orderKind}`;
       const body: Record<string, unknown> = {
-        broker_id: brokerId,
         order_type: orderType,
         symbol: selectedSymbol,
         volume: stake,
-        duration,
-        duration_unit: "m",
       };
+      // Fan-out: one ticked account -> classic single-account response;
+      // several -> broker_ids fan-out with per-account results. The
+      // server ownership-checks every target before any order fires.
+      if (effectiveTargets.length > 1) body.broker_ids = effectiveTargets;
+      else body.broker_id = effectiveTargets[0] || brokerId;
+      // Paid tiers trade CFD multipliers (no duration); only the free
+      // options terminal sends a contract duration.
+      if (nodeTier === "free") {
+        body.duration = duration;
+        body.duration_unit = "m";
+      }
       if (orderKind !== "INSTANT") body.price = triggerPrice;
       if (useSL && stopLoss > 0) body.stop_loss = stopLoss;
       if (useTP && takeProfit > 0) body.take_profit = takeProfit;
@@ -454,13 +506,33 @@ function TradingTerminalInner() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        if (data.pending) {
+        if (data.multi) {
+          const results: any[] = Array.isArray(data.results) ? data.results : [];
+          const ok = results.filter((r) => r.success);
+          const bad = results.filter((r) => !r.success);
+          const shortId = (b: string) => String(b || "").split("_").slice(-1)[0] || String(b || "?");
+          const kind = data.pending ? "Working order" : "Order";
+          pushLog(
+            `${kind} placed on ${ok.length}/${results.length} account(s): ` +
+              (ok.map((r) => shortId(r.broker_id)).join(", ") || "none") +
+              (bad.length
+                ? ` — failed: ${bad
+                    .map((r) => `${shortId(r.broker_id)} (${r.error || "rejected"})`)
+                    .join(", ")}`
+                : ".")
+          );
+          if (data.pending) {
+            pushLog(`Ids: ${ok.map((r) => r.working_order?.id).filter(Boolean).join(", ") || "—"}.`);
+          } else if (ok.some((r) => r.monitor_armed)) {
+            pushLog("SL/TP monitors armed on filled accounts.");
+          }
+        } else if (data.pending) {
           pushLog(
             `Working order placed: ${side} ${orderKind} ${selectedSymbol} @ ${triggerPrice} · vol ${stake} ${account?.currency || "USD"}. Id ${data.working_order?.id}.`
           );
         } else {
           pushLog(
-            `Order placed: ${side} ${selectedSymbol}, stake ${stake} ${account?.currency || "USD"}, ${duration}m.${data.monitor_armed ? " SL/TP armed." : ""} Contract ID: ${data.order_id?.order_id}.`
+            `Order placed: ${side} ${selectedSymbol}, stake ${stake} ${account?.currency || "USD"}${nodeTier === "free" ? `, ${duration}m` : " (CFD multiplier)"}.${data.monitor_armed ? " SL/TP armed." : ""} Contract ID: ${data.order_id?.order_id}.`
           );
         }
         fetchAccount(brokerId);
@@ -515,12 +587,15 @@ function TradingTerminalInner() {
   };
 
   const handleClosePosition = async (pos: OpenPosition) => {
-    if (!brokerId) return;
+    // Route the close to the account that actually holds the contract
+    // (fan-out rows are tagged with their source broker_id).
+    const target = pos.broker_id || brokerId;
+    if (!target) return;
     try {
       const res = await fetch("/api/brokers/close-position", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(await userHeader()) },
-        body: JSON.stringify({ broker_id: brokerId, symbol: pos.symbol }),
+        body: JSON.stringify({ broker_id: target, symbol: pos.symbol }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -813,7 +888,59 @@ function TradingTerminalInner() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3.5">
+              {modeAccounts.length > 1 && (
+                <div className="space-y-1.5">
+                  <label className="block text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+                    Trade to · {effectiveTargets.length} of {modeAccounts.length} {activeMode} account
+                    {modeAccounts.length === 1 ? "" : "s"}
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedAccounts(
+                          allModeSelected ? (brokerId ? [brokerId] : []) : modeAccounts.map((a) => a.broker_id)
+                        )
+                      }
+                      className={`px-2 py-1 rounded border text-[9px] font-mono uppercase tracking-wider ${
+                        allModeSelected
+                          ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+                          : "bg-white/5 text-zinc-400 border-white/10 hover:bg-white/10"
+                      }`}
+                      title={allModeSelected ? "Back to active account only" : "Send this order to every account"}
+                    >
+                      All
+                    </button>
+                    {modeAccounts.map((a) => {
+                      const on = effectiveTargets.includes(a.broker_id);
+                      return (
+                        <button
+                          key={a.broker_id}
+                          type="button"
+                          onClick={() =>
+                            setSelectedAccounts(
+                              on
+                                ? effectiveTargets.filter((id) => id !== a.broker_id)
+                                : [...effectiveTargets, a.broker_id]
+                            )
+                          }
+                          className={`px-2 py-1 rounded border text-[9px] font-mono ${
+                            on
+                              ? "bg-sky-500/15 text-sky-300 border-sky-500/40"
+                              : "bg-white/5 text-zinc-500 border-white/10 hover:bg-white/10"
+                          }`}
+                        >
+                          {a.loginid}
+                          {a.is_default ? " ★" : ""}
+                          <span className="ml-1 text-[8px] opacity-70 uppercase">{a.platform || "deriv"}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className={`grid ${nodeTier === "free" ? "grid-cols-2" : "grid-cols-1"} gap-3.5`}>
                 <div className="space-y-1">
                   <label className="block text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
                     Stake ({account?.currency || "USD"})
@@ -827,18 +954,20 @@ function TradingTerminalInner() {
                     className="w-full bg-neutral-950 border border-white/10 rounded p-2.5 text-xs text-white font-mono"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="block text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Duration (min)</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={60}
-                    step={1}
-                    value={duration}
-                    onChange={(e) => setDuration(parseInt(e.target.value) || 1)}
-                    className="w-full bg-neutral-950 border border-white/10 rounded p-2.5 text-xs text-white font-mono"
-                  />
-                </div>
+                {nodeTier === "free" && (
+                  <div className="space-y-1">
+                    <label className="block text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Duration (min)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={60}
+                      step={1}
+                      value={duration}
+                      onChange={(e) => setDuration(parseInt(e.target.value) || 1)}
+                      className="w-full bg-neutral-950 border border-white/10 rounded p-2.5 text-xs text-white font-mono"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3.5">
@@ -1011,7 +1140,7 @@ function TradingTerminalInner() {
                 const mon = monitors.find((m) => m.status === "ACTIVE" && m.contract_id === pos.order_id);
                 return (
                   <div
-                    key={pos.order_id}
+                    key={pos.broker_id ? `${pos.broker_id}:${pos.order_id}` : pos.order_id}
                     className="flex items-center justify-between p-3 border border-white/5 bg-neutral-950/40 rounded text-xs font-mono"
                   >
                     <div className="min-w-0">
@@ -1020,6 +1149,9 @@ function TradingTerminalInner() {
                       </div>
                       <div className="text-zinc-500 text-[10px]">
                         Stake {pos.buy_price} · Payout {pos.payout} · #{pos.order_id}
+                        {pos.broker_id && pos.broker_id !== brokerId
+                          ? ` · ${pos.broker_id.split("_").slice(-1)[0]}`
+                          : ""}
                       </div>
                       {mon && (mon.sl || mon.tp) && (
                         <div className="flex items-center gap-2 mt-1 text-[9px]">
@@ -1175,8 +1307,7 @@ function TradingTerminalInner() {
                     user_identity: profile.userIdentity,
                     leverage: profile.leverage,
                     risk_pct: riskPct,
-                    duration,
-                    duration_unit: "m",
+                    ...(nodeTier === "free" ? { duration, duration_unit: "m" } : {}),
                   });
                   pushAutoLog(
                     scanAllMarkets
@@ -1216,6 +1347,11 @@ function TradingTerminalInner() {
                       {autotrader.status.scan_all_markets && autotrader.status.universe_size
                         ? ` \u00b7 scanning ${autotrader.status.universe_size} markets`
                         : ""}
+                      {autotrader.status.strategy
+                        ? ` \u00b7 strategy ${autotrader.status.strategy}${
+                            Object.keys(autotrader.status.strategy_params || {}).length ? " ~" : ""
+                          }`
+                        : " \u00b7 multi-agent desk"}
                     </span>
                   )}
                 </span>
@@ -1244,6 +1380,7 @@ function TradingTerminalInner() {
           </div>
         </div>
 
+        {nodeTier === "free" && (
         <div className="metric-card p-5 rounded border border-white/10 bg-neutral-950/5">
           <div className="flex items-center justify-between pb-3 border-b border-white/5 mb-3">
             <span className="font-serif italic text-white flex items-center font-normal">
@@ -1279,6 +1416,7 @@ function TradingTerminalInner() {
             </p>
           </div>
         </div>
+        )}
       </div>
         </div>
       )}
