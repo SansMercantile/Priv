@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export interface AgentStatus {
   armed: boolean;
   broker_id?: string;
+  platform?: string;
   symbol?: string;
   symbols?: string[] | null;
   scan_all_markets?: boolean;

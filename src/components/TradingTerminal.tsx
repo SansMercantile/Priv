@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAutotrader } from "./terminal/useAutotrader";
-import { useDerivSymbols, tvSymbolFor } from "./terminal/derivSymbols";
+import { useDerivSymbols, tvSymbolForPlatform } from "./terminal/derivSymbols";
 import SymbolPicker from "./terminal/SymbolPicker";
 import NativeChart from "./terminal/NativeChart";
 import { userHeader } from "../lib/userHeader";
@@ -106,6 +106,35 @@ interface AutonomousAnalysis {
 // and Signals selector.
 const DEFAULT_SYMBOL = "R_100";
 
+// ── Platform surfaces (mirrors Deriv's "My trading accounts" list) ───────
+// TradingView is the default: it trades from the browser with no MT5
+// terminal and no MetaApi bridge, and the chart above reflects the real
+// TradingView widget (incl. the DERIV: synthetic feed) when selected.
+// Execution for TradingView/Options goes through the existing web-based
+// Deriv adapter server-side; CFD Standard is the MT5 bridge (pending a
+// MetaApi top-up); cTrader/Crypto are launch-only placeholders for now.
+type PlatformId = "tradingview" | "options" | "cfds" | "ctrader" | "crypto";
+
+const PLATFORMS: { id: PlatformId; label: string; soon?: boolean }[] = [
+  { id: "tradingview", label: "TradingView" },
+  { id: "options", label: "Options" },
+  { id: "cfds", label: "CFD Standard" },
+  { id: "ctrader", label: "cTrader", soon: true },
+  { id: "crypto", label: "Crypto", soon: true },
+];
+
+const PLATFORM_IDS: PlatformId[] = PLATFORMS.map((p) => p.id);
+
+const readStoredPlatform = (): PlatformId => {
+  try {
+    const p = localStorage.getItem("priv_platform");
+    if (p && (PLATFORM_IDS as string[]).includes(p)) return p as PlatformId;
+  } catch {
+    /* ignore */
+  }
+  return "tradingview";
+};
+
 // ── Error Boundary — prevents blank screen on any runtime crash ──────────
 class TerminalErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -156,6 +185,17 @@ function TradingTerminalInner() {
   const [brokerId, setBrokerId] = useState<string | null>(null);
   const [activeLogin, setActiveLogin] = useState<string | null>(null);
   const [activeMode, setActiveMode] = useState<"demo" | "live">("demo");
+  // Selected platform surface. Default = TradingView (web-based; no MT5
+  // terminal, no MetaApi) so the autotrader arms against it out of the box.
+  const [activePlatform, setActivePlatform] = useState<PlatformId>(readStoredPlatform);
+  const selectPlatform = (id: PlatformId) => {
+    setActivePlatform(id);
+    try {
+      localStorage.setItem("priv_platform", id);
+    } catch {
+      /* ignore */
+    }
+  };
   // Rise & Fall mini app: swapped in place of the desk grid so the
   // embedded app gets full terminal width for its own chart + controls.
   const [showMiniApp, setShowMiniApp] = useState(false);
@@ -678,7 +718,7 @@ function TradingTerminalInner() {
   };
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const activeTv = tvSymbolFor(selectedSymbol);
+  const activeTv = tvSymbolForPlatform(selectedSymbol, activePlatform);
 
   useEffect(() => {
     if (!activeTv) return; // synthetic index: NativeChart handles rendering instead
@@ -697,14 +737,16 @@ function TradingTerminalInner() {
         style: "1",
         locale: "en",
         enable_publishing: false,
-        allow_symbol_change: false,
+        // TradingView surface: let the widget's own search cover any
+        // symbol the mapping misses (other surfaces keep it pinned).
+        allow_symbol_change: activePlatform === "tradingview",
         studies: ["RSI@tv-basicstudies", "MASimple@tv-basicstudies"],
         support_gestures: true,
         container_id: "tradingview_chart_frame",
       });
       containerRef.current.appendChild(script);
     }
-  }, [activeTv]);
+  }, [activeTv, activePlatform]);
 
   const [calcStake, setCalcStake] = useState(10);
   const [calcPayoutPct, setCalcPayoutPct] = useState(82);
@@ -768,6 +810,50 @@ function TradingTerminalInner() {
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
       <div className="xl:col-span-4 flex flex-col gap-6">
+        <div className="metric-card p-4 rounded border border-white/10 bg-neutral-950/5">
+          <span className="block font-mono text-[9px] text-zinc-500 uppercase tracking-widest mb-2">
+            Platform · TradingView default (web, no MT5)
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {PLATFORMS.map((p) => {
+              const on = activePlatform === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  disabled={p.soon}
+                  onClick={() => selectPlatform(p.id)}
+                  className={`px-2.5 py-1.5 rounded border text-[10px] font-mono uppercase tracking-wider transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                    on
+                      ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
+                      : "bg-white/5 text-zinc-400 border-white/10 hover:bg-white/10"
+                  }`}
+                  title={p.soon ? "Coming soon" : undefined}
+                >
+                  {p.label}
+                  {p.soon && <span className="ml-1 text-[8px] text-zinc-500">soon</span>}
+                </button>
+              );
+            })}
+          </div>
+          {activePlatform === "tradingview" && (
+            <div className="mt-2.5 pt-2.5 border-t border-white/5 flex items-center justify-between gap-2">
+              <span className="text-[9px] font-mono text-zinc-500 leading-snug">
+                Charts + orders right here; for full TradingView charting connect once under
+                Deriv → CFDs → Connect to TradingView.
+              </span>
+              <a
+                href="https://www.tradingview.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 px-2.5 py-1.5 rounded border border-white/20 bg-white text-black text-[10px] font-mono font-bold hover:bg-neutral-200 transition"
+              >
+                Continue in browser
+              </a>
+            </div>
+          )}
+        </div>
+
         <div className="metric-card p-5 rounded border border-white/10 bg-neutral-950/5">
           <div className="flex items-center justify-between pb-3 border-b border-white/5 mb-4">
             <span className="font-mono text-[10px] text-zinc-500 tracking-wider">
@@ -831,10 +917,33 @@ function TradingTerminalInner() {
             <span className="font-serif italic text-white flex items-center font-normal">
               <Activity className="w-4 h-4 mr-2 text-stone-400" />
               Order Dispatch
+              <span className="ml-2 text-[9px] font-mono text-zinc-500 not-italic uppercase tracking-wider">
+                · {PLATFORMS.find((p) => p.id === activePlatform)?.label}
+                {activePlatform === "tradingview" ? " (web)" : ""}
+              </span>
             </span>
           </div>
 
-          {!isConnected ? (
+          {activePlatform === "cfds" ? (
+            <div className="p-5 text-center rounded border border-white/5 bg-neutral-900/10 font-mono text-[11px] space-y-3">
+              <p className="text-zinc-300">
+                CFD Standard executes over the MT5 bridge (MetaApi) — paused until the
+                MetaApi account is topped up. Your MT5 login is already linked.
+              </p>
+              <p className="text-zinc-500">
+                Trade the same markets from TradingView in your browser meanwhile — no MT5
+                terminal needed, and the chart above stays live either way.
+              </p>
+              <a
+                href="https://www.tradingview.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block px-3 py-2 bg-white text-black rounded-lg font-bold text-[10px] hover:bg-neutral-200 transition"
+              >
+                Continue in browser → TradingView
+              </a>
+            </div>
+          ) : !isConnected ? (
             <div className="p-6 text-center rounded border border-white/5 bg-neutral-900/10 font-mono text-[11px] text-stone-500">
               Order dispatch unavailable while Deriv connection is offline.
             </div>
@@ -1300,6 +1409,7 @@ function TradingTerminalInner() {
                   const profile = deskProfile();
                   void autotrader.arm({
                     broker_id: brokerId,
+                    platform: activePlatform,
                     symbol: selectedSymbol,
                     scan_all_markets: scanAllMarkets,
                     risk_appetite: profile.riskAppetite,
@@ -1311,8 +1421,8 @@ function TradingTerminalInner() {
                   });
                   pushAutoLog(
                     scanAllMarkets
-                      ? "Autonomous agent ARMED -- scanning all Deriv markets server-side. Stays live across tab close/logout; only Disable Agent stops it."
-                      : `Autonomous agent ARMED on ${selectedSymbol} -- runs server-side, stays live across tab close/logout; only Disable Agent stops it.`
+                      ? `Autonomous agent ARMED (platform=${activePlatform}) -- scanning all Deriv markets server-side. Stays live across tab close/logout; only Disable Agent stops it.`
+                      : `Autonomous agent ARMED on ${selectedSymbol} (platform=${activePlatform}) -- runs server-side, stays live across tab close/logout; only Disable Agent stops it.`
                   );
                 }}
                 className={`w-full py-2.5 rounded text-xs font-mono font-bold border disabled:opacity-50 disabled:cursor-not-allowed ${

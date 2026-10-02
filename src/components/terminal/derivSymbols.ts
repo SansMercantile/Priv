@@ -96,3 +96,49 @@ export function tvSymbolFor(code: string): string | null {
   if (m) return `COINBASE:${m[1]}${m[2]}`;
   return null;
 }
+
+// Deriv's own Derived Indices feed on TradingView (DERIV: exchange,
+// listed Jul 2026): Volatility / 1s Volatility / Boom / Crash / Jump /
+// Step. Used only when the TradingView platform surface is active --
+// elsewhere synthetics keep the native candle chart. A code that misses
+// the table is recoverable: the TradingView platform embed leaves
+// allow_symbol_change on so the widget's own search finds any symbol.
+const DERIV_TV: Record<string, string> = {
+  R_10: "DERIV:VOLATILITY_10_INDEX",
+  R_25: "DERIV:VOLATILITY_25_INDEX",
+  R_50: "DERIV:VOLATILITY_50_INDEX",
+  R_75: "DERIV:VOLATILITY_75_INDEX",
+  R_100: "DERIV:VOLATILITY_100_INDEX",
+  "1HZ10V": "DERIV:VOLATILITY_10_1S_INDEX",
+  "1HZ15V": "DERIV:VOLATILITY_15_1S_INDEX",
+  "1HZ25V": "DERIV:VOLATILITY_25_1S_INDEX",
+  "1HZ30V": "DERIV:VOLATILITY_30_1S_INDEX",
+  "1HZ50V": "DERIV:VOLATILITY_50_1S_INDEX",
+  "1HZ75V": "DERIV:VOLATILITY_75_1S_INDEX",
+  "1HZ90V": "DERIV:VOLATILITY_90_1S_INDEX",
+  "1HZ100V": "DERIV:VOLATILITY_100_1S_INDEX",
+  BOOM500: "DERIV:BOOM_500_INDEX",
+  BOOM1000: "DERIV:BOOM_1000_INDEX",
+  CRASH500: "DERIV:CRASH_500_INDEX",
+  CRASH1000: "DERIV:CRASH_1000_INDEX",
+  JD10: "DERIV:JUMP_10_INDEX",
+  JD25: "DERIV:JUMP_25_INDEX",
+  JD50: "DERIV:JUMP_50_INDEX",
+  JD75: "DERIV:JUMP_75_INDEX",
+  JD100: "DERIV:JUMP_100_INDEX",
+  stpRNG: "DERIV:STEP_INDEX",
+};
+
+/**
+ * TV symbol for the terminal chart, aware of the selected platform.
+ * TradingView surface: mainstream mapping first, then the DERIV:
+ * synthetic feed, so the platform charts R_100 / BOOM / CRASH natively
+ * "instead of the deriv charts" the native renderer draws. Any other
+ * platform keeps the original behaviour (null -> native chart).
+ */
+export function tvSymbolForPlatform(code: string, platform?: string): string | null {
+  const base = tvSymbolFor(code);
+  if (base) return base;
+  if ((platform || "").toLowerCase() === "tradingview") return DERIV_TV[code] || null;
+  return null;
+}

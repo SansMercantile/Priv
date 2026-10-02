@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Brain, Landmark, Link2, Gift, Copy, CheckCircle2, ExternalLink } from "lucide-react";
 import apiClient from "../api/apiClient";
 import DerivConnectCard from "./DerivConnectCard";
+import TradingViewCard from "./TradingViewCard";
 
 // Ordinary-user view of SANS Network Link: ONLY what applies to a client --
 // the AI Core entry point, their OWN country's eTax portal (never a picker
@@ -172,6 +173,7 @@ export default function ClientConnections() {
           Broker Connections
         </h2>
         <DerivConnectCard />
+        <TradingViewCard />
         {affiliates.map((b) => (
           <div
             key={b.id}

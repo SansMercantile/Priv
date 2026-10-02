@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBrokerConnections } from "../lib/useBrokerConnections";
+import { userHeader } from "../lib/userHeader";
 import DerivConnectCard from "./DerivConnectCard";
 import { 
   DollarSign, 
@@ -344,23 +345,47 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
     }
   }, [riskAppetite]);
 
+  // Real open positions across ALL of the caller's linked accounts
+  // (uid-scoped GET /api/v1/portfolio/positions), replacing the dead
+  // xm_positions localStorage feed that nothing has ever written --
+  // it left this table permanently empty. Rows keep the table's
+  // shape; the ticket shows which account holds the contract.
   useEffect(() => {
-    const syncDynamicData = () => {
+    let cancelled = false;
+    const syncRealPositions = async () => {
       try {
-        const savedPos = localStorage.getItem("xm_positions");
-        if (savedPos) {
-          setLivePositions(JSON.parse(savedPos));
-        } else {
-          setLivePositions([]);
-        }
-      } catch (e) {
-        setLivePositions([]);
+        const res = await fetch("/api/v1/portfolio/positions", { headers: await userHeader() });
+        if (!res.ok) throw new Error(String(res.status));
+        const json = await res.json();
+        const rows: any[] = json?.data?.positions || [];
+        if (cancelled) return;
+        setLivePositions(
+          rows.map((p: any) => {
+            const ct = String(p.contract_type || "").toUpperCase();
+            const side = ["PUT", "MULTDOWN", "SELL", "SHORT"].includes(ct) ? "SELL" : "BUY";
+            const acct = String(p.broker_id || "").split("_").slice(-1)[0];
+            return {
+              id: p.order_id ? `${acct}:${p.order_id}` : acct || "—",
+              symbol: p.symbol || "—",
+              side,
+              lots: p.quantity ?? "—",
+              entryPrice: typeof p.avg_cost === "number" ? p.avg_cost : null,
+              currentPrice: typeof p.current_price === "number" ? p.current_price : null,
+              pnl: typeof p.unrealized_pnl === "number" ? p.unrealized_pnl : null,
+            };
+          })
+        );
+      } catch {
+        if (!cancelled) setLivePositions([]);
       }
     };
 
-    syncDynamicData();
-    const t = setInterval(syncDynamicData, 1500);
-    return () => clearInterval(t);
+    syncRealPositions();
+    const t = setInterval(syncRealPositions, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
   }, []);
 
   // Real Deriv account info, from the backend connections list (see
@@ -453,16 +478,26 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         }
       }
 
-      // Real Deriv balance for this mode's account.
+      // Real Deriv balance for this mode's account -- SUMMED across
+      // every account in the mode (one account's balance was shown
+      // before while other linked accounts went invisible).
       try {
         const res = await fetch("/api/v1/auth/deriv/balances");
         const json = await res.json();
         const rows: any[] = json?.data?.balances || [];
-        const pick = rows.find((r: any) =>
+        const modeRows = rows.filter((r: any) =>
           wantLive ? r.account_type !== "demo" : r.account_type === "demo"
-        ) || rows[0];
-        if (!cancelled && pick && typeof pick.balance === "number") {
-          setStats(prev => ({ ...prev, totalProfit: pick.balance, dailyReturn: null }));
+        );
+        let sum = 0;
+        let counted = 0;
+        for (const r of modeRows) {
+          if (typeof r.balance === "number") {
+            sum += r.balance;
+            counted += 1;
+          }
+        }
+        if (!cancelled && counted > 0) {
+          setStats(prev => ({ ...prev, totalProfit: sum, dailyReturn: null }));
         }
       } catch {
         // leave as-is (null) rather than fabricate a number
@@ -868,7 +903,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
                   </thead>
                   <tbody className="divide-y divide-white/5 font-mono text-[10.5px]">
                     {livePositions.map((pos) => {
-                      const isUp = pos.pnl >= 0;
+                      const isUp = pos.pnl !== null && pos.pnl !== undefined && pos.pnl >= 0;
                       return (
                         <tr key={pos.id} className="hover:bg-white/5 transition">
                           <td className="py-2.5">
@@ -884,11 +919,21 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
                             {pos.lots}
                           </td>
                           <td className="py-2.5 text-right text-zinc-300">
-                            <div>{pos.entryPrice?.toFixed(5)}</div>
-                            <div className="text-[9px] text-zinc-500">{pos.currentPrice?.toFixed(5)}</div>
+                            <div>{pos.entryPrice?.toFixed(5) ?? "—"}</div>
+                            <div className="text-[9px] text-zinc-500">{pos.currentPrice?.toFixed(5) ?? "—"}</div>
                           </td>
-                          <td className={`py-2.5 text-right font-bold ${isUp ? "text-emerald-400" : "text-rose-400"}`}>
-                            {isUp ? "+" : ""}{pos.pnl?.toFixed(2)} USD
+                          <td
+                            className={`py-2.5 text-right font-bold ${
+                              pos.pnl === null || pos.pnl === undefined
+                                ? "text-zinc-500"
+                                : isUp
+                                ? "text-emerald-400"
+                                : "text-rose-400"
+                            }`}
+                          >
+                            {pos.pnl === null || pos.pnl === undefined
+                              ? "—"
+                              : `${isUp ? "+" : ""}${pos.pnl.toFixed(2)} USD`}
                           </td>
                         </tr>
                       );
