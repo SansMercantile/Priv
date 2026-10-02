@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { History as HistoryIcon, Search, RefreshCw, AlertTriangle, BarChart2, Camera, Trash2, Eye } from "lucide-react";
 import Analytics from "./Analytics";
 import apiClient from "../api/apiClient";
@@ -20,9 +20,14 @@ export default function History({ demoMode }: { demoMode?: boolean }) {
   const [note, setNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Background polls (every 15s) must NOT flip the table back to the
+  // "Loading..." row -- that made the whole history section blink like a
+  // page reload every 15 seconds. Only the first load and an explicit
+  // Refresh click may show loading state.
+  const loadedRef = useRef(false);
 
-  const fetchTransactions = async () => {
-    setLoading(true);
+  const fetchTransactions = async (manual = false) => {
+    if (manual || !loadedRef.current) setLoading(true);
     try {
       const res = await fetch("/api/v1/history/transactions?limit=50&days=30");
       const data = await res.json();
@@ -37,6 +42,7 @@ export default function History({ demoMode }: { demoMode?: boolean }) {
       setError(err.message || "Could not load transaction history.");
     } finally {
       setLoading(false);
+      loadedRef.current = true;
     }
   };
 
@@ -68,7 +74,7 @@ export default function History({ demoMode }: { demoMode?: boolean }) {
           </p>
         </div>
         <button
-          onClick={fetchTransactions}
+          onClick={() => fetchTransactions(true)}
           className="flex items-center space-x-2 px-3.5 py-2 bg-white text-black rounded-lg font-mono text-xs hover:bg-neutral-200 transition"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -110,7 +116,7 @@ export default function History({ demoMode }: { demoMode?: boolean }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {loading ? (
+              {loading && transactions.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-stone-500">Loading...</td>
                 </tr>
