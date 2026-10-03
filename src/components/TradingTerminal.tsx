@@ -111,8 +111,9 @@ const DEFAULT_SYMBOL = "R_100";
 // terminal and no MetaApi bridge, and the chart above reflects the real
 // TradingView widget (incl. the DERIV: synthetic feed) when selected.
 // Execution for TradingView/Options goes through the existing web-based
-// Deriv adapter server-side; CFD Standard is the MT5 bridge (pending a
-// MetaApi top-up); cTrader/Crypto are launch-only placeholders for now.
+// Deriv adapter server-side; CFD Standard executes over an MT5 bridge
+// (local downloadable bridge, free, or MetaApi cloud when topped up);
+// cTrader/Crypto are launch-only placeholders for now.
 type PlatformId = "tradingview" | "options" | "cfds" | "ctrader" | "crypto";
 
 const PLATFORMS: { id: PlatformId; label: string; soon?: boolean }[] = [
@@ -490,14 +491,32 @@ function TradingTerminalInner() {
   const allModeSelected = modeAccounts.length > 1 && effectiveTargets.length === modeAccounts.length;
   positionTargetsRef.current = effectiveTargets;
 
+  // CFD Standard targets MT5 accounts only, and only ones with a live
+  // adapter (local bridge online, or MetaApi provisioned). Selected-but-
+  // offline MT5 rows never become default targets.
+  const mt5Live = modeAccounts.filter((a) => a.platform === "mt5" && a.adapter_live);
+  const cfdReady = mt5Live.length > 0;
+  const cfdRunsLocal = activePlatform === "cfds" && cfdReady;
+
   const handlePlaceOrder = async (e: React.FormEvent | null, forcedSide?: "BUY" | "SELL") => {
     e?.preventDefault();
     const side = forcedSide ?? orderSide;
-    if (!brokerId) {
-      pushLog(`No Deriv ${activeMode} account linked — connect one first.`);
+    const isCfdPlatform = activePlatform === "cfds";
+    const selectedMt5 = selectedAccounts.filter((id) => mt5Live.some((a) => a.broker_id === id));
+    const targets = isCfdPlatform
+      ? selectedMt5.length > 0
+        ? selectedMt5
+        : mt5Live.map((a) => a.broker_id)
+      : effectiveTargets;
+    if (!targets.length) {
+      pushLog(
+        isCfdPlatform
+          ? "No live MT5 account — start the local MT5 bridge on Connections (free) or top up MetaApi."
+          : `No Deriv ${activeMode} account linked — connect one first.`
+      );
       return;
     }
-    if (!isConnected) {
+    if (!isConnected && !cfdRunsLocal) {
       pushLog("Cannot place order - Deriv connection is offline.");
       return;
     }
@@ -528,8 +547,8 @@ function TradingTerminalInner() {
       // Fan-out: one ticked account -> classic single-account response;
       // several -> broker_ids fan-out with per-account results. The
       // server ownership-checks every target before any order fires.
-      if (effectiveTargets.length > 1) body.broker_ids = effectiveTargets;
-      else body.broker_id = effectiveTargets[0] || brokerId;
+      if (targets.length > 1) body.broker_ids = targets;
+      else body.broker_id = targets[0];
       // Paid tiers trade CFD multipliers (no duration); only the free
       // options terminal sends a contract duration.
       if (nodeTier === "free") {
@@ -575,9 +594,10 @@ function TradingTerminalInner() {
             `Order placed: ${side} ${selectedSymbol}, stake ${stake} ${account?.currency || "USD"}${nodeTier === "free" ? `, ${duration}m` : " (CFD multiplier)"}.${data.monitor_armed ? " SL/TP armed." : ""} Contract ID: ${data.order_id?.order_id}.`
           );
         }
-        fetchAccount(brokerId);
-        fetchPositions(brokerId);
-        fetchWorking(brokerId);
+        const primary = targets[0] || brokerId;
+        fetchAccount(primary);
+        fetchPositions(primary);
+        fetchWorking(primary);
       } else {
         pushLog(`Order failed: ${data.detail || data.error || "Unknown error"}`);
       }
@@ -924,11 +944,13 @@ function TradingTerminalInner() {
             </span>
           </div>
 
-          {activePlatform === "cfds" ? (
+          {activePlatform === "cfds" && !cfdReady ? (
             <div className="p-5 text-center rounded border border-white/5 bg-neutral-900/10 font-mono text-[11px] space-y-3">
               <p className="text-zinc-300">
-                CFD Standard executes over the MT5 bridge (MetaApi) — paused until the
-                MetaApi account is topped up. Your MT5 login is already linked.
+                CFD Standard executes over an MT5 bridge — either the{" "}
+                <span className="text-white">local bridge</span> (free, runs on your PC from
+                Connections) or MetaApi cloud (needs a top-up). Your MT5 login is already
+                linked; start the bridge and this form unlocks.
               </p>
               <p className="text-zinc-500">
                 Trade the same markets from TradingView in your browser meanwhile — no MT5
@@ -943,7 +965,7 @@ function TradingTerminalInner() {
                 Continue in browser → TradingView
               </a>
             </div>
-          ) : !isConnected ? (
+          ) : !isConnected && !cfdRunsLocal ? (
             <div className="p-6 text-center rounded border border-white/5 bg-neutral-900/10 font-mono text-[11px] text-stone-500">
               Order dispatch unavailable while Deriv connection is offline.
             </div>
