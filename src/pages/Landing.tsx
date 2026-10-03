@@ -51,6 +51,16 @@ interface LiveSignal {
   slot_start_utc: string;
   app_id?: string;
   stale?: boolean;
+  // Same market on every candle interval (1m..1D), primary first.
+  timeframes?: Array<{
+    timeframe: string;
+    direction: "BUY" | "SELL";
+    entry: number;
+    take_profit_1: number;
+    stop_loss: number;
+    display_name?: string;
+    symbol?: string;
+  }>;
 }
 
 const STATIC_SIGNAL: LiveSignal = {
@@ -485,6 +495,26 @@ function SignalCarousel({ signal, live, stale, sentLocal, isBuy, rows, history, 
               {signal.direction} · {signal.timeframe}
             </div>
           </div>
+          {/* All-candle variants of this market (1m..1D) built server-side. */}
+          {Array.isArray(signal.timeframes) && signal.timeframes.length > 1 && (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {signal.timeframes.map((tf) => (
+                <span
+                  key={tf.timeframe}
+                  title={`${tf.display_name || tf.symbol || signal.symbol} · entry ${tf.entry} · TP ${tf.take_profit_1} · SL ${tf.stop_loss}`}
+                  className={`text-[9px] font-mono uppercase px-1.5 py-0.5 rounded border ${
+                    tf.timeframe === signal.timeframe
+                      ? "border-white/40 bg-white/10 text-white"
+                      : tf.direction === "BUY"
+                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                      : "border-rose-500/30 bg-rose-500/10 text-rose-400"
+                  }`}
+                >
+                  {tf.timeframe} {tf.direction}
+                </span>
+              ))}
+            </div>
+          )}
           <div className="space-y-2 text-[14px]">
             {rows.map(([k, v, cls]) => (
               <div key={k} className="flex justify-between border-b border-white/5 pb-2">

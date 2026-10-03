@@ -359,7 +359,10 @@ export default function StrategyTester() {
     setMainSaving(name);
     setActionError(null);
     try {
-      await apiClient.put("/api/v1/profile/strategies/main", { strategy: next });
+      // timeframe = the candle interval currently selected above, so the
+      // autotrader re-fetches the winner "as tested" instead of assuming 1h.
+      await apiClient.put("/api/v1/profile/strategies/main",
+        { strategy: next, timeframe: next ? timeframe : null });
       if (next && !selected.includes(next)) setSelected((prev) => [...prev, next]);
     } catch (e: any) {
       setMainStrategy(previous);
@@ -487,7 +490,7 @@ export default function StrategyTester() {
               className="bg-neutral-950 border border-white/10 rounded px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-white/30 cursor-pointer"
               title="Timeframe"
             >
-              {["1d", "4h", "1h", "1w"].map((tf) => (
+              {["1m", "5m", "15m", "30m", "1h", "4h", "1d"].map((tf) => (
                 <option key={tf} value={tf}>
                   {tf}
                 </option>

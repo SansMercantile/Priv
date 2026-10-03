@@ -103,6 +103,9 @@ export default function MT5BridgeCard() {
 
   const online = !!status?.online;
   const accounts = status?.accounts ?? [];
+  const nonDeriv = accounts.filter(
+    (a) => a.server && !a.server.toLowerCase().startsWith("deriv")
+  );
   const runCmd = pairing?.run || "python mt5_bridge.py --code XXXXXXXX";
 
   return (
@@ -144,6 +147,14 @@ export default function MT5BridgeCard() {
               </span>
             </div>
           ))}
+        </div>
+      )}
+
+      {nonDeriv.length > 0 && (
+        <div className="px-3 py-2 rounded border border-red-500/40 bg-red-500/10 text-[11px] font-mono text-red-300 leading-relaxed">
+          MT5 login {nonDeriv[0].loginid} is on “{nonDeriv[0].server}” (non-Deriv).
+          The autotrader is blocked for this account regardless of your plan —
+          contact an administrator.
         </div>
       )}
 

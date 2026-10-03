@@ -309,6 +309,27 @@ export default function MySignals() {
         {current ? (
           <>
             <SignalRow s={current} />
+            {/* Every candle interval of the same market: 1m..1D variants
+                built server-side (data.timeframes); primary stays 1H. */}
+            {Array.isArray(current.timeframes) && current.timeframes.length > 1 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {current.timeframes.map((tf: any) => (
+                  <span
+                    key={tf.timeframe}
+                    title={`${tf.display_name || tf.symbol} · entry ${tf.entry} · TP ${tf.take_profit_1} · SL ${tf.stop_loss}`}
+                    className={`text-[9px] font-mono uppercase px-1.5 py-0.5 rounded border ${
+                      tf.timeframe === current.timeframe
+                        ? "border-white/40 bg-white/10 text-white"
+                        : tf.direction === "BUY"
+                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                        : "border-rose-500/30 bg-rose-500/10 text-rose-400"
+                    }`}
+                  >
+                    {tf.timeframe} {tf.direction}
+                  </span>
+                ))}
+              </div>
+            )}
             {current.stale && (
               <p className="text-[10px] text-amber-400/80 font-mono mt-2">
                 Archived ticket (live engine budget elapsed) — shown as-is, not regenerated.
