@@ -19,9 +19,9 @@ jobs:
         working-directory: desktop-shell
         run: npm install --no-audit --no-fund
 
-      - name: Build macOS dmg + zip (unsigned)
+      - name: Build macOS dmg + zip (universal, unsigned)
         working-directory: desktop-shell
-        run: npx electron-builder --mac dmg zip --publish never
+        run: npx electron-builder --mac dmg zip --universal --publish never
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
