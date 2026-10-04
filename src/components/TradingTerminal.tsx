@@ -732,11 +732,16 @@ function TradingTerminalInner() {
       const res = await fetch("/api/brokers/close-position", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(await userHeader()) },
-        body: JSON.stringify({ broker_id: target, symbol: pos.symbol }),
+        body: JSON.stringify({ broker_id: target, symbol: pos.symbol, order_id: pos.order_id }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        pushLog(`Position ${pos.order_id} closed.`);
+        const realizedPnl = Number(data.realized_pnl);
+        const currency = pos.currency || account?.currency || "";
+        const pnlText = data.realized_pnl == null || !Number.isFinite(realizedPnl)
+          ? ""
+          : ` Realized P&L ${realizedPnl > 0 ? "+" : ""}${realizedPnl.toFixed(2)}${currency ? ` ${currency}` : ""}.`;
+        pushLog(`Position ${pos.order_id} closed.${pnlText}`);
         fetchAccount(brokerId);
         fetchPositions(brokerId);
       } else {
