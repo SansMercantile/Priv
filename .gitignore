@@ -15,3 +15,6 @@ coverage/
 .vercel
 
 desktop-shell/release/
+
+!desktop-shell/build/
+!desktop-shell/build/**
