@@ -13,3 +13,5 @@ coverage/
 /priv/
 
 .vercel
+
+desktop-shell/release/

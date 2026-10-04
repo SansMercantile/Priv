@@ -1,0 +1,50 @@
+{
+  "name": "priv-core-desktop",
+  "productName": "Priv Core",
+  "version": "1.0.0",
+  "description": "Priv Core desktop shell",
+  "main": "main.js",
+  "author": "Sans Mercantile",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "build:linux": "electron-builder --linux AppImage",
+    "build:mac": "electron-builder --mac dmg zip",
+    "build": "electron-builder --linux AppImage --mac dmg zip"
+  },
+  "devDependencies": {
+    "electron": "^31.3.10",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.sansmercantile.privcore",
+    "productName": "Priv Core",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js"
+    ],
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Finance",
+      "icon": "build/icon.png",
+      "maintainer": "Sans Mercantile <hello@sansmercantile.com>",
+      "synopsis": "Priv Core trading workspace",
+      "executableName": "priv-core"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.finance",
+      "icon": "build/icon.png",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    }
+  }
+}
