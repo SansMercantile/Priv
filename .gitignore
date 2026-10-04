@@ -18,3 +18,9 @@ desktop-shell/release/
 
 !desktop-shell/build/
 !desktop-shell/build/**
+
+# iOS: XcodeGen output is generated in CI — only project.yml + sources are tracked
+ios/PrivCore.xcodeproj/
+ios/Support/Info.plist
+ios/exportOptions.plist
+*.xcarchive
