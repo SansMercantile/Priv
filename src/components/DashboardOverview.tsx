@@ -102,10 +102,10 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
 
   const lastPoint = data[data.length - 1] || { sentiment: 0.5 };
   const sentimentLabel = lastPoint.sentiment > 0.7 
-    ? "Bullish" 
+    ? "Rising" 
     : lastPoint.sentiment < 0.3 
-      ? "Bearish" 
-      : "Neutral";
+      ? "Falling" 
+      : "Flat";
 
   const sentimentColor = lastPoint.sentiment > 0.7 
     ? "text-green-400" 
@@ -121,16 +121,21 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
           Performance & Sentiment Engine
         </h3>
         <div className="flex items-center space-x-4 text-xs font-mono text-gray-400">
-          <span>REAL-TIME P&L</span>
+          <span>REALIZED P&L</span>
           <div className="flex items-center space-x-1.5">
             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-white/60">SENTIMENT: <span className={`${sentimentColor} font-bold`}>{sentimentLabel}</span></span>
+            <span className="text-white/60">TREND: <span className={`${sentimentColor} font-bold`}>{sentimentLabel}</span></span>
           </div>
         </div>
       </div>
 
       <div className="relative">
         <canvas ref={canvasRef} className="w-full h-64 rounded bg-neutral-900/40 border border-white/10" />
+        {!data.length && (
+          <div className="absolute inset-0 rounded bg-neutral-900/40 flex items-center justify-center text-[11px] font-mono text-zinc-500">
+            No settled trades in the selected window
+          </div>
+        )}
         <div className="absolute top-2 left-2 flex space-x-4 text-[9px] font-mono text-white/30">
           <div>SCALE: DYNAMIC</div>
           <div>DPR: {window.devicePixelRatio || 1}</div>
@@ -437,6 +442,24 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
   // the backend's agent registry, not a hardcoded guess.
   const [liveTotalAgents, setLiveTotalAgents] = useState<number | null>(null);
 
+  // Realized wins/losses for this mode's Deriv account, from settled
+  // contracts (GET /api/v1/history/performance). Drives the wins/losses
+  // strip, the equity curve and the daily-return card; null until the
+  // first successful response ("—"), never fabricated.
+  const [perf, setPerf] = useState<{
+    trades: number;
+    wins: number;
+    losses: number;
+    win_rate: number | null;
+    net_pnl: number;
+    profit_factor: number | null;
+    today_pnl: number;
+    daily_return_pct: number | null;
+    balance: number | null;
+    curve: { t: number; v: number }[];
+    days: number;
+  } | null>(null);
+
   // Real data in BOTH modes: demo shows the real Deriv DEMO account,
   // live shows the real Deriv LIVE account (GET /api/v1/auth/deriv/
   // balances, resolved server-side through the linked adapters), plus
@@ -482,7 +505,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
       // every account in the mode (one account's balance was shown
       // before while other linked accounts went invisible).
       try {
-        const res = await fetch("/api/v1/auth/deriv/balances");
+        // MUST carry userHeader: without an identity the backend resolves
+        // "anonymous", finds no linked account, and every balance stays
+        // null ("—") even with a connected Deriv account.
+        const res = await fetch("/api/v1/auth/deriv/balances", { headers: await userHeader() });
         const json = await res.json();
         const rows: any[] = json?.data?.balances || [];
         const modeRows = rows.filter((r: any) =>
@@ -502,6 +528,41 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
       } catch {
         // leave as-is (null) rather than fabricate a number
       }
+
+      // Realized wins/losses + cumulative equity curve from this mode's
+      // settled contracts. available:false (no linked account in mode)
+      // clears the strip so stale other-mode numbers can't linger; any
+      // failure leaves the honest "—".
+      try {
+        const res = await fetch(
+          `/api/v1/history/performance?days=30&mode=${wantLive ? "live" : "demo"}`,
+          { headers: await userHeader() }
+        );
+        const json = await res.json();
+        const d = json?.data;
+        if (!cancelled && d?.available) {
+          setPerf(d);
+          if (typeof d.daily_return_pct === "number") {
+            setStats(prev => ({ ...prev, dailyReturn: d.daily_return_pct }));
+          }
+          const curve = Array.isArray(d.curve) ? d.curve : [];
+          setChartData(
+            curve.length > 0
+              ? curve.map((pt: any, i: number, arr: any[]) => ({
+                  time: pt.t * 1000,
+                  value: pt.v,
+                  volume: 0,
+                  sentiment: i === 0 ? 0.5 : arr[i].v > arr[i - 1].v ? 0.85 : 0.15,
+                }))
+              : []
+          );
+        } else if (!cancelled) {
+          setPerf(null);
+          setChartData([]);
+        }
+      } catch {
+        // leave as-is rather than fabricate performance numbers
+      }
     };
 
     refreshRealData();
@@ -514,10 +575,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
 
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
 
-  // NOTE: no fabricated chart points. The performance canvas renders
-  // whatever real series exist (currently none -- no equity-history
-  // feed yet) and stays empty otherwise. A random walk here would be
-  // fake P&L on a real-money screen.
+  // NOTE: no fabricated chart points. The performance canvas renders the
+  // real cumulative equity curve from /api/v1/history/performance
+  // (settled contracts) and stays empty otherwise. A random walk here
+  // would be fake P&L on a real-money screen.
 
   // (Removed: a second agent-count effect used to race the one above,
   // which is how active/total could disagree. One source now.)
@@ -719,7 +780,61 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
 
       {/* Analytics Bento Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-4">
+          {/* Realized wins/losses strip: settled contracts only (the
+              numbers a P&L screen must show, straight from profit_table). */}
+          <div className="metric-card rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="font-mono text-[9px] text-white/50 uppercase tracking-widest">
+                Realized P&amp;L &middot; Last {perf?.days ?? 30} Days
+              </span>
+              <span className="font-mono text-[9px] text-white/40 uppercase tracking-widest">
+                {perf
+                  ? `${perf.trades} settled trade${perf.trades === 1 ? "" : "s"}`
+                  : "settled trades loading…"}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {[
+                {
+                  label: "Win Rate",
+                  value: perf?.win_rate == null ? "—" : `${(perf.win_rate * 100).toFixed(1)}%`,
+                  cls: "text-white",
+                },
+                {
+                  label: "Wins",
+                  value: perf ? String(perf.wins) : "—",
+                  cls: "text-emerald-400",
+                },
+                {
+                  label: "Losses",
+                  value: perf ? String(perf.losses) : "—",
+                  cls: "text-red-400",
+                },
+                {
+                  label: "Net P&L",
+                  value: perf
+                    ? `${perf.net_pnl >= 0 ? "+" : "-"}$${Math.abs(perf.net_pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : "—",
+                  cls: perf == null ? "text-white" : perf.net_pnl >= 0 ? "text-emerald-400" : "text-red-400",
+                },
+                {
+                  label: "Profit Factor",
+                  value: perf?.profit_factor == null ? "—" : perf.profit_factor.toFixed(2),
+                  cls: "text-white",
+                },
+              ].map(cell => (
+                <div key={cell.label} className="border border-white/5 bg-white/[0.02] rounded-lg px-3 py-2">
+                  <div className="text-[9px] text-white/40 uppercase tracking-wider font-mono">
+                    {cell.label}
+                  </div>
+                  <div className={`font-mono text-sm font-bold mt-0.5 ${cell.cls}`}>
+                    {cell.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
           <PerformanceChart data={chartData} />
         </div>
         <div>

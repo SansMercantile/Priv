@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { History as HistoryIcon, Search, RefreshCw, AlertTriangle, BarChart2, Camera, Trash2, Eye } from "lucide-react";
 import Analytics from "./Analytics";
 import apiClient from "../api/apiClient";
+import { userHeader } from "../lib/userHeader";
 
 interface Transaction {
   id: string;
@@ -11,8 +12,24 @@ interface Transaction {
   contract_type?: string;
   price: number;
   payout?: number;
+  pnl?: number | null;
   status: string;
 }
+
+// Status badge styling: open positions vs settled outcomes must not all
+// read green -- a losing trade rendering as a green "lost" chip was one
+// of the reasons the history looked untrustworthy.
+const STATUS_CLS: Record<string, string> = {
+  open: "bg-sky-500/10 text-sky-400 border-sky-500/20",
+  won: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  lost: "bg-red-500/10 text-red-400 border-red-500/20",
+  even: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
+};
+
+const fmtPnl = (pnl: number | null | undefined) =>
+  pnl == null
+    ? "—"
+    : `${pnl >= 0 ? "+" : "-"}$${Math.abs(pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function History({ demoMode }: { demoMode?: boolean }) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -29,7 +46,14 @@ export default function History({ demoMode }: { demoMode?: boolean }) {
   const fetchTransactions = async (manual = false) => {
     if (manual || !loadedRef.current) setLoading(true);
     try {
-      const res = await fetch("/api/v1/history/transactions?limit=50&days=30");
+      // userHeader is required: without an identity the backend resolves
+      // "anonymous" and returns no linked account (the page was stuck on
+      // "Broker not connected" / empty). mode scopes to this view's
+      // demo/live account.
+      const mode = demoMode ? "demo" : "live";
+      const res = await fetch(`/api/v1/history/transactions?limit=50&days=30&mode=${mode}`, {
+        headers: await userHeader(),
+      });
       const data = await res.json();
       if (res.ok) {
         setTransactions(data.transactions || []);
@@ -50,14 +74,15 @@ export default function History({ demoMode }: { demoMode?: boolean }) {
     fetchTransactions();
     const interval = setInterval(fetchTransactions, 15000);
     return () => clearInterval(interval);
-  }, []);
+  }, [demoMode]);
 
   const filteredRecords = transactions.filter((rec) => {
     const term = searchTerm.toLowerCase();
     return (
       (rec.id || "").toLowerCase().includes(term) ||
       (rec.symbol || "").toLowerCase().includes(term) ||
-      (rec.type || "").toLowerCase().includes(term)
+      (rec.type || "").toLowerCase().includes(term) ||
+      (rec.status || "").toLowerCase().includes(term)
     );
   });
 
@@ -70,7 +95,7 @@ export default function History({ demoMode }: { demoMode?: boolean }) {
             Position &amp; Activity History
           </h1>
           <p className="text-white/40 text-xs mt-1 font-light">
-            Real open positions from your live Deriv connection.
+            Open positions and settled trades from your Deriv {demoMode ? "demo" : "live"} account — real fills, real P&amp;L.
           </p>
         </div>
         <button
@@ -112,28 +137,32 @@ export default function History({ demoMode }: { demoMode?: boolean }) {
                 <th className="p-4">Type</th>
                 <th className="p-4">Stake</th>
                 <th className="p-4">Payout</th>
+                <th className="p-4">P&amp;L</th>
                 <th className="p-4 text-center">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {loading && transactions.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-stone-500">Loading...</td>
+                  <td colSpan={7} className="p-8 text-center text-stone-500">Loading...</td>
                 </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-stone-500">No open positions.</td>
+                  <td colSpan={7} className="p-8 text-center text-stone-500">No trades in this window.</td>
                 </tr>
               ) : (
                 filteredRecords.map((rec) => (
                   <tr key={rec.id} className="hover:bg-white/2 transition">
                     <td className="p-4 text-white font-semibold">{rec.id}</td>
-                    <td className="p-4 text-zinc-300">{rec.symbol}</td>
+                    <td className="p-4 text-zinc-300">{rec.symbol ?? "—"}</td>
                     <td className="p-4 text-stone-400">{rec.contract_type || rec.type}</td>
                     <td className="p-4 text-gray-400">{rec.price}</td>
                     <td className="p-4 text-gray-400">{rec.payout ?? "—"}</td>
+                    <td className={`p-4 font-semibold ${rec.pnl == null ? "text-gray-400" : rec.pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {fmtPnl(rec.pnl)}
+                    </td>
                     <td className="p-4 text-center">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${STATUS_CLS[rec.status] || "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"}`}>
                         {rec.status}
                       </span>
                     </td>
