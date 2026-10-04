@@ -12,6 +12,7 @@ import {
   TrendingDown,
   RefreshCw,
   X,
+  Pencil,
   Calculator,
   Maximize2,
   Bot,
@@ -45,6 +46,16 @@ interface OpenPosition {
   date_expiry: number;
   longcode: string;
   broker_id?: string;
+  // Optional enrichments the backend now returns per row:
+  // native direction + terminal stop levels (MT5) and the floating
+  // (unrealized) P&L for both MT5 and Deriv option contracts.
+  side?: string;
+  current_price?: number | null;
+  unrealized_pnl?: number | null;
+  currency?: string | null;
+  stop_loss?: number | null;
+  take_profit?: number | null;
+  volume?: number | null;
 }
 
 // One linked Deriv account from GET /api/v1/auth/deriv/accounts
@@ -467,6 +478,11 @@ function TradingTerminalInner() {
   const [takeProfit, setTakeProfit] = useState<number>(0);
   const [workingOrders, setWorkingOrders] = useState<WorkingOrder[]>([]);
   const [monitors, setMonitors] = useState<PositionMonitor[]>([]);
+  // Inline SL/TP editor for one open position (row key = broker:order).
+  const [editingPos, setEditingPos] = useState<string | null>(null);
+  const [levelSl, setLevelSl] = useState("");
+  const [levelTp, setLevelTp] = useState("");
+  const [savingLevels, setSavingLevels] = useState(false);
 
   // Multi-account switcher: every linked Deriv account (platform-tagged
   // server-side). The user ticks which accounts a manual order goes to
@@ -627,22 +643,83 @@ function TradingTerminalInner() {
     }
   };
 
-  const handleRemoveMonitor = async (monitor: PositionMonitor) => {
+  const posRowKey = (pos: OpenPosition) =>
+    pos.broker_id ? `${pos.broker_id}:${pos.order_id}` : pos.order_id;
+
+  // POST /position-monitors/upsert: sets, adjusts or clears SL/TP for
+  // ONE open position. null = clear that level. The route picks the
+  // enforcement path (native terminal levels for MT5, server monitor for
+  // Deriv options) and is ownership-checked server-side.
+  const postLevels = async (
+    pos: OpenPosition,
+    sl: number | null,
+    tp: number | null
+  ): Promise<boolean> => {
+    const target = pos.broker_id || brokerId;
+    if (!target) return false;
     try {
-      const res = await fetch("/api/brokers/position-monitors/remove", {
+      const res = await fetch("/api/brokers/position-monitors/upsert", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(await userHeader()) },
-        body: JSON.stringify({ monitor_id: monitor.id }),
+        body: JSON.stringify({ broker_id: target, order_id: pos.order_id, sl, tp }),
       });
       const data = await res.json();
-      if (res.ok && data.success) {
-        pushLog(`SL/TP removed from contract ${monitor.contract_id} (position stays open).`);
-        fetchWorking(brokerId);
-      } else {
-        pushLog(`Remove failed: ${data.detail || "Unknown error"}`);
-      }
+      if (res.ok && data.success) return true;
+      pushLog(`SL/TP update failed: ${data.detail || "Unknown error"}`);
+      return false;
     } catch (err: any) {
-      pushLog(`Remove failed: ${err.message || err}`);
+      pushLog(`SL/TP update failed: ${err.message || err}`);
+      return false;
+    }
+  };
+
+  const openLevelEditor = (pos: OpenPosition) => {
+    const mon = monitors.find(
+      (m) => m.status === "ACTIVE" && m.contract_id === pos.order_id
+    );
+    const sl = mon?.sl ?? (pos.stop_loss || null);
+    const tp = mon?.tp ?? (pos.take_profit || null);
+    setLevelSl(sl != null ? String(sl) : "");
+    setLevelTp(tp != null ? String(tp) : "");
+    setEditingPos(posRowKey(pos));
+  };
+
+  const handleSaveLevels = async () => {
+    const pos = positions.find((p) => posRowKey(p) === editingPos);
+    if (!pos) return;
+    const slRaw = levelSl.trim();
+    const tpRaw = levelTp.trim();
+    const sl = slRaw === "" ? null : Number(slRaw);
+    const tp = tpRaw === "" ? null : Number(tpRaw);
+    if ((sl !== null && Number.isNaN(sl)) || (tp !== null && Number.isNaN(tp))) {
+      pushLog("SL/TP must be numeric (leave a field empty to clear it).");
+      return;
+    }
+    setSavingLevels(true);
+    try {
+      const ok = await postLevels(pos, sl, tp);
+      if (ok) {
+        pushLog(
+          sl === null && tp === null
+            ? `SL/TP cleared on ${pos.order_id}.`
+            : `SL/TP updated on ${pos.order_id}: SL ${sl ?? "—"} / TP ${tp ?? "—"} (position stays open).`
+        );
+        setEditingPos(null);
+        fetchWorking(brokerId);
+        fetchPositions(brokerId);
+      }
+    } finally {
+      setSavingLevels(false);
+    }
+  };
+
+  const handleClearLevels = async (pos: OpenPosition) => {
+    const ok = await postLevels(pos, null, null);
+    if (ok) {
+      pushLog(`SL/TP cleared on ${pos.order_id} (position stays open).`);
+      setEditingPos(null);
+      fetchWorking(brokerId);
+      fetchPositions(brokerId);
     }
   };
 
@@ -1269,33 +1346,127 @@ function TradingTerminalInner() {
             <div className="space-y-2">
               {positions.map((pos) => {
                 const mon = monitors.find((m) => m.status === "ACTIVE" && m.contract_id === pos.order_id);
+                const key = posRowKey(pos);
+                const editing = editingPos === key;
+                // Effective levels: server monitor wins (it's the live
+                // enforcement), else the terminal's native MT5 levels
+                // (MT5 reports 0 for "no level" -> treat as absent).
+                const effSl = mon?.sl ?? (pos.stop_loss || null);
+                const effTp = mon?.tp ?? (pos.take_profit || null);
+                const hasLevels = effSl != null || effTp != null;
+                const pnlNum =
+                  pos.unrealized_pnl == null || Number.isNaN(Number(pos.unrealized_pnl))
+                    ? null
+                    : Number(pos.unrealized_pnl);
+                const cur = pos.currency || account?.currency || "";
+                const pnlColor =
+                  pnlNum === null
+                    ? "text-zinc-500"
+                    : pnlNum > 0
+                    ? "text-emerald-400"
+                    : pnlNum < 0
+                    ? "text-red-400"
+                    : "text-zinc-400";
                 return (
                   <div
-                    key={pos.broker_id ? `${pos.broker_id}:${pos.order_id}` : pos.order_id}
+                    key={key}
                     className="flex items-center justify-between p-3 border border-white/5 bg-neutral-950/40 rounded text-xs font-mono"
                   >
-                    <div className="min-w-0">
-                      <div className="text-white font-bold">
-                        {pos.symbol || "—"} · {pos.contract_type}
-                      </div>
-                      <div className="text-zinc-500 text-[10px]">
-                        Stake {pos.buy_price} · Payout {pos.payout} · #{pos.order_id}
-                        {pos.broker_id && pos.broker_id !== brokerId
-                          ? ` · ${pos.broker_id.split("_").slice(-1)[0]}`
-                          : ""}
-                      </div>
-                      {mon && (mon.sl || mon.tp) && (
-                        <div className="flex items-center gap-2 mt-1 text-[9px]">
-                          {mon.sl ? <span className="text-red-400">SL {mon.sl}</span> : null}
-                          {mon.tp ? <span className="text-emerald-400">TP {mon.tp}</span> : null}
-                          <button
-                            onClick={() => handleRemoveMonitor(mon)}
-                            className="p-0.5 rounded hover:bg-white/10 text-zinc-500"
-                            title="Remove SL/TP (position stays open)"
-                          >
-                            <X className="w-2.5 h-2.5" />
-                          </button>
+                    <div className="min-w-0 flex-1 mr-2">
+                      {editing ? (
+                        <div>
+                          <div className="text-white font-bold mb-1.5">
+                            SL/TP · {pos.symbol || pos.order_id}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <input
+                              value={levelSl}
+                              onChange={(e) => setLevelSl(e.target.value)}
+                              placeholder="SL price"
+                              inputMode="decimal"
+                              className="w-24 bg-neutral-950/70 border border-white/10 rounded px-2 py-1 text-[10px] font-mono text-red-300 placeholder:text-zinc-600 focus:border-red-400/40 outline-none"
+                            />
+                            <input
+                              value={levelTp}
+                              onChange={(e) => setLevelTp(e.target.value)}
+                              placeholder="TP price"
+                              inputMode="decimal"
+                              className="w-24 bg-neutral-950/70 border border-white/10 rounded px-2 py-1 text-[10px] font-mono text-emerald-300 placeholder:text-zinc-600 focus:border-emerald-400/40 outline-none"
+                            />
+                            <button
+                              onClick={handleSaveLevels}
+                              disabled={savingLevels}
+                              className="px-2 py-1 bg-white/10 hover:bg-white/20 disabled:opacity-50 rounded text-[10px] font-mono text-white"
+                            >
+                              {savingLevels ? "…" : "Save"}
+                            </button>
+                            <button
+                              onClick={() => setEditingPos(null)}
+                              className="px-2 py-1 bg-white/5 hover:bg-white/10 rounded text-[10px] font-mono text-zinc-400"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleClearLevels(pos)}
+                              className="px-2 py-1 bg-white/5 hover:bg-red-500/10 hover:text-red-400 rounded text-[10px] font-mono text-zinc-500"
+                              title="Clear both levels (position stays open)"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                          <div className="text-[9px] text-zinc-600 mt-1">
+                            Empty field = that level is removed.
+                          </div>
                         </div>
+                      ) : (
+                        <>
+                          <div className="text-white font-bold flex items-center gap-2 flex-wrap">
+                            <span>
+                              {pos.symbol || "—"} · {pos.contract_type}
+                            </span>
+                            <span className={`font-normal text-[10px] ${pnlColor}`}>
+                              {pnlNum === null
+                                ? "P&L —"
+                                : `P&L ${pnlNum > 0 ? "+" : ""}${pnlNum.toFixed(2)}${
+                                    cur ? ` ${cur}` : ""
+                                  }`}
+                            </span>
+                          </div>
+                          <div className="text-zinc-500 text-[10px]">
+                            Stake {pos.buy_price} · Payout {pos.payout} · #{pos.order_id}
+                            {pos.broker_id && pos.broker_id !== brokerId
+                              ? ` · ${pos.broker_id.split("_").slice(-1)[0]}`
+                              : ""}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 text-[9px]">
+                            {effSl != null ? (
+                              <span className="text-red-400">SL {effSl}</span>
+                            ) : (
+                              <span className="text-zinc-600">SL —</span>
+                            )}
+                            {effTp != null ? (
+                              <span className="text-emerald-400">TP {effTp}</span>
+                            ) : (
+                              <span className="text-zinc-600">TP —</span>
+                            )}
+                            <button
+                              onClick={() => openLevelEditor(pos)}
+                              className="p-0.5 rounded hover:bg-white/10 text-zinc-500 hover:text-white"
+                              title="Add / adjust stop loss & take profit"
+                            >
+                              <Pencil className="w-2.5 h-2.5" />
+                            </button>
+                            {hasLevels && (
+                              <button
+                                onClick={() => handleClearLevels(pos)}
+                                className="p-0.5 rounded hover:bg-white/10 text-zinc-500 hover:text-red-400"
+                                title="Clear SL/TP (position stays open)"
+                              >
+                                <X className="w-2.5 h-2.5" />
+                              </button>
+                            )}
+                          </div>
+                        </>
                       )}
                     </div>
                     <button
