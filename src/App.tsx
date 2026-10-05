@@ -325,7 +325,9 @@ function App({ initialDevice = "desktop" }: AppProps) {
       <Route path="/legal/eula" element={<LegalEula />} />
       <Route path="/legal/liability" element={<LegalLiability />} />
       <Route path="/legal/data-deletion" element={<LegalDataDeletion />} />
-      {/* Everything else behind the login gate */}
+      {/* Everything else: the app shell itself (no sign-in gate -- the
+          legacy login wall was removed 2026-10-05; the backend enforces
+          verified identity where it matters). */}
       <Route path="/*" element={<GatedApp initialDevice={initialDevice} />} />
     </Routes>
   );
