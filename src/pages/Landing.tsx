@@ -37,6 +37,67 @@ const STEPS = [
   },
 ];
 
+// Published installer artifacts (bucket is public-read for releases/*).
+const RELEASE_BASE =
+  "https://sans-mercantile-priv-downloads.s3.us-east-1.amazonaws.com/releases/1.0.0";
+
+const DOWNLOADS = [
+  {
+    platform: "Web",
+    badge: "No install",
+    title: "Start instantly, right here",
+    body: "The full Priv terminal and live signal feed in any browser — sign in and you're trading in seconds. Nothing to download, nothing to update.",
+    cta: "Open the web app",
+    href: "/dashboard",
+    meta: "Desktop & mobile browsers",
+  },
+  {
+    platform: "Windows",
+    badge: "Signed .exe",
+    title: "The full desktop terminal",
+    body: "Code-signed installer with the local MetaTrader 5 bridge — run Priv beside your MT5 terminal and execute on your own server, not just Deriv.",
+    cta: "Download for Windows",
+    href: `${RELEASE_BASE}/PrivCore-Windows.exe`,
+    meta: "Windows 10+ · 91 MB",
+  },
+  {
+    platform: "macOS",
+    badge: "Universal",
+    title: "Native on Apple Silicon & Intel",
+    body: "One disk image for every Mac — the same terminal, charts, and live signal feed running as a real desktop app, not a browser tab.",
+    cta: "Download for macOS",
+    href: `${RELEASE_BASE}/PrivCore-macOS.dmg`,
+    meta: "macOS 11+ · universal · 177 MB",
+  },
+  {
+    platform: "Linux",
+    badge: "AppImage",
+    title: "One file, every distro",
+    body: "A portable AppImage — no package manager, no root, no dependency hunting. Make it executable, launch it, and you're trading.",
+    cta: "Download for Linux",
+    href: `${RELEASE_BASE}/PrivCore-Linux.AppImage`,
+    meta: "Ubuntu, Fedora, Arch… · 107 MB",
+  },
+  {
+    platform: "Android",
+    badge: "Direct APK",
+    title: "Signals in your pocket",
+    body: "Install the APK straight from us — no Play Store account required. The whole app on your home screen, with signals still landing by email, SMS, or WhatsApp.",
+    cta: "Download for Android",
+    href: `${RELEASE_BASE}/PrivCore-Android.apk`,
+    meta: "Android 8+ · 221 KB",
+  },
+  {
+    platform: "iOS",
+    badge: "Home screen",
+    title: "Add Priv to your home screen",
+    body: "Open priv.sansmercantile.com in Safari, tap Share, then Add to Home Screen — Priv launches full-screen like a native app. The App Store build is in progress.",
+    cta: "Open in Safari",
+    href: "https://priv.sansmercantile.com",
+    meta: "iOS 16+ · Safari",
+  },
+];
+
 interface LiveSignal {
   id: string;
   symbol: string;
@@ -771,6 +832,53 @@ export default function Landing() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Download */}
+      <section id="download" className="py-14 border-t border-white/5">
+        <p className="text-[11px] font-mono tracking-widest text-rose-200/70 mb-2">DOWNLOAD PRIV</p>
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">
+          Your signals, on every screen you own.
+        </h2>
+        <p className="text-white/55 text-[15px] max-w-2xl mb-8">
+          One account, one live signal feed — from a full desk setup to your pocket. Free to start on
+          every platform, and every client talks to the same secured backend.
+        </p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {DOWNLOADS.map((d) => (
+            <div key={d.platform} className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 flex flex-col">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-semibold text-white">{d.platform}</h3>
+                <span className="text-[10px] font-mono uppercase tracking-widest text-rose-200/60 border border-rose-500/20 rounded-full px-2 py-0.5 whitespace-nowrap">
+                  {d.badge}
+                </span>
+              </div>
+              <p className="mt-2 text-[13.5px] font-medium text-white/85">{d.title}</p>
+              <p className="mt-1.5 text-[13px] text-white/50 leading-relaxed flex-1">{d.body}</p>
+              {d.href.startsWith("/") ? (
+                <Link
+                  to={d.href}
+                  className="mt-4 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white text-sm font-semibold transition text-center"
+                >
+                  {d.cta}
+                </Link>
+              ) : (
+                <a
+                  href={d.href}
+                  className="mt-4 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white text-sm font-semibold transition text-center"
+                >
+                  {d.cta}
+                </a>
+              )}
+              <p className="mt-2 text-[11px] text-white/35 font-mono">{d.meta}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-5 text-xs text-white/35">
+          All installers are release 1.0.0. The Windows installer is code-signed; the macOS build is
+          currently unsigned — right-click → Open on first launch. Android installs via APK (allow
+          "unknown sources" when prompted).
+        </p>
       </section>
       </main>
 
