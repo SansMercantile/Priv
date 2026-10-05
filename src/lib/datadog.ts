@@ -10,7 +10,6 @@ export function initDatadog(): { RUM_STATUS: string; isReal: boolean } {
   // silence RUM entirely (e.g. while the client token is invalid and every
   // upload 403s noisily). Default stays on.
   if (String(metaEnv.VITE_DD_ENABLED || "").toLowerCase() === "false") {
-    console.log("[SANS Datadog] Disabled via VITE_DD_ENABLED=false.");
     return { RUM_STATUS: "disabled", isReal: false };
   }
   const appId = metaEnv.VITE_DD_APPLICATION_ID || metaEnv.VITE_DD_APP_ID;
