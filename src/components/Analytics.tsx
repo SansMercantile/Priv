@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { BarChart2, RefreshCw, AlertTriangle, PieChart, TrendingUp } from "lucide-react";
+import { userHeader } from "../lib/userHeader";
 
 export default function Analytics({ demoMode }: { demoMode?: boolean }) {
   const [performance, setPerformance] = useState<any>(null);
@@ -15,10 +16,14 @@ export default function Analytics({ demoMode }: { demoMode?: boolean }) {
   const fetchAll = async (manual = false) => {
     if (manual || !loadedRef.current) setLoading(true);
     try {
+      // Identity + mode required: without them the backend can't resolve
+      // the caller's linked adapter and every panel stays "—".
+      const headers = await userHeader();
+      const mode = demoMode ? "demo" : "live";
       const [perfRes, allocRes, riskRes] = await Promise.all([
-        fetch("/api/v1/analytics/portfolio/performance"),
-        fetch("/api/v1/analytics/portfolio/allocation"),
-        fetch("/api/v1/analytics/risk/metrics"),
+        fetch(`/api/v1/analytics/portfolio/performance?mode=${mode}`, { headers }),
+        fetch(`/api/v1/analytics/portfolio/allocation?mode=${mode}`, { headers }),
+        fetch(`/api/v1/analytics/risk/metrics?mode=${mode}`, { headers }),
       ]);
       const [perfData, allocData, riskData] = await Promise.all([perfRes.json(), allocRes.json(), riskRes.json()]);
       setPerformance(perfData);
@@ -34,10 +39,11 @@ export default function Analytics({ demoMode }: { demoMode?: boolean }) {
   };
 
   useEffect(() => {
+    loadedRef.current = false;
     fetchAll();
     const interval = setInterval(fetchAll, 15000);
     return () => clearInterval(interval);
-  }, []);
+  }, [demoMode]);
 
   return (
     <div className="space-y-6">

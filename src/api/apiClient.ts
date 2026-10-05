@@ -266,6 +266,22 @@ export const apiClient = {
     safeFetchRelative(`/api/v1/signals/notifications?limit=${limit}`),
   markSignalNotificationsRead: () =>
     safeFetchRelative("/api/v1/signals/notifications/read", { method: "POST" }),
+  // Web push for position alerts (opened / TP hit / SL hit) on this device.
+  getVapidPublicKey: () =>
+    safeFetchRelative("/api/v1/signals/push/vapid-public-key"),
+  pushSubscribe: (subscription: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+    safeFetchRelative("/api/v1/signals/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(subscription),
+    }),
+  pushUnsubscribe: (endpoint: string) =>
+    safeFetchRelative("/api/v1/signals/push/unsubscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint }),
+    }),
+  testPush: () => safeFetchRelative("/api/v1/signals/push/test", { method: "POST" }),
 
   // Contact OTP verification + emotion check-in log (backend/api/verify_api.py).
   getVerifiedContacts: () => safeFetchRelative("/api/v1/verify/contacts"),

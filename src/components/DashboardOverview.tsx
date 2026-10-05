@@ -364,6 +364,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         const json = await res.json();
         const rows: any[] = json?.data?.positions || [];
         if (cancelled) return;
+        setPositionsLoaded(true);
         setLivePositions(
           rows.map((p: any) => {
             const ct = String(p.contract_type || "").toUpperCase();
@@ -381,7 +382,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
           })
         );
       } catch {
-        if (!cancelled) setLivePositions([]);
+        if (!cancelled) {
+          setLivePositions([]);
+          setPositionsLoaded(true);
+        }
       }
     };
 
@@ -459,6 +463,21 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
     curve: { t: number; v: number }[];
     days: number;
   } | null>(null);
+
+  // All-time realized P&L for this mode's account (same endpoint, no
+  // day window) so the strip answers "overall P&L", not just last 30d.
+  const [perfAll, setPerfAll] = useState<{
+    trades: number;
+    wins: number;
+    losses: number;
+    win_rate: number | null;
+    net_pnl: number;
+    profit_factor: number | null;
+  } | null>(null);
+
+  // True once the open-positions poll has answered at least once, so the
+  // Open P&L card can show "—" while loading instead of a fake $0.00.
+  const [positionsLoaded, setPositionsLoaded] = useState(false);
 
   // Real data in BOTH modes: demo shows the real Deriv DEMO account,
   // live shows the real Deriv LIVE account (GET /api/v1/auth/deriv/
@@ -563,6 +582,31 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
       } catch {
         // leave as-is rather than fabricate performance numbers
       }
+
+      // All-time realized P&L (same endpoint, no day window) -- the
+      // "overall" figure. available:false clears it like the 30d strip.
+      try {
+        const res = await fetch(
+          `/api/v1/history/performance?days=3650&mode=${wantLive ? "live" : "demo"}`,
+          { headers: await userHeader() }
+        );
+        const json = await res.json();
+        const d = json?.data;
+        if (!cancelled && d?.available) {
+          setPerfAll({
+            trades: d.trades,
+            wins: d.wins,
+            losses: d.losses,
+            win_rate: d.win_rate,
+            net_pnl: d.net_pnl,
+            profit_factor: d.profit_factor,
+          });
+        } else if (!cancelled) {
+          setPerfAll(null);
+        }
+      } catch {
+        // leave as-is rather than fabricate all-time numbers
+      }
     };
 
     refreshRealData();
@@ -590,6 +634,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
     return { g: "CCC+ LEVERAGED", desc: "High-Yield HFT", color: "text-amber-500 border-amber-900/50 bg-amber-950/30" };
   };
   const gradeInfo = getSovereignGrade();
+
+  // Unrealized P&L across every open position the poll returned.
+  const openPnl = livePositions.reduce((s, p) => s + (p.pnl ?? 0), 0);
 
   if (!demoMode && !brokerLoading && !hasRealDeriv) {
     return (
@@ -700,14 +747,26 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
       </div>
 
       {/* Metrics Bento Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
         <MetricCard
-          title="Total Profit"
+          title="Account Balance"
           value={stats.totalProfit === null ? "—" : `$${stats.totalProfit.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           change={stats.dailyReturn === null ? "Live data pending" : (stats.dailyReturn > 0 ? `+${stats.dailyReturn.toFixed(2)}%` : `${stats.dailyReturn.toFixed(2)}%`)}
           icon={DollarSign}
           trend={stats.dailyReturn === null ? "stable" : (stats.dailyReturn > 0 ? "up" : "down")}
           color="green"
+        />
+        <MetricCard
+          title="Open P&L"
+          value={
+            !positionsLoaded
+              ? "—"
+              : `${openPnl >= 0 ? "+" : "-"}$${Math.abs(openPnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          }
+          change={`${livePositions.length} open position${livePositions.length === 1 ? "" : "s"} · unrealized`}
+          icon={TrendingUp}
+          trend={!positionsLoaded || openPnl === 0 ? "stable" : openPnl > 0 ? "up" : "down"}
+          color={!positionsLoaded || openPnl === 0 ? "blue" : openPnl > 0 ? "green" : "red"}
         />
         <MetricCard
           title="Daily Return"
@@ -790,11 +849,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
               </span>
               <span className="font-mono text-[9px] text-white/40 uppercase tracking-widest">
                 {perf
-                  ? `${perf.trades} settled trade${perf.trades === 1 ? "" : "s"}`
+                  ? `${perf.trades} settled · ${perfAll ? perfAll.trades : "—"} all-time`
                   : "settled trades loading…"}
               </span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-3">
               {[
                 {
                   label: "Win Rate",
@@ -812,7 +871,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
                   cls: "text-red-400",
                 },
                 {
-                  label: "Net P&L",
+                  label: "Net P&L (30d)",
                   value: perf
                     ? `${perf.net_pnl >= 0 ? "+" : "-"}$${Math.abs(perf.net_pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                     : "—",
@@ -821,6 +880,18 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
                 {
                   label: "Profit Factor",
                   value: perf?.profit_factor == null ? "—" : perf.profit_factor.toFixed(2),
+                  cls: "text-white",
+                },
+                {
+                  label: "Overall P&L",
+                  value: perfAll
+                    ? `${perfAll.net_pnl >= 0 ? "+" : "-"}$${Math.abs(perfAll.net_pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : "—",
+                  cls: perfAll == null ? "text-white" : perfAll.net_pnl >= 0 ? "text-emerald-400" : "text-red-400",
+                },
+                {
+                  label: "Overall W / L",
+                  value: perfAll ? `${perfAll.wins} / ${perfAll.losses}` : "—",
                   cls: "text-white",
                 },
               ].map(cell => (

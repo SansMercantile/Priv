@@ -87,8 +87,23 @@ export function useBrokerConnections(): BrokerConnectionsState {
   }, [tick, refresh]);
 
   const derivConns = connections.filter((c) => c.broker === "deriv");
-  const hasRealDeriv = derivConns.some((c) => c.account_type === "live");
-  const hasDemoDeriv = derivConns.some((c) => c.account_type === "demo");
+  // The backend's connections list may collapse both linked accounts into
+  // ONE deriv row whose account_type reflects only the primary (live) --
+  // its accounts[] still lists every loginid. Derive the demo/live gates
+  // from the loginids too, so demo mode isn't gated off (the dashboard
+  // then skips its performance/balance fetches entirely and every P&L
+  // cell shows "—").
+  const DEMO_PREFIXES = ["VRTC", "VRW", "DOT", "D0T"];
+  const isDemoLogin = (id?: string) =>
+    DEMO_PREFIXES.some((p) => String(id || "").toUpperCase().startsWith(p));
+  const hasRealDeriv =
+    derivConns.some((c) => c.account_type === "live") ||
+    derivConns.some((c) =>
+      (c.accounts || []).some((a) => a.account_id && !isDemoLogin(a.account_id))
+    );
+  const hasDemoDeriv =
+    derivConns.some((c) => c.account_type === "demo") ||
+    derivConns.some((c) => (c.accounts || []).some((a) => isDemoLogin(a.account_id)));
 
   return { connections, hasRealDeriv, hasDemoDeriv, loading, refresh };
 }

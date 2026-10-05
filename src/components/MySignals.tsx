@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { Radio, RefreshCw, AlertTriangle, CheckCircle2, BellRing } from "lucide-react";
+import { Radio, RefreshCw, AlertTriangle, CheckCircle2, BellRing, Bell, BellOff, Send } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../api/apiClient";
 import { getAuthToken } from "../lib/authToken";
+import { getPushState, enablePush, disablePush, PushState } from "../lib/pushNotifications";
 
 // "My Signals" tab: the subscriber signal product, real data only.
 // - Today's ticket (GET /api/signals/current, stale-flagged archive when live budgets out)
@@ -46,6 +47,13 @@ export default function MySignals() {
   // feed open (backend marker); lastSeen also drives row highlighting.
   const [unread, setUnread] = useState(0);
   const [lastSeen, setLastSeen] = useState<string | null>(null);
+  // Position lifecycle items (opened / TP hit / SL hit) from the same feed.
+  const [positionEvents, setPositionEvents] = useState<any[]>([]);
+  // Browser push subscription state for this device.
+  const [pushState, setPushState] = useState<PushState>("off");
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMsg, setPushMsg] = useState<string | null>(null);
+  const [pushErr, setPushErr] = useState<string | null>(null);
 
   const loadNotifications = async (ackRead: boolean) => {
     try {
@@ -54,6 +62,10 @@ export default function MySignals() {
       const n = d.unread || 0;
       setUnread(n);
       setLastSeen(typeof d.last_seen === "string" ? d.last_seen : null);
+      const items = Array.isArray(d.items) ? d.items : [];
+      setPositionEvents(
+        items.filter((i: any) => i?.scope === "position").slice(0, 12)
+      );
       if (ackRead && n > 0) {
         // Ack after the banner has had time to render; keeps the sidebar
         // badge and this banner in sync on the next poll.
@@ -175,6 +187,53 @@ export default function MySignals() {
     };
   }, []);
 
+  useEffect(() => {
+    getPushState().then(setPushState).catch(() => {});
+  }, []);
+
+  const togglePush = async () => {
+    setPushBusy(true);
+    setPushMsg(null);
+    setPushErr(null);
+    try {
+      if (pushState === "on") {
+        const s = await disablePush();
+        setPushState(s);
+        setPushMsg("Browser alerts turned off on this device.");
+      } else {
+        const s = await enablePush();
+        setPushState(s);
+        if (s === "on") {
+          setPushMsg("Browser alerts on — opens, TP and SL hits will ping this device.");
+        } else if (s === "blocked") {
+          setPushErr("Notifications are blocked. Allow them for this site in your browser settings, then retry.");
+        }
+      }
+    } catch (e: any) {
+      setPushErr(e?.message || "Could not change alert settings.");
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const sendTestPush = async () => {
+    setPushBusy(true);
+    setPushMsg(null);
+    setPushErr(null);
+    try {
+      const res: any = await apiClient.testPush();
+      const d = res?.data?.data ?? res?.data ?? {};
+      setPushMsg(
+        `Test sent — ${d.push_devices ?? 0} device(s) pushed` +
+          (d.has_email ? ", email queued to your verified contact." : ".")
+      );
+    } catch (e: any) {
+      setPushErr(e?.message || "Test failed.");
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
   // When the category changes, keep only instruments that exist in it.
   useEffect(() => {
     const allowed = new Set(Object.keys(categories[cat]?.instruments || {}));
@@ -251,6 +310,37 @@ export default function MySignals() {
     </div>
   );
 
+  const statusTone = (status: string) =>
+    status === "TP_HIT" || status === "CLOSED_TP"
+      ? "bg-emerald-500/10 text-emerald-400"
+      : status === "SL_HIT" || status === "CLOSE_FAILED"
+      ? "bg-rose-500/10 text-rose-400"
+      : "bg-white/10 text-zinc-300";
+
+  const PositionEventRow = ({ ev }: { ev: any }) => (
+    <div className="flex items-center justify-between gap-2 p-2 rounded-lg border border-white/10 bg-black/40 text-xs font-mono">
+      <div className="min-w-0">
+        <span className="text-white font-bold truncate">{ev.display_name || ev.symbol}</span>{" "}
+        <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded ${statusTone(ev.status)}`}>
+          {ev.status}
+        </span>
+        {ev.basis && <div className="text-zinc-500 text-[10px] truncate">{ev.basis}</div>}
+      </div>
+      <div className="text-right text-[10px] whitespace-nowrap">
+        {ev.pnl !== null && ev.pnl !== undefined && (
+          <div className={Number(ev.pnl) >= 0 ? "text-emerald-400" : "text-rose-400"}>
+            {Number(ev.pnl) >= 0 ? "+" : "-"}${Math.abs(Number(ev.pnl)).toFixed(2)}
+          </div>
+        )}
+        <div className="text-zinc-500">
+          {ev.created_at
+            ? new Date(ev.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            : ""}
+        </div>
+      </div>
+    </div>
+  );
+
   // A signal counts as "new" until the feed's read marker passes it.
   // Never opened the feed (no marker) -> everything is new.
   const isNewSignal = (s: any) =>
@@ -298,10 +388,82 @@ export default function MySignals() {
       {unread > 0 && (
         <div className="p-3 rounded border border-rose-500/20 bg-rose-500/5 text-rose-300 text-xs font-mono flex items-center gap-2">
           <BellRing className="w-4 h-4 shrink-0" />
-          {unread} new signal{unread === 1 ? "" : "s"} since your last visit
+          {unread} unread update{unread === 1 ? "" : "s"} since your last visit
           {mine.some((s) => isNewSignal(s)) && " — highlighted below"}
         </div>
       )}
+
+      {/* Position lifecycle alerts (feed items) + browser push subscription */}
+      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+            <BellRing className="w-4 h-4 text-rose-300" /> Position alerts
+          </h2>
+          <div className="flex gap-2">
+            {pushState === "unsupported" ? (
+              <span className="text-[10px] font-mono text-zinc-500">
+                push not supported in this browser
+              </span>
+            ) : pushState === "blocked" ? (
+              <span className="text-[10px] font-mono text-amber-400">
+                notifications blocked in browser settings
+              </span>
+            ) : (
+              <button
+                onClick={togglePush}
+                disabled={pushBusy}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-xs border transition disabled:opacity-50 ${
+                  pushState === "on"
+                    ? "border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10"
+                    : "border-white/10 text-white hover:bg-white/10"
+                }`}
+              >
+                {pushState === "on" ? (
+                  <BellOff className="w-3.5 h-3.5" />
+                ) : (
+                  <Bell className="w-3.5 h-3.5" />
+                )}
+                {pushState === "on" ? "ALERTS ON" : "ENABLE ON THIS DEVICE"}
+              </button>
+            )}
+            {pushState === "on" && (
+              <button
+                onClick={sendTestPush}
+                disabled={pushBusy}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-xs border border-white/10 text-white hover:bg-white/10 transition disabled:opacity-50"
+              >
+                <Send className="w-3.5 h-3.5" /> TEST
+              </button>
+            )}
+          </div>
+        </div>
+        <p className="text-[10px] font-mono text-zinc-500">
+          Opens, TP hits and SL hits ping every subscribed device. On iOS, add
+          Priv to your Home Screen first (Share → Add to Home Screen).
+        </p>
+        {pushMsg && (
+          <div className="p-2 rounded border border-emerald-500/20 bg-emerald-500/5 text-emerald-300 text-xs font-mono">
+            {pushMsg}
+          </div>
+        )}
+        {pushErr && (
+          <div className="p-2 rounded border border-red-500/20 bg-red-500/5 text-red-400 text-xs font-mono">
+            {pushErr}
+          </div>
+        )}
+        {positionEvents.length === 0 ? (
+          <p className="text-xs text-zinc-500 font-mono">
+            No position alerts yet — they land here when a position opens or
+            hits TP/SL.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {positionEvents.map((ev) => (
+              <PositionEventRow key={ev.id} ev={ev} />
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Today's ticket */}
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
