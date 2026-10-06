@@ -93,6 +93,20 @@ export default function Billing({ demoMode }: { demoMode?: boolean }) {
     setRedirecting(plan.plan_id);
     try {
       const origin = window.location.origin;
+      // Buyer identity for PayFast receipts/subscriptions: read from the
+      // local profile shell (pre-filled from the social profile at login,
+      // editable in the profile editor). Optional server-side, but an
+      // empty email_address on a recurring billing agreement produces
+      // receipt-less subscriptions and PayFast validation errors.
+      let profile: Record<string, string> = {};
+      try {
+        profile = JSON.parse(localStorage.getItem("xm_user_profile") || "{}");
+      } catch {
+        /* ignore corrupt profile */
+      }
+      const userEmail = (profile.email || localStorage.getItem("xm_account_email") || "").trim();
+      const userFirst = (profile.firstName || "").trim();
+      const userLast = (profile.lastName || "").trim();
       const result: any = await apiClient.createPayfastSubscription({
         plan_id: plan.plan_id,
         return_url: `${origin}/dashboard/billing?status=success`,
@@ -101,6 +115,9 @@ export default function Billing({ demoMode }: { demoMode?: boolean }) {
         // label) and the ITN route lives under the /api/v1/payment prefix.
         notify_url: "https://priv.sansmercantile.com/api/v1/payment/payfast/itn",
         billing_frequency: "3",
+        ...(userEmail ? { user_email: userEmail } : {}),
+        ...(userFirst ? { user_first_name: userFirst } : {}),
+        ...(userLast ? { user_last_name: userLast } : {}),
       });
       // createPayfastSubscription calls safeFetchRelative directly, which
       // returns the parsed body as-is (unlike apiClient.post's {data}
