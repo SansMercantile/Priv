@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import KycVerificationPage from './KycVerificationPage';
 import DerivConnectCard from '../DerivConnectCard';
+import TradingViewCard from '../TradingViewCard';
+import MT5BridgeCard from '../MT5BridgeCard';
 import { TaxIntelligence } from '../TaxIntelligence';
 import apiClient from '../../api/apiClient';
 import ContactVerifier, { VerifiedEntry } from './ContactVerifier';
@@ -51,6 +53,12 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
   // below, after kycStatus is declared.)
   const [isAdmin, setIsAdmin] = useState(false);
   const [hasRealConnection, setHasRealConnection] = useState<boolean>(false);
+  // Broker connections beyond Deriv (TradingView / MT5 bridge / affiliate
+  // venues) are reserved for the two highest subscription tiers --
+  // sovereign + autonomous -- plus admins. Server-derived tier only
+  // (GET /subscriptions/me -> tier), never the cosmetic node-tier picker.
+  const [brokerTierOk, setBrokerTierOk] = useState(false);
+  const [signalBrokers, setSignalBrokers] = useState<any[]>([]);
   
   useEffect(() => {
     const checkConnections = () => {
@@ -184,6 +192,55 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
   useEffect(() => {
     if (!isAdmin && activeTab === 'billing') setActiveTab('profile');
   }, [isAdmin, activeTab]);
+
+  // Tier gate for the broker-connections block (sovereign/autonomous or
+  // admin). Both probes are console-clean when signed out: whoami is
+  // anon-safe and getMySubscription short-circuits without a request.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      let ok = false;
+      try {
+        const res: any = await apiClient.get('/api/v1/admin/whoami');
+        ok = !!res?.data?.data?.admin;
+      } catch (_) {
+        /* stay non-admin */
+      }
+      if (!ok) {
+        try {
+          const body: any = await apiClient.getMySubscription();
+          const sub = body?.subscription ?? (body && typeof body === 'object' ? body : null);
+          const tier = sub?.tier;
+          ok = tier === 'sovereign' || tier === 'autonomous';
+        } catch (_) {
+          /* signed out / free..elite -> no extra broker block */
+        }
+      }
+      if (!cancelled) setBrokerTierOk(ok);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Affiliate venue directory (XM/IFX/FBS) -- only fetched once the
+  // block is actually going to render.
+  useEffect(() => {
+    if (!brokerTierOk) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res: any = await apiClient.getSignalBrokers();
+        const d = res?.data?.data ?? res?.data ?? {};
+        if (!cancelled) setSignalBrokers(d.brokers || []);
+      } catch (_) {
+        /* offline: block still renders with the two cards */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [brokerTierOk]);
 
   // Server truth for KYC status: after submit, poll the record so an
   // admin approve/reject flips this UI without a resubmit. Local status
@@ -1158,6 +1215,50 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
             </p>
             <DerivConnectCard />
           </div>
+
+          {brokerTierOk && (
+            <div className="p-5 border border-zinc-800 bg-zinc-950/40 rounded-xl space-y-4">
+              <div>
+                <h3 className="text-sm font-mono font-bold text-white uppercase tracking-widest">
+                  Broker connections
+                </h3>
+                <p className="text-[11px] text-zinc-400 font-mono mt-1 leading-relaxed">
+                  Additional execution venues — available on the two highest tiers
+                  (Sovereign and Autonomous). The MT5 bridge pairing itself is
+                  reserved for Autonomous subscribers.
+                </p>
+              </div>
+              <TradingViewCard />
+              <MT5BridgeCard />
+              {signalBrokers
+                .filter((b) => b.id !== 'deriv')
+                .map((b) => (
+                  <div
+                    key={b.id}
+                    className="flex items-center justify-between gap-3 p-3 rounded-lg border border-white/10 bg-black/40"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-sm text-white font-semibold">{b.name}</div>
+                      {b.description && (
+                        <div className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                          {b.description}
+                        </div>
+                      )}
+                    </div>
+                    {b.url && (
+                      <a
+                        href={b.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/20 rounded-lg font-mono text-xs text-white hover:bg-white/10 transition"
+                      >
+                        Open account <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                  </div>
+                ))}
+            </div>
+          )}
         </div>
       )}
 

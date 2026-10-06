@@ -41,6 +41,24 @@ async function safeFetch(url: string, options?: RequestInit) {
   return data;
 }
 
+// Verified-only endpoints (require_verified_user_id on the backend: the
+// signals surface + subscriptions/me). Without a live Auth0 session the
+// server answers 401 no matter what, so for signed-out / demo / expired-
+// session visitors we skip the request entirely instead of spamming the
+// console with 401s. Callers already catch and fall back to their
+// defaults (free tier, empty lists), so behavior is unchanged -- only
+// the noise goes away. withUserHeader still runs for everything else
+// (the pre-login Deriv flow relies on the anonymous X-User-Id header).
+async function safeFetchAuthed(url: string, options?: RequestInit) {
+  const token = await getAuthToken();
+  if (!token) {
+    throw Object.assign(new Error("Sign in to view this."), {
+      response: { data: { detail: "Sign in to view this." }, status: 401 },
+    });
+  }
+  return safeFetchRelative(url, options);
+}
+
 // Broker/OAuth calls always use a relative path so they go through the
 // same-origin /api/* proxy to the live backend, never a cross-origin host.
 async function safeFetchRelative(url: string, options?: RequestInit) {
@@ -205,7 +223,7 @@ export const apiClient = {
   // resolves the paying user from the verified Auth0 Bearer token sent
   // by withUserHeader() above, never from a client-supplied user id.
   getPlans: () => safeFetchRelative("/api/v1/payment/plans"),
-  getMySubscription: () => safeFetchRelative("/api/v1/payment/subscriptions/me"),
+  getMySubscription: () => safeFetchAuthed("/api/v1/payment/subscriptions/me"),
   createPayfastSubscription: (payload: {
     plan_id: string;
     return_url: string;
@@ -241,9 +259,9 @@ export const apiClient = {
   // Subscriber signals (mounted at /api/v1/signals). Preferences choose
   // the instruments per paid tier; history mixes the caller's issued
   // signals with the global landing-ticket archive.
-  getSignalTiers: () => safeFetchRelative("/api/v1/signals/tiers"),
-  getSignalCategories: () => safeFetchRelative("/api/v1/signals/categories"),
-  getSignalPreferences: () => safeFetchRelative("/api/v1/signals/preferences"),
+  getSignalTiers: () => safeFetchAuthed("/api/v1/signals/tiers"),
+  getSignalCategories: () => safeFetchAuthed("/api/v1/signals/categories"),
+  getSignalPreferences: () => safeFetchAuthed("/api/v1/signals/preferences"),
   setSignalPreferences: (payload: {
     category: string;
     instruments: string[];
@@ -252,20 +270,20 @@ export const apiClient = {
     contact_phone?: string;
     broker?: string;
   }) =>
-    safeFetchRelative("/api/v1/signals/preferences", {
+    safeFetchAuthed("/api/v1/signals/preferences", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     }),
   getSignalHistory: (limit: number = 50) =>
-    safeFetchRelative(`/api/v1/signals/history?limit=${limit}`),
+    safeFetchAuthed(`/api/v1/signals/history?limit=${limit}`),
   getCurrentSignal: () => safeFetchRelative("/api/signals/current"),
   // In-app signal notifications: items + unread count (signals issued
   // after the last read), and the read-ack that advances the marker.
   getSignalNotifications: (limit: number = 25) =>
-    safeFetchRelative(`/api/v1/signals/notifications?limit=${limit}`),
+    safeFetchAuthed(`/api/v1/signals/notifications?limit=${limit}`),
   markSignalNotificationsRead: () =>
-    safeFetchRelative("/api/v1/signals/notifications/read", { method: "POST" }),
+    safeFetchAuthed("/api/v1/signals/notifications/read", { method: "POST" }),
   // Web push for position alerts (opened / TP hit / SL hit) on this device.
   getVapidPublicKey: () =>
     safeFetchRelative("/api/v1/signals/push/vapid-public-key"),
