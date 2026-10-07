@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Radio, RefreshCw, AlertTriangle, CheckCircle2, BellRing, Bell, BellOff, Send } from "lucide-react";
+import { Radio, RefreshCw, AlertTriangle, CheckCircle2, BellRing, Bell, BellOff, Send, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../api/apiClient";
 import { getAuthToken } from "../lib/authToken";
@@ -289,26 +289,50 @@ export default function MySignals() {
     </span>
   );
 
-  const SignalRow = ({ s, isNew }: { s: any; isNew?: boolean }) => (
-    <div className={`flex items-center justify-between gap-2 p-2 rounded-lg border text-xs font-mono ${
-      isNew ? "border-rose-500/40 bg-rose-500/5" : "border-white/10 bg-black/40"}`}>
-      <div className="min-w-0">
-        <span className="text-white font-bold truncate">{s.display_name || s.symbol}</span>{" "}
-        <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded ${s.direction === "BUY" ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
-          {s.direction}
-        </span>{" "}
-        {s.status && <span className="text-zinc-500 text-[10px]">{s.status}</span>}
-        {isNew && (
-          <span className="ml-1.5 text-[9px] uppercase px-1.5 py-0.5 rounded bg-[#e11d48]/20 text-rose-300">new</span>
+  const SignalRow = ({ s, isNew }: { s: any; isNew?: boolean }) => {
+    // One click ships the signal to the trading terminal, which prefills
+    // symbol/side/SL/TP and executes the order. Every tier gets this — it
+    // rides the plain manual order path (no desk/autotrader gate).
+    const dir = String(s.direction || "").toUpperCase();
+    const canTrade = Boolean(s.symbol) && (dir === "BUY" || dir === "SELL");
+    const trade = () => {
+      const p = new URLSearchParams({ trade_symbol: String(s.symbol), trade_side: dir });
+      if (Number(s.stop_loss) > 0) p.set("trade_sl", String(s.stop_loss));
+      if (Number(s.take_profit_1) > 0) p.set("trade_tp", String(s.take_profit_1));
+      if (s.id) p.set("trade_id", String(s.id));
+      navigate(`/dashboard/terminal?${p.toString()}`);
+    };
+    return (
+      <div className={`flex items-center justify-between gap-2 p-2 rounded-lg border text-xs font-mono ${
+        isNew ? "border-rose-500/40 bg-rose-500/5" : "border-white/10 bg-black/40"}`}>
+        <div className="min-w-0">
+          <span className="text-white font-bold truncate">{s.display_name || s.symbol}</span>{" "}
+          <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded ${s.direction === "BUY" ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
+            {s.direction}
+          </span>{" "}
+          {s.status && <span className="text-zinc-500 text-[10px]">{s.status}</span>}
+          {isNew && (
+            <span className="ml-1.5 text-[9px] uppercase px-1.5 py-0.5 rounded bg-[#e11d48]/20 text-rose-300">new</span>
+          )}
+        </div>
+        <div className="text-right text-[10px] text-zinc-400 whitespace-nowrap">
+          <div>IN {s.entry}</div>
+          <div className="text-emerald-400">TP {s.take_profit_1}</div>
+          <div className="text-rose-400">SL {s.stop_loss}</div>
+        </div>
+        {canTrade && (
+          <button
+            type="button"
+            onClick={trade}
+            title="Trade this signal in the terminal"
+            className="shrink-0 flex items-center gap-1 px-2 py-1 rounded border text-[9px] font-mono uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/25 transition"
+          >
+            <TrendingUp className="w-3 h-3" /> Trade
+          </button>
         )}
       </div>
-      <div className="text-right text-[10px] text-zinc-400 whitespace-nowrap">
-        <div>IN {s.entry}</div>
-        <div className="text-emerald-400">TP {s.take_profit_1}</div>
-        <div className="text-rose-400">SL {s.stop_loss}</div>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const statusTone = (status: string) =>
     status === "TP_HIT" || status === "CLOSED_TP"

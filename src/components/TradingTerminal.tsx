@@ -33,7 +33,7 @@ const RISE_FALL_MINI_APP_URL = "https://privcoremini.sansmercantile.com";
 // linked -- the UI prompts to connect instead of showing any shared or
 // other-mode account.
 
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import apiClient from "../api/apiClient";
 
 interface OpenPosition {
@@ -623,6 +623,63 @@ function TradingTerminalInner() {
       setPlacingOrder(false);
     }
   };
+
+  // ── Signal handoff (MySignals "Trade" button) ─────────────────────────
+  // ?trade_symbol=…&trade_side=BUY|SELL[&trade_sl=&trade_tp=] prefills the
+  // ticket and fires exactly one order once an account is usable — the
+  // trade executes right here in the terminal, on every tier (this is the
+  // plain manual order path, no desk/autotrader gate). The query is
+  // stripped on mount so refresh/back never re-executes, and a one-shot
+  // ref keeps StrictMode/mount races from double-firing. Grace: if no
+  // account resolves (or the link is offline), wait 10s then fire once so
+  // handlePlaceOrder surfaces the exact "link/connect" reason in the log;
+  // the prefill stays put for a manual retry.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const signalTrade = React.useMemo(() => {
+    const symbol = searchParams.get("trade_symbol");
+    const side = (searchParams.get("trade_side") || "").toUpperCase();
+    if (!symbol || (side !== "BUY" && side !== "SELL")) return null;
+    return {
+      symbol,
+      side: side as "BUY" | "SELL",
+      sl: Number(searchParams.get("trade_sl") || 0),
+      tp: Number(searchParams.get("trade_tp") || 0),
+    };
+  }, []);
+  const signalTradeFired = useRef(false);
+  const [signalGrace, setSignalGrace] = useState(false);
+
+  useEffect(() => {
+    if (!signalTrade) return;
+    setSelectedSymbol(signalTrade.symbol);
+    setOrderSide(signalTrade.side);
+    if (signalTrade.sl > 0) {
+      setUseSL(true);
+      setStopLoss(signalTrade.sl);
+    }
+    if (signalTrade.tp > 0) {
+      setUseTP(true);
+      setTakeProfit(signalTrade.tp);
+    }
+    pushLog(
+      `Signal trade queued: ${signalTrade.side} ${signalTrade.symbol}` +
+        (signalTrade.sl > 0 ? ` · SL ${signalTrade.sl}` : "") +
+        (signalTrade.tp > 0 ? ` · TP ${signalTrade.tp}` : "") +
+        " — executing…"
+    );
+    setSearchParams({}, { replace: true });
+    const grace = setTimeout(() => setSignalGrace(true), 10000);
+    return () => clearTimeout(grace);
+  }, [signalTrade]);
+
+  useEffect(() => {
+    if (!signalTrade || signalTradeFired.current || placingOrder) return;
+    const cfdReady = activePlatform === "cfds" && mt5Live.length > 0;
+    const derivReady = Boolean(brokerId) && isConnected;
+    if (!cfdReady && !derivReady && !signalGrace) return;
+    signalTradeFired.current = true;
+    handlePlaceOrder(null, signalTrade.side);
+  }, [brokerId, isConnected, activePlatform, mt5Live.length, placingOrder, signalGrace, signalTrade]);
 
   const handleCancelWorking = async (order: WorkingOrder) => {
     try {
