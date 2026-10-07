@@ -844,6 +844,11 @@ function TradingTerminalInner() {
         allow_symbol_change: activePlatform === "tradingview",
         studies: ["RSI@tv-basicstudies", "MASimple@tv-basicstudies"],
         support_gestures: true,
+        // Official snippets always pin this: without it the widget's
+        // support/incidents fetch resolves against its own iframe origin
+        // (www.tradingview-widget.com) which 403s every request; routed
+        // here it answers 200 and the console error disappears.
+        support_host: "https://www.tradingview.com",
         container_id: "tradingview_chart_frame",
       });
       containerRef.current.appendChild(script);
