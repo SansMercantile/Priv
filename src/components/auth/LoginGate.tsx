@@ -37,7 +37,7 @@ interface LoginGateProps {
 async function checkDerivConnected(): Promise<boolean> {
   try {
     const { data } = await apiClient.getBrokerConnections();
-    const connections = data?.data?.connections || [];
+    const connections = data?.data?.connections ?? data?.connections ?? [];
     return connections.some((c: { broker: string }) => c.broker === "deriv");
   } catch {
     return false;
@@ -99,6 +99,14 @@ export default function LoginGate({ children }: LoginGateProps) {
       return;
     }
     setAuthTokenGetter(() => getAccessTokenSilently());
+    // The connections hook may already have fetched before this getter
+    // existed (anonymous uuid -> []). Tell every useBrokerConnections
+    // instance to re-fetch now that Bearer tokens are available.
+    try {
+      window.dispatchEvent(new Event("priv:auth-ready"));
+    } catch {
+      /* non-DOM environment */
+    }
     // Probe token health once per identity: a throw here means the
     // session is a cached shell with no working token.
     getAccessTokenSilently()

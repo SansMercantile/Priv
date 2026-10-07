@@ -486,8 +486,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
   // unavailable stays null ("—") rather than fabricated.
   useEffect(() => {
     const wantLive = !demoMode;
-    if (wantLive && !hasRealDeriv) return;
-    if (!wantLive && !hasDemoDeriv) return;
+    // The agent registry is public: always fetch it so Active Agents fills
+    // even before (or without) a linked Deriv account. Account-scoped
+    // numbers below stay gated on the mode's real linked account.
+    const accountScoped = wantLive ? hasRealDeriv : hasDemoDeriv;
     let cancelled = false;
 
     const refreshRealData = async () => {
@@ -520,6 +522,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         }
       }
 
+      // Everything below is scoped to the mode's linked account -- without
+      // one the endpoints resolve an empty balance/no settled contracts,
+      // so skip the calls entirely rather than render their nulls.
+      if (!accountScoped) return;
+
       // Real Deriv balance for this mode's account -- SUMMED across
       // every account in the mode (one account's balance was shown
       // before while other linked accounts went invisible).
@@ -527,8 +534,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         // MUST carry userHeader: without an identity the backend resolves
         // "anonymous", finds no linked account, and every balance stays
         // null ("—") even with a connected Deriv account.
+        const t0 = performance.now();
         const res = await fetch("/api/v1/auth/deriv/balances", { headers: await userHeader() });
         const json = await res.json();
+        const latencySec = (performance.now() - t0) / 1000;
         const rows: any[] = json?.data?.balances || [];
         const modeRows = rows.filter((r: any) =>
           wantLive ? r.account_type !== "demo" : r.account_type === "demo"
@@ -542,7 +551,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
           }
         }
         if (!cancelled && counted > 0) {
-          setStats(prev => ({ ...prev, totalProfit: sum, dailyReturn: null }));
+          setStats(prev => ({
+            ...prev,
+            totalProfit: sum,
+            dailyReturn: null,
+            // Execution Spd: EWMA of this call's real round-trip
+            // (browser -> proxy -> EC2 -> Deriv). Measured, never faked.
+            executionSpeed: prev.executionSpeed == null
+              ? latencySec
+              : prev.executionSpeed * 0.7 + latencySec * 0.3,
+          }));
         }
       } catch {
         // leave as-is (null) rather than fabricate a number
@@ -616,6 +634,32 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
       clearInterval(interval);
     };
   }, [demoMode, hasRealDeriv, hasDemoDeriv]);
+
+  // Data Points: REAL rows from the Deriv chart feed (the same endpoint
+  // the terminal's native chart renders), re-checked every 5 minutes.
+  // The card was never wired to anything before -- null stays "—", never
+  // a fabricated ingestion rate.
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/brokers/deriv/candles?symbol=R_100&timeframe=1h&limit=400", {
+          headers: await userHeader(),
+        });
+        const body = await res.json();
+        const n = Array.isArray(body?.candles) ? body.candles.length : 0;
+        if (!cancelled && n > 0) setStats(prev => ({ ...prev, dataPoints: n }));
+      } catch {
+        // keep previous value (or null -> "—") rather than fabricate
+      }
+    };
+    load();
+    const timer = window.setInterval(load, 5 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
 
@@ -788,7 +832,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         <MetricCard
           title="Data Points"
           value={stats.dataPoints === null ? "—" : stats.dataPoints.toLocaleString()}
-          change="+2.3K / min"
+          change="Deriv R_100 candle feed"
           icon={Activity}
           trend="up"
           color="purple"
@@ -830,7 +874,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         <MetricCard
           title="Execution Spd"
           value={stats.executionSpeed === null ? "—" : `${stats.executionSpeed.toFixed(3)}s`}
-          change="Average latency"
+          change="avg balance-API round-trip"
           icon={Zap}
           trend="stable"
           color="green"

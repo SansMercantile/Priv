@@ -44,7 +44,7 @@ export function useBrokerConnections(): BrokerConnectionsState {
       .getBrokerConnections()
       .then(({ data }) => {
         if (cancelled) return;
-        const list = data?.data?.connections || [];
+        const list = data?.data?.connections ?? data?.connections ?? [];
         setConnections(list);
         // Empty on first load often means a race, not absence: the
         // Auth0 token may not have been renewable yet, or the claim
@@ -57,7 +57,7 @@ export function useBrokerConnections(): BrokerConnectionsState {
               .getBrokerConnections()
               .then(({ data: d2 }) => {
                 if (cancelled) return;
-                const l2 = d2?.data?.connections || [];
+                const l2 = d2?.data?.connections ?? d2?.connections ?? [];
                 if (l2.length > 0) setConnections(l2);
               })
               .catch(() => {
@@ -79,10 +79,20 @@ export function useBrokerConnections(): BrokerConnectionsState {
     };
     window.addEventListener("priv:deriv-linked", onLinked);
 
+    // Auth0 registers its token getter asynchronously (LoginGate); the
+    // first fetch and its single 3s retry can both run before it exists,
+    // which left connections [] and every deriv-derived gate stuck closed.
+    // Re-fetch when the getter lands.
+    const onAuthReady = () => {
+      if (!cancelled) refresh();
+    };
+    window.addEventListener("priv:auth-ready", onAuthReady);
+
     return () => {
       cancelled = true;
       if (retryTimer) window.clearTimeout(retryTimer);
       window.removeEventListener("priv:deriv-linked", onLinked);
+      window.removeEventListener("priv:auth-ready", onAuthReady);
     };
   }, [tick, refresh]);
 
