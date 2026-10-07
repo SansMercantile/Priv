@@ -291,10 +291,23 @@ export default function MySignals() {
 
   const SignalRow = ({ s, isNew }: { s: any; isNew?: boolean }) => {
     // One click ships the signal to the trading terminal, which prefills
-    // symbol/side/SL/TP and executes the order. Every tier gets this — it
-    // rides the plain manual order path (no desk/autotrader gate).
+    // symbol/side/SL/TP and executes the order — one click = live trade
+    // carrying the signal's TP/SL, every tier (plain manual order path,
+    // no desk/autotrader gate). Archived news can't be traded: global
+    // archive rows come back status ARCHIVED, Today's ticket is flagged
+    // stale when the engine serves the archived copy, and issued signals
+    // that already resolved (CLOSED_SL/CLOSED_TP/TP_HIT/SL_HIT/EXPIRED)
+    // are old news — those rows get no button. OPEN / TP1_HIT (still in
+    // play) stay tradable.
+    const status = String(s.status || "").toUpperCase();
+    const done =
+      status === "ARCHIVED" ||
+      status === "EXPIRED" ||
+      status === "TP_HIT" ||
+      status === "SL_HIT" ||
+      status.startsWith("CLOSED");
     const dir = String(s.direction || "").toUpperCase();
-    const canTrade = Boolean(s.symbol) && (dir === "BUY" || dir === "SELL");
+    const canTrade = !s.stale && !done && Boolean(s.symbol) && (dir === "BUY" || dir === "SELL");
     const trade = () => {
       const p = new URLSearchParams({ trade_symbol: String(s.symbol), trade_side: dir });
       if (Number(s.stop_loss) > 0) p.set("trade_sl", String(s.stop_loss));
