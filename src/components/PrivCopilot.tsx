@@ -472,6 +472,16 @@ export const PrivCopilot: React.FC = () => {
     const promptToSend = input.trim();
     if (!promptToSend) return;
 
+    // Conversation memory: the support API is stateless per request, so
+    // the prior turns must travel with every message -- otherwise the
+    // model answers follow-ups as if the chat just started ("I don't see
+    // a previous message from you"). `messages` here is the rendered
+    // state, i.e. it excludes the message being sent right now.
+    const history = messages.slice(-12).map((m) => ({
+      sender: m.sender,
+      text: m.text,
+    }));
+
     setMessages((prev) => [...prev, { sender: "user", text: promptToSend }]);
     setInput("");
     setIsTyping(true);
@@ -486,7 +496,7 @@ export const PrivCopilot: React.FC = () => {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ message: promptToSend }),
+        body: JSON.stringify({ message: promptToSend, history }),
       });
       const data: SupportResponse = await res.json();
       const emotionNote = await emotionNotePromise;
