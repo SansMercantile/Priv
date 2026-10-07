@@ -114,8 +114,8 @@ export const apiClient = {
   // (route exists, needs auth), not 404. Do NOT change these to
   // /api/v1/kyc/* -- that's a DIFFERENT, older router (kyc_api.py) that
   // lacks /record, /verify-document, and /verify-face entirely.
-  getKycRecord: () => safeFetchRelative("/api/kyc/record"),
-  getKycStatus: () => safeFetchRelative("/api/kyc/status"),
+  getKycRecord: () => safeFetchAuthed("/api/kyc/record"),
+  getKycStatus: () => safeFetchAuthed("/api/kyc/status"),
   saveKycDraft: (form: any) =>
     safeFetchRelative("/api/kyc/draft", {
       method: "POST",
@@ -178,16 +178,6 @@ export const apiClient = {
   getBrokerCatalog: () => safeFetchRelative("/api/v1/auth/brokers"),
   disconnectBroker: (broker: string, accountType: string = "live") =>
     safeFetchRelative(`/api/v1/auth/connections/${broker}?account_type=${accountType}`, { method: "DELETE" }),
-
-  // Claims any broker connections made before login (anonymous, keyed by
-  // getAppUserId()) onto the now-verified Auth0 identity. Call once per
-  // session right after isAuthenticated becomes true (see LoginGate.tsx).
-  linkAnonymousConnections: () =>
-    safeFetchRelative("/api/v1/auth/link-anonymous", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ anonymous_id: getAppUserId() }),
-    }),
 
   // Multi-account Deriv management: every linked loginid, per-type
   // defaults, and the resolved active account for a mode.
@@ -302,7 +292,9 @@ export const apiClient = {
   testPush: () => safeFetchRelative("/api/v1/signals/push/test", { method: "POST" }),
 
   // Contact OTP verification + emotion check-in log (backend/api/verify_api.py).
-  getVerifiedContacts: () => safeFetchRelative("/api/v1/verify/contacts"),
+  // Verified-only (require_verified_user_id): skip entirely without a token
+  // instead of firing a console-visible 401 on every signed-out mount.
+  getVerifiedContacts: () => safeFetchAuthed("/api/v1/verify/contacts"),
   requestOtp: (channel: string, contact: string) =>
     safeFetchRelative("/api/v1/verify/otp/request", {
       method: "POST",
@@ -318,7 +310,9 @@ export const apiClient = {
   // Server-side profile (client_profiles row + verified contacts). The
   // single source of truth so data follows the account across devices;
   // localStorage is only a fast-paint cache (backend/api/identity_sync_api.py).
-  getMyProfile: () => safeFetchRelative("/api/v1/identity/me"),
+  // Verified-only endpoint: safeFetchAuthed skips the request when no
+  // token exists yet (see getVerifiedContacts).
+  getMyProfile: () => safeFetchAuthed("/api/v1/identity/me"),
   updateMyProfile: (fields: {
     email?: string; // accepted only when the account has no email yet
     given_name?: string;

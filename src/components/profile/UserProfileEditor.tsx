@@ -312,7 +312,8 @@ export default function UserProfileEditor() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    let hydrated = false;
+    const loadIdentity = async () => {
       try {
         const [meRes, verRes]: any[] = await Promise.all([
           apiClient.getMyProfile(),
@@ -374,12 +375,23 @@ export default function UserProfileEditor() {
           }));
         }
         setServerHydrated(true);
+        hydrated = true;
       } catch (_) {
         /* offline / unauthenticated: stay on the local cache */
       }
-    })();
+    };
+    loadIdentity();
+    // Auth0 registers its token getter only in LoginGate's effect, which
+    // runs AFTER children mount -- so the first loadIdentity often runs
+    // tokenless (verified-only endpoints answer 401, no request fires).
+    // Re-run when the getter lands so the server copy still hydrates.
+    const onAuthReady = () => {
+      if (!hydrated && !cancelled) loadIdentity();
+    };
+    window.addEventListener("priv:auth-ready", onAuthReady);
     return () => {
       cancelled = true;
+      window.removeEventListener("priv:auth-ready", onAuthReady);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -181,9 +181,18 @@ export default function MySignals() {
       if (!document.hidden) refreshFeed();
     };
     document.addEventListener("visibilitychange", onVisible);
+    // Auth0's token getter registers after children mount (LoginGate's
+    // effect), so this first load can run tokenless: verified-only calls
+    // then resolve as signed-out (free tier, no contacts). Re-run when
+    // the getter lands.
+    const onAuthReady = () => {
+      load();
+    };
+    window.addEventListener("priv:auth-ready", onAuthReady);
     return () => {
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("priv:auth-ready", onAuthReady);
     };
   }, []);
 

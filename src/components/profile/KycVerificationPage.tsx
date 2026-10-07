@@ -283,14 +283,27 @@ export default function KycVerificationPage({ onSuccess }: KycVerificationPagePr
   }, []);
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+    let loaded = false;
+    const loadDraft = async () => {
       try {
         const data = await apiClient.getKycRecord();
-        if (data?.personal) setForm(f => ({ ...f, ...data }));
+        if (!cancelled && data?.personal) setForm(f => ({ ...f, ...data }));
         const st = await apiClient.getKycStatus();
-        setCompletion(st?.completion_percent ?? 0);
+        if (!cancelled) setCompletion(st?.completion_percent ?? 0);
+        loaded = true;
       } catch (e) { console.warn('KYC load:', e); }
-    })();
+    };
+    loadDraft();
+    // The token getter registers after children mount (LoginGate); a
+    // tokenless first load now throws without a request (safeFetchAuthed),
+    // so re-run once auth is ready instead of leaving the draft unloaded.
+    const onAuthReady = () => { if (!loaded && !cancelled) loadDraft(); };
+    window.addEventListener("priv:auth-ready", onAuthReady);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("priv:auth-ready", onAuthReady);
+    };
   }, []);
 
   // "Draft saved ✓" feedback reverts to plain Save after a few seconds.

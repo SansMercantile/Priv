@@ -167,13 +167,15 @@ export default function LoginGate({ children }: LoginGateProps) {
         /* ignore */
       }
     }
-    // One-time per session: claim any broker connections made before
-    // login under the verified identity, bind a landing-page referral
-    // (?ref=CODE captured into priv_referral_code), and ensure the free
-    // subscription every account holds from signup. All idempotent
-    // server-side. Skipped when no usable token exists (would just 401):
-    // the session-expired banner above handles re-login, and the next
-    // successful login retries the claim.
+    // One-time per session: bind a landing-page referral (?ref=CODE
+    // captured into priv_referral_code) and ensure the free subscription
+    // every account holds from signup. Idempotent server-side. Skipped
+    // when no usable token exists (would just 401): the session-expired
+    // banner above handles re-login, and the next successful login
+    // retries. Anonymous-connection claims are retired by the backend
+    // (POST /link-anonymous answers 410 by design -- source ownership
+    // can't be proven), so we no longer call it; users reconnect Deriv
+    // after signing in instead.
     if (!linkedAnonymousRef.current) {
       linkedAnonymousRef.current = true;
       getAuthToken().then((tok) => {
@@ -181,11 +183,6 @@ export default function LoginGate({ children }: LoginGateProps) {
           linkedAnonymousRef.current = false;
           return;
         }
-        apiClient.linkAnonymousConnections().catch(() => {
-          // Non-fatal -- worst case a pre-login Deriv connection stays
-          // anonymous and the user reconnects it manually.
-          linkedAnonymousRef.current = false;
-        });
         // Referral bind: first login wins server-side; the stored code
         // is cleared once the backend accepts or definitively rejects
         // it (unknown code = cleared too, it will never become valid).
