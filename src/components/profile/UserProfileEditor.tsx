@@ -34,7 +34,6 @@ import {
 } from 'lucide-react';
 
 interface UserProfileEditorProps {
-  demoMode?: boolean;
 }
 
 interface BillingLog {
@@ -45,7 +44,7 @@ interface BillingLog {
   type: 'burn' | 'mint' | 'system';
 }
 
-export default function UserProfileEditor({ demoMode = false }: UserProfileEditorProps) {
+export default function UserProfileEditor() {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<'profile' | 'billing' | 'kyc' | 'brokers' | 'tax'>('profile');
   // Node Allocation & Credits is an admin surface (plan pricing, license
@@ -1326,7 +1325,7 @@ export default function UserProfileEditor({ demoMode = false }: UserProfileEdito
               </div>
             </div>
           ) : (
-            <KycVerificationPage demoMode={demoMode} onSuccess={() => setKycStatus('submitted')} />
+            <KycVerificationPage onSuccess={() => setKycStatus('submitted')} />
           )}
         </div>
       )}

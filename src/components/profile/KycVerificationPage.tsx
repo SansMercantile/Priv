@@ -175,19 +175,22 @@ function FaceCameraModal({
 // ─── Document AI Verify Badge ─────────────────────────────────────────────────
 function VerifyBadge({ result }: { result: any }) {
   if (!result) return null;
-  const ok = result.verified || result.match;
+  const ok = !!(result.verified || result.match || result.face_match ||
+    (result.is_live_person === true && result.good_quality !== false));
   return (
     <div className={`mt-2 p-2 rounded-lg border text-[10px] font-mono flex items-center gap-2 ${ok ? 'bg-emerald-950/30 border-emerald-800/50 text-emerald-400' : 'bg-amber-950/30 border-amber-800/50 text-amber-400'}`}>
       {ok ? <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />}
-      <span>AI: {result.notes || (ok ? 'Verified' : 'Needs review')} — confidence {result.confidence ?? '?'}%</span>
+      <span>AI: {result.notes || (ok ? 'Verified' : 'Needs review')}{result.confidence != null ? ` — confidence ${result.confidence}%` : ''}</span>
     </div>
   );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-interface KycVerificationPageProps { demoMode?: boolean; onSuccess?: () => void; }
+// KYC ALWAYS runs the real backend path (server draft, AI verification, real
+// admin queue). The trading demo/live toggle must never fake identity checks.
+interface KycVerificationPageProps { onSuccess?: () => void; }
 
-export default function KycVerificationPage({ demoMode = false, onSuccess }: KycVerificationPageProps) {
+export default function KycVerificationPage({ onSuccess }: KycVerificationPageProps) {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState(emptyForm);
@@ -195,6 +198,7 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [completion, setCompletion] = useState(0);
   const [showCamera, setShowCamera] = useState(false);
@@ -235,7 +239,7 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
     if (f.is_politically_exposed) need(f.pep_details?.trim(), "PEP duties / associations", 2);
     need((tx.tax_residency_countries || []).length > 0, "Tax residency country", 3);
     if (!tx.has_no_tax_number) need(tx.tax_identification_number?.trim(), "Tax identification number (or tick 'no tax number')", 3);
-    if (needsFatca) need(tx.fatca_declaration_acknowledged, "FATCA / CRS acknowledgement", 3);
+    need(tx.fatca_declaration_acknowledged, needsFatca ? "FATCA / CRS acknowledgement" : "CRS tax self-certification", 3);
     need(d.terms_accepted, "Terms of Execution acceptance", 3);
     need(d.privacy_accepted, "Privacy consent", 3);
     need(d.aml_consent, "AML/CTF screening consent", 3);
@@ -279,11 +283,6 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
   }, []);
 
   useEffect(() => {
-    if (demoMode) {
-      const draft = localStorage.getItem('kyc_draft_demo');
-      if (draft) { try { setForm(JSON.parse(draft)); } catch (_) {} }
-      return;
-    }
     (async () => {
       try {
         const data = await apiClient.getKycRecord();
@@ -292,13 +291,20 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
         setCompletion(st?.completion_percent ?? 0);
       } catch (e) { console.warn('KYC load:', e); }
     })();
-  }, [demoMode]);
+  }, []);
+
+  // "Draft saved ✓" feedback reverts to plain Save after a few seconds.
+  useEffect(() => {
+    if (!savedAt) return;
+    const t = setTimeout(() => setSavedAt(null), 5000);
+    return () => clearTimeout(t);
+  }, [savedAt]);
 
   const patch = (section: string, field: string, value: any) =>
     setForm(f => ({ ...f, [section]: { ...(f as any)[section], [field]: value } }));
 
-  // Shape uploads for draft/submit: metadata always, byte payload when the
-  // server should offload it to encrypted S3 (never in demo/localStorage).
+  // Shape uploads for draft/submit: metadata always, byte payload so the
+  // server can offload it to encrypted S3 (records keep references only).
   const serializableUploads = (includeBytes: boolean) =>
     Object.entries(uploads).map(([type, d]) => ({
       type,
@@ -314,10 +320,15 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
     }));
 
   const saveDraft = useCallback(async () => {
-    if (demoMode) { localStorage.setItem('kyc_draft_demo', JSON.stringify(form)); return; }
     setSaving(true);
-    try { await apiClient.saveKycDraft({ ...(form as any), documents: serializableUploads(true) }); } catch (e) { console.warn(e); } finally { setSaving(false); }
-  }, [demoMode, form, uploads, docVerifyResults]);
+    try {
+      const res: any = await apiClient.saveKycDraft({ ...(form as any), documents: serializableUploads(true) });
+      if (res?.success === false) throw new Error(res?.detail || 'server rejected the draft');
+      setSavedAt(Date.now());
+    } catch (e: any) {
+      setError(`Draft save failed — ${e?.message || 'network error'}. Your entries stay on this page; retry Save.`);
+    } finally { setSaving(false); }
+  }, [form, uploads, docVerifyResults]);
 
   const handleUpload = async (file: File | null, docKey: string) => {
     if (!file) return;
@@ -334,7 +345,7 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
       setUploads(u => ({ ...u, [docKey]: { filename: file.name, url, base64, mimeType: file.type } }));
 
       // Trigger AI document verification in background
-      if (!demoMode && docKey.startsWith('id_')) {
+      if (docKey.startsWith('id_')) {
         setVerifyingDoc(docKey);
         try {
           const result = await apiClient.verifyDocument(base64, file.type, {
@@ -345,7 +356,10 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
             issuingCountry: form.identity.issuing_country,
           });
           setDocVerifyResults(r => ({ ...r, [docKey]: result }));
-        } catch (e) { console.warn('Doc verify:', e); }
+        } catch (e: any) {
+          // Honest fallback instead of a blank badge: flag for manual review.
+          setDocVerifyResults(r => ({ ...r, [docKey]: { verified: false, confidence: null, notes: `AI check unavailable (${e?.message || 'error'}) — sent for manual review` } }));
+        }
         finally { setVerifyingDoc(null); }
       }
     } catch (e: any) { setError(e.message || 'Upload failed'); }
@@ -356,13 +370,13 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
     setShowCamera(false);
     setSelfieBase64(base64);
     const docBase64 = uploads['id_front']?.base64;
-    if (!demoMode) {
-      try {
-        const result = await apiClient.verifyFace(base64, docBase64);
-        setFaceVerifyResult(result);
-      } catch (e) { console.warn('Face verify:', e); }
-    } else {
-      setFaceVerifyResult({ is_live_person: true, good_quality: true, face_match: true, confidence: 92, notes: 'Demo mode verification' });
+    try {
+      const result = await apiClient.verifyFace(base64, docBase64);
+      setFaceVerifyResult(result);
+    } catch (e: any) {
+      // Honest fallback instead of a fake pass: queue for manual review.
+      setFaceVerifyResult({ face_match: false, confidence: null,
+        notes: `AI liveness check unavailable (${e?.message || 'error'}) — selfie queued for manual review` });
     }
   };
 
@@ -390,21 +404,8 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
       netWorthRange: form.financial.net_worth_range || '< R50k',
       tradingExperience: form.trading.years_trading_experience || 'None',
       selfieBase64: selfieBase64 || undefined,
-      documents: serializableUploads(!demoMode),
+      documents: serializableUploads(true),
     };
-    if (demoMode) {
-      localStorage.setItem('xm_kyc_status', 'submitted');
-      const q = JSON.parse(localStorage.getItem('kyc_applications_queue') || '[]');
-      const demoId = `KYC-DEMO-${Date.now()}`;
-      q.push({ id: demoId, ...payload, status: 'pending', submittedAt: new Date().toLocaleString() });
-      localStorage.setItem('kyc_applications_queue', JSON.stringify(q));
-      try {
-        localStorage.setItem('xm_kyc_ref', demoId);
-        localStorage.setItem('xm_kyc_submitted_at', new Date().toISOString());
-      } catch (_) {}
-      setTimeout(() => { setSubmitting(false); onSuccess ? onSuccess() : navigate('/dashboard'); }, 1200);
-      return;
-    }
     try {
       const res: any = await apiClient.submitKyc(payload);
       localStorage.setItem('xm_kyc_status', 'submitted');
@@ -663,8 +664,8 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
           <ShieldCheck className="w-4 h-4"/> Compliance Attestation — Sovereign Trust Framework
         </h3>
         {[
-          { section:'tax', field:'us_person_fatca', text:'I am a US person (citizen, resident, green card) for FATCA compliance', show: true },
-          { section:'tax', field:'fatca_declaration_acknowledged', text:'I acknowledge the FATCA / CRS reporting policies', show: true },
+          { section:'tax', field:'us_person_fatca', text:'I am a US person (citizen, resident, green card holder) for FATCA compliance', show: needsFatca },
+          { section:'tax', field:'fatca_declaration_acknowledged', text: needsFatca ? 'I acknowledge the FATCA / CRS reporting policies' : 'I confirm my tax residency details are complete and accurate (CRS self-certification)', show: true },
           { section:'declarations', field:'terms_accepted', text:'I accept the general SANS Mercantile Terms of Execution', show: true },
           { section:'declarations', field:'privacy_accepted', text:'I consent to the processing of identity profiles in alignment with localized privacy rules', show: true },
           { section:'declarations', field:'aml_consent', text:'I voluntarily submit to AML/CTF automated screenings', show: true },
@@ -800,8 +801,9 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
                 <ShieldCheck className="w-5 h-5 text-rose-500"/> SANS AML Compliance Dossier
               </h2>
               <p className="text-[10px] text-zinc-400 font-mono mt-1">
-                {demoMode ? 'PROVISIONAL SANDBOX SESSION' : `Ledger completion: ${completion}%`}
+                {`Ledger completion: ${completion}%`}
                 {saving && <span className="ml-2 text-rose-400">· Saving...</span>}
+                {!saving && savedAt && <span className="ml-2 text-emerald-400">· Draft saved ✓</span>}
               </p>
             </div>
             <span className="px-2 py-1 bg-rose-950/40 text-rose-400 font-bold border border-rose-900/50 rounded-md font-mono text-[9px]">
@@ -874,8 +876,9 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
             </button>
             <div className="flex gap-2">
               <button type="button" onClick={saveDraft} disabled={saving}
-                className="px-3 py-2 border border-zinc-800 bg-zinc-950 text-zinc-400 font-mono text-[11px] rounded-lg hover:bg-zinc-900 transition flex items-center gap-1">
-                <Save className="w-3.5 h-3.5"/> Save
+                className="px-3 py-2 border border-zinc-800 bg-zinc-950 text-zinc-400 font-mono text-[11px] rounded-lg hover:bg-zinc-900 transition flex items-center gap-1 disabled:opacity-50">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : savedAt ? <CheckCircle className="w-3.5 h-3.5 text-emerald-400"/> : <Save className="w-3.5 h-3.5"/>}
+                {saving ? 'Saving…' : savedAt ? 'Saved ✓' : 'Save'}
               </button>
               {step < STEPS.length - 1 ? (
                 <button type="button" onClick={next}
