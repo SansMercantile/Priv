@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import chatAvatar from "../assets/images/chat_avatar_1779278082106.png";
 import { getAuthToken } from "../lib/authToken";
+import { forSpeech, pickBestVoice, rankVoices } from "../lib/speech";
 
 interface HarmonicPoint {
   index: number;
@@ -317,6 +318,10 @@ export const PrivCopilot: React.FC = () => {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [speechActive, setSpeechActive] = useState(true);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [voiceURI, setVoiceURI] = useState<string>(
+    () => localStorage.getItem("priv_voice_uri") || "",
+  );
   const [micActive, setMicActive] = useState(false);
   // Opt-in camera check-in: off by default. The camera is never accessed
   // until the user explicitly clicks the toggle, and the stream is fully
@@ -363,6 +368,50 @@ export const PrivCopilot: React.FC = () => {
       speechRecognizer.current.start();
       setMicActive(true);
     }
+  };
+
+  // Voice list loads asynchronously in Chrome (empty on first getVoices()).
+  useEffect(() => {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    const load = () => setVoices(synth.getVoices() || []);
+    load();
+    synth.addEventListener?.("voiceschanged", load);
+    // Some engines never fire voiceschanged -- poll briefly as a fallback.
+    let tries = 0;
+    const poll = window.setInterval(() => {
+      const vs = synth.getVoices() || [];
+      if (vs.length > 0) {
+        setVoices(vs);
+        window.clearInterval(poll);
+      } else if (++tries > 20) {
+        window.clearInterval(poll);
+      }
+    }, 500);
+    return () => {
+      synth.removeEventListener?.("voiceschanged", load);
+      window.clearInterval(poll);
+      synth.cancel();
+    };
+  }, []);
+
+  const rankedVoices = rankVoices(voices);
+  const effectiveVoiceURI = voiceURI || rankedVoices[0]?.voiceURI || "";
+
+  const selectVoice = (uri: string) => {
+    setVoiceURI(uri);
+    localStorage.setItem("priv_voice_uri", uri);
+    // Preview so the choice is audible immediately.
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance("Hi, I'm Priv. This is how I'll sound.");
+    const v = voices.find((x) => x.voiceURI === uri);
+    if (v) {
+      u.voice = v;
+      u.lang = v.lang;
+    }
+    synth.speak(u);
   };
 
   const stopCamera = () => {
@@ -438,33 +487,43 @@ export const PrivCopilot: React.FC = () => {
     }
   };
 
-  // Narrator hygiene: support replies are markdown (tables, **bold**,
-  // ## headings). Reading that raw makes speech synthesis spell out
-  // "asterisk asterisk hash hash". Strip to plain spoken prose first.
-  const stripMarkdownForSpeech = (md: string): string => {
-    let t = md || "";
-    t = t.replace(/```[\s\S]*?```/g, " ");       // fenced code
-    t = t.replace(/`([^`]*)`/g, "$1");            // inline code
-    t = t.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1"); // images -> alt
-    t = t.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");  // links -> text
-    t = t.replace(/<[^>]+>/g, " ");               // html tags
-    t = t.replace(/^#{1,6}\s*/gm, "");            // headings
-    t = t.replace(/^>\s?/gm, "");                 // quotes
-    t = t.replace(/^(\s*[-*+]\s+)/gm, " ");       // bullets
-    t = t.replace(/^(\s*\d+[.)]\s+)/gm, " ");     // numbered lists
-    t = t.replace(/\|/g, " ");                    // table pipes
-    t = t.replace(/(\*\*|__)(.*?)\1/g, "$2");     // bold
-    t = t.replace(/(\*|_)(.*?)\1/g, "$2");        // italic
-    t = t.replace(/~~(.*?)~~/g, "$1");            // strike
-    t = t.replace(/[•#*_~`]/g, "");               // leftovers
-    t = t.replace(/\s+/g, " ").trim();
-    return t;
-  };
-
   const speak = (text: string) => {
     if (!speechActive || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(stripMarkdownForSpeech(text)));
+    const clean = forSpeech(text);
+    if (!clean) return;
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(clean);
+    const v = pickBestVoice(voices, voiceURI);
+    if (v) {
+      u.voice = v;
+      u.lang = v.lang;
+    }
+    u.rate = 1;
+    u.pitch = 1;
+    // Chrome stalls synthesis after ~15s; nudge it to keep long replies flowing.
+    let tick = 0;
+    const stopTick = () => {
+      if (tick) {
+        window.clearInterval(tick);
+        tick = 0;
+      }
+    };
+    u.onend = stopTick;
+    u.onerror = stopTick;
+    synth.speak(u);
+    tick = window.setInterval(() => {
+      if (!synth.speaking) {
+        stopTick();
+        return;
+      }
+      try {
+        synth.pause();
+        synth.resume();
+      } catch {
+        stopTick();
+      }
+    }, 9000);
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -545,7 +604,21 @@ export const PrivCopilot: React.FC = () => {
                 </p>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
+              {speechActive && rankedVoices.length > 0 && (
+                <select
+                  value={effectiveVoiceURI}
+                  onChange={(e) => selectVoice(e.target.value)}
+                  title="Narrator voice"
+                  className="max-w-[130px] bg-white/5 border border-white/15 text-[10px] text-gray-300 rounded px-1 py-1.5 outline-none focus:border-white/30 cursor-pointer truncate"
+                >
+                  {rankedVoices.map((v) => (
+                    <option key={v.voiceURI} value={v.voiceURI} className="bg-neutral-900">
+                      {v.name}
+                    </option>
+                  ))}
+                </select>
+              )}
               <button
                 onClick={() => setSpeechActive(!speechActive)}
                 className={`p-1.5 rounded border transition ${speechActive ? "text-white border-white/25 bg-white/5" : "text-gray-500 border-white/5"}`}
