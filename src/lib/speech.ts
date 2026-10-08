@@ -38,6 +38,7 @@ export function sanitizeForSpeech(raw: string): string {
 
   // Words for direction glyphs before generic emoji removal eats them.
   t = t.replace(/[→⇒➜]/g, " to ");
+  t = t.replace(/->/g, " to ");
   t = t.replace(/[←]/g, " to ");
   t = t.replace(/[↑]/g, " up ");
   t = t.replace(/[↓]/g, " down ");
@@ -65,8 +66,8 @@ export function sanitizeForSpeech(raw: string): string {
   t = t.replace(/\//g, " ");
 
   // Money shorthand -> spoken form ("$65.2M" -> "$65.2 million").
-  t = t.replace(/\$\s?(\d+(?:\.\d+)?)\s?M\b/g, "$$1 million");
-  t = t.replace(/\$\s?(\d+(?:\.\d+)?)\s?B\b/g, "$$1 billion");
+  t = t.replace(/\$\s?(\d+(?:\.\d+)?)\s?M\b/g, "$$$1 million");
+  t = t.replace(/\$\s?(\d+(?:\.\d+)?)\s?B\b/g, "$$$1 billion");
 
   // Trading abbreviations the model leans on.
   t = t.replace(/\bTPs?\s?(\d)\b/g, "take profit $1");
