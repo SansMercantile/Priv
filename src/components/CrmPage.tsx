@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Users, RefreshCw, Search, X, Plus, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Users, RefreshCw, Search, X, Plus, AlertTriangle, CheckCircle2, Copy } from "lucide-react";
 import apiClient from "../api/apiClient";
 
 // Admin Client CRM -- ported from the ptah-realty CRM design (KPI strip,
@@ -94,6 +94,19 @@ interface ClientDetail {
   billing_history?: Array<Record<string, any>>;
 }
 
+// GET /api/v1/admin/auth0/users row
+interface Auth0User {
+  user_id: string;
+  email?: string | null;
+  email_verified?: boolean;
+  username?: string | null;
+  identities: Array<{ provider?: string | null; connection?: string | null }>;
+  has_password: boolean;
+  logins_count?: number;
+  created_at?: string | null;
+  last_login?: string | null;
+}
+
 // Backend timestamps are naive UTC -- assume Z when no zone present.
 const parseUtc = (iso: string) =>
   new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`);
@@ -137,6 +150,18 @@ const FIX_ACTIONS = [
   { id: "reset_status_active", label: "Reset status → active" },
 ];
 
+const providerLabel = (p?: string | null) => {
+  const v = (p || "").toLowerCase();
+  if (v === "auth0") return "password";
+  if (v.startsWith("google")) return "google";
+  if (v.startsWith("apple")) return "apple";
+  if (v.startsWith("twitter") || v === "x") return "twitter";
+  if (v.startsWith("facebook")) return "facebook";
+  if (v.startsWith("github")) return "github";
+  if (v.startsWith("microsoft")) return "microsoft";
+  return v || "unknown";
+};
+
 export default function CrmPage() {
   const [clients, setClients] = useState<ClientSub[]>([]);
   const [overview, setOverview] = useState<OverviewUser[]>([]);
@@ -170,6 +195,18 @@ export default function CrmPage() {
 
   const [newUserId, setNewUserId] = useState("");
   const [newPlan, setNewPlan] = useState("Free");
+
+  // Auth0 user-account directory (password logins / resets / verification)
+  const [auQuery, setAuQuery] = useState("");
+  const [auUsers, setAuUsers] = useState<Auth0User[] | null>(null);
+  const [auLoading, setAuLoading] = useState(false);
+  const [auError, setAuError] = useState<string | null>(null);
+  const [auBusy, setAuBusy] = useState<string | null>(null);
+  const [auMsg, setAuMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [auPw, setAuPw] = useState<
+    { userId: string; email: string; password: string; created: boolean } | null
+  >(null);
+  const [auPwCopied, setAuPwCopied] = useState(false);
 
   const loadAll = async (quiet = false) => {
     if (!quiet) setRefreshing(true);
@@ -370,6 +407,89 @@ export default function CrmPage() {
       setActionBusy(false);
     }
   };
+
+  const searchAuth0 = async (q?: string) => {
+    const query = (q ?? auQuery).trim();
+    setAuLoading(true);
+    setAuError(null);
+    try {
+      const res: any = await apiClient.get(
+        `/api/v1/admin/auth0/users?query=${encodeURIComponent(query)}&limit=25`
+      );
+      setAuUsers((res?.data?.users ?? []) as Auth0User[]);
+    } catch (e: any) {
+      const d = e?.response?.data?.detail;
+      setAuError(typeof d === "string" ? d : e?.message || "Auth0 search failed.");
+      setAuUsers((prev) => prev ?? []);
+    } finally {
+      setAuLoading(false);
+    }
+  };
+
+  const runAuth0Action = async (
+    userId: string,
+    fn: () => Promise<any>,
+    okText: (data: any) => string
+  ) => {
+    setAuBusy(userId);
+    setAuMsg(null);
+    try {
+      const res = await fn();
+      const data = res?.data ?? res;
+      setAuMsg({ ok: true, text: okText(data) });
+    } catch (e: any) {
+      const d = e?.response?.data?.detail;
+      setAuMsg({
+        ok: false,
+        text: typeof d === "string" ? d : d?.message || e?.message || "Action failed",
+      });
+    } finally {
+      setAuBusy(null);
+    }
+  };
+
+  const auth0SetPassword = (u: Auth0User) =>
+    runAuth0Action(
+      u.user_id,
+      () =>
+        apiClient.post("/api/v1/admin/auth0/users/set-password", {
+          user_id: u.user_id,
+        }),
+      (data) => {
+        if (data?.password) {
+          setAuPw({
+            userId: u.user_id,
+            email: u.email || "",
+            password: data.password,
+            created: !!data.created_identity,
+          });
+          setAuPwCopied(false);
+        }
+        return data?.created_identity
+          ? "Password login created for this social-only account."
+          : "Temporary password set.";
+      }
+    ).then(() => searchAuth0());
+
+  const auth0SendReset = (u: Auth0User) =>
+    runAuth0Action(
+      u.user_id,
+      () =>
+        apiClient.post("/api/v1/admin/auth0/users/send-reset", {
+          user_id: u.user_id,
+        }),
+      () => `Password reset email sent to ${u.email || u.user_id}.`
+    );
+
+  const auth0SendVerification = (u: Auth0User) =>
+    runAuth0Action(
+      u.user_id,
+      () =>
+        apiClient.post("/api/v1/admin/auth0/users/send-verification", {
+          user_id: u.user_id,
+        }),
+      () => `Verification email sent to ${u.email || u.user_id}.`
+    );
 
   const inputCls =
     "w-full bg-neutral-950 border border-white/10 rounded px-2.5 py-2 text-xs font-mono text-white placeholder-stone-600 focus:outline-none focus:border-white/30";
@@ -587,6 +707,248 @@ export default function CrmPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* User accounts (Auth0) -- password logins, reset + verification emails */}
+      <div className="border border-white/10 rounded-xl bg-black/30 p-4 space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-bold">
+              User accounts (Auth0)
+            </div>
+            <p className="text-[11px] text-zinc-500 font-mono mt-0.5 max-w-xl">
+              Search any sign-up by email, username or user id. Set a temporary
+              password (creates the password login on social-only accounts so
+              forgot-password can work), send the reset email, or resend
+              verification. Every action is audited to billing history.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative min-w-[220px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
+              <input
+                type="text"
+                placeholder="email / username / auth0|..."
+                value={auQuery}
+                onChange={(e) => setAuQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") searchAuth0();
+                }}
+                className={`${inputCls} pl-9`}
+              />
+            </div>
+            <button
+              onClick={() => searchAuth0()}
+              disabled={auLoading}
+              className={btnGhost}
+            >
+              {auLoading ? (
+                <RefreshCw className="w-3.5 h-3.5 inline animate-spin" />
+              ) : (
+                "SEARCH"
+              )}
+            </button>
+          </div>
+        </div>
+
+        {auMsg && (
+          <div
+            className={`p-2.5 rounded-lg border text-[11px] font-mono ${
+              auMsg.ok
+                ? "border-emerald-500/40 bg-emerald-950/20 text-emerald-300"
+                : "border-rose-500/40 bg-rose-950/20 text-rose-300"
+            }`}
+          >
+            {auMsg.ok ? (
+              <CheckCircle2 className="w-3.5 h-3.5 inline mr-1.5" />
+            ) : (
+              <AlertTriangle className="w-3.5 h-3.5 inline mr-1.5" />
+            )}
+            {auMsg.text}
+          </div>
+        )}
+
+        {auPw && (
+          <div className="p-3 rounded-lg border border-amber-500/40 bg-amber-950/20 space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="text-[11px] font-mono text-amber-200">
+                {auPw.created
+                  ? "Created the password login for this account. Hand this temporary password to the user -- they should change it right after signing in:"
+                  : "Temporary password for this account. Hand it over -- the user should reset it right after signing in:"}
+              </div>
+              <button
+                onClick={() => setAuPw(null)}
+                className="p-1 rounded hover:bg-white/10 transition cursor-pointer"
+                title="Dismiss"
+              >
+                <X className="w-3.5 h-3.5 text-zinc-400" />
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="px-2.5 py-1.5 rounded bg-black/60 border border-white/15 text-xs font-mono font-bold text-white select-all break-all">
+                {auPw.password}
+              </code>
+              <button
+                onClick={() => {
+                  navigator.clipboard
+                    .writeText(auPw.password)
+                    .then(() => {
+                      setAuPwCopied(true);
+                      setTimeout(() => setAuPwCopied(false), 1500);
+                    })
+                    .catch(() => undefined);
+                }}
+                className={btnGhost}
+              >
+                <Copy className="w-3.5 h-3.5 inline mr-1.5" />
+                {auPwCopied ? "COPIED" : "COPY"}
+              </button>
+              <span className="text-[10px] font-mono text-zinc-500">
+                {auPw.email || auPw.userId}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {auError && (
+          <div className="p-2.5 rounded-lg border border-rose-500/40 bg-rose-950/20 text-[11px] font-mono text-rose-300">
+            <AlertTriangle className="w-3.5 h-3.5 inline mr-1.5" />
+            {auError}
+          </div>
+        )}
+
+        {auUsers === null ? (
+          <p className="py-6 text-center text-[11px] font-mono text-zinc-600">
+            Not searched yet -- try an email address, username or auth0| user id.
+          </p>
+        ) : (
+          <div className="border border-white/10 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-white/5 text-zinc-500 uppercase text-[9px] font-mono">
+                    <th className="py-2 px-3">Account</th>
+                    <th className="py-2 px-3">Login methods</th>
+                    <th className="py-2 px-3">Verified</th>
+                    <th className="py-2 px-3 text-right">Logins</th>
+                    <th className="py-2 px-3">Joined</th>
+                    <th className="py-2 px-3">Last login</th>
+                    <th className="py-2 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auLoading && (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-xs font-mono text-zinc-500">
+                        <RefreshCw className="w-4 h-4 inline animate-spin text-rose-500 mr-2" />
+                        SEARCHING AUTH0...
+                      </td>
+                    </tr>
+                  )}
+                  {!auLoading && auUsers.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-xs font-mono text-zinc-500">
+                        No Auth0 users match this search.
+                      </td>
+                    </tr>
+                  )}
+                  {!auLoading &&
+                    auUsers.map((u) => {
+                      const busy = auBusy === u.user_id;
+                      return (
+                        <tr key={u.user_id} className="border-t border-white/5">
+                          <td className="py-2 px-3">
+                            <div className="text-xs font-mono font-bold text-white">
+                              {u.email || u.username || u.user_id}
+                            </div>
+                            <div
+                              className="text-[10px] text-zinc-500 truncate max-w-[220px]"
+                              title={u.user_id}
+                            >
+                              {u.user_id}
+                            </div>
+                          </td>
+                          <td className="py-2 px-3">
+                            <div className="flex flex-wrap gap-1">
+                              {u.identities.map((i) => (
+                                <span
+                                  key={`${i.provider}|${i.connection}`}
+                                  className={`text-[9px] font-mono uppercase px-1.5 py-0.5 rounded-full border ${
+                                    i.provider === "auth0"
+                                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                                      : "border-sky-500/40 bg-sky-500/10 text-sky-300"
+                                  }`}
+                                >
+                                  {providerLabel(i.provider)}
+                                </span>
+                              ))}
+                              {!u.has_password && (
+                                <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">
+                                  no password
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-2 px-3 text-[10px] font-mono">
+                            {u.email_verified ? (
+                              <span className="text-emerald-400">yes</span>
+                            ) : (
+                              <span className="text-amber-400">no</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-right text-[10px] font-mono text-zinc-400">
+                            {u.logins_count ?? 0}
+                          </td>
+                          <td className="py-2 px-3 text-[10px] font-mono text-zinc-500">
+                            {fmtDate(u.created_at)}
+                          </td>
+                          <td className="py-2 px-3 text-[10px] font-mono text-zinc-500">
+                            {fmtDateTime(u.last_login)}
+                          </td>
+                          <td className="py-2 px-3">
+                            <div className="flex flex-wrap items-center justify-end gap-1.5">
+                              <button
+                                disabled={busy}
+                                onClick={() => auth0SetPassword(u)}
+                                className="px-2 py-1 rounded border border-amber-500/40 bg-amber-500/10 text-amber-300 text-[9px] font-mono font-bold uppercase hover:bg-amber-500/20 transition disabled:opacity-40 cursor-pointer"
+                                title={
+                                  u.has_password
+                                    ? "Set a new temporary password"
+                                    : "Social-only account: create the password login first"
+                                }
+                              >
+                                {busy ? "..." : u.has_password ? "SET TEMP PW" : "CREATE PW"}
+                              </button>
+                              <button
+                                disabled={busy || !u.has_password}
+                                onClick={() => auth0SendReset(u)}
+                                className="px-2 py-1 rounded border border-white/15 bg-white/5 text-white text-[9px] font-mono font-bold uppercase hover:bg-white/10 transition disabled:opacity-40 cursor-pointer"
+                                title={
+                                  u.has_password
+                                    ? "Email the forgot-password link"
+                                    : "No password login yet -- use CREATE PW first"
+                                }
+                              >
+                                {busy ? "..." : "RESET EMAIL"}
+                              </button>
+                              <button
+                                disabled={busy}
+                                onClick={() => auth0SendVerification(u)}
+                                className="px-2 py-1 rounded border border-white/15 bg-white/5 text-white text-[9px] font-mono font-bold uppercase hover:bg-white/10 transition disabled:opacity-40 cursor-pointer"
+                                title="Resend the email-verification link"
+                              >
+                                {busy ? "..." : "VERIFY EMAIL"}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Client detail modal (ptah LeadDetailModal pattern, simplified) */}
