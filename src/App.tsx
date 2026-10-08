@@ -30,6 +30,7 @@ import LegalEula from "./pages/legal/Eula";
 import LegalLiability from "./pages/legal/Liability";
 import LegalDataDeletion from "./pages/legal/DataDeletion";
 import apiClient from "./api/apiClient";
+import { probeAdmin } from "./api/adminProbe";
 import { useBrokerConnections } from "./lib/useBrokerConnections";
 import { isDerivCallback } from "./lib/derivAuth/oauth";
 import { initDatadog } from "./lib/datadog";
@@ -46,12 +47,8 @@ function RequireAdmin({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res: any = await apiClient.get("/api/v1/admin/whoami");
-        if (!cancelled) setState(res?.data?.data?.admin ? "ok" : "deny");
-      } catch (_) {
-        if (!cancelled) setState("deny");
-      }
+      const admin = await probeAdmin();
+      if (!cancelled) setState(admin ? "ok" : "deny");
     })();
     return () => {
       cancelled = true;
@@ -71,12 +68,7 @@ function RequirePaying({ children }: { children: React.ReactNode }) {
     (async () => {
       let admin = false;
       let paying = false;
-      try {
-        const res: any = await apiClient.get("/api/v1/admin/whoami");
-        admin = !!res?.data?.data?.admin;
-      } catch (_) {
-        /* not admin */
-      }
+      admin = await probeAdmin();
       try {
         const body: any = await apiClient.getMySubscription();
         const sub = body?.subscription ?? (body && typeof body === "object" ? body : null);

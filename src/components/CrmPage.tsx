@@ -27,6 +27,7 @@ interface ClientSub {
   payment_provider?: string | null;
   current_period_end?: string | null;
   created_at?: string | null;
+  signed_up_at?: string | null;
 }
 
 interface OverviewAccount {
@@ -45,6 +46,15 @@ interface OverviewAccount {
   }>;
 }
 
+interface LicenseInfo {
+  tier?: string;
+  enabled?: boolean;
+  effective_tier?: string;
+  expires_at?: string | null;
+  expired?: boolean;
+  updated_by?: string | null;
+}
+
 interface OverviewUser {
   user_id: string;
   name?: string | null;
@@ -52,11 +62,12 @@ interface OverviewUser {
   kyc_status?: string | null;
   plan?: string | null;
   subscription_status?: string | null;
-  license?: { tier?: string; enabled?: boolean };
+  license?: LicenseInfo;
   accounts?: OverviewAccount[];
   signals_30d?: number;
   signals_open?: number;
   sources?: string[];
+  signed_up_at?: string | null;
 }
 
 interface PlanOpt {
@@ -70,7 +81,7 @@ interface MergedRow extends ClientSub {
   name?: string | null;
   email?: string | null;
   kyc?: string | null;
-  license?: { tier?: string; enabled?: boolean };
+  license?: LicenseInfo;
   accounts?: OverviewAccount[];
   signals_30d?: number;
   signals_open?: number;
@@ -148,6 +159,9 @@ export default function CrmPage() {
 
   const [licTier, setLicTier] = useState("standard");
   const [licEnabled, setLicEnabled] = useState(true);
+  // Grant window for the license form: default = leave the current
+  // expiry untouched so an enabled/tier-only save never wipes a window.
+  const [licDuration, setLicDuration] = useState("nochange");
   const [setPlanName, setSetPlanName] = useState("");
   const [setPlanReason, setSetPlanReason] = useState("");
   const [fixAction, setFixAction] = useState("reactivate");
@@ -213,6 +227,9 @@ export default function CrmPage() {
       r.signals_30d = u.signals_30d ?? 0;
       r.signals_open = u.signals_open ?? 0;
       r.sources = u.sources;
+      // Signed-up date for profile-only rows (no subscription carries
+      // created_at of its own) -- this is the waiting-list join date.
+      if (!r.created_at && u.signed_up_at) r.created_at = u.signed_up_at;
       byId.set(u.user_id, r);
     }
     return Array.from(byId.values()).sort((a, b) =>
@@ -255,8 +272,14 @@ export default function CrmPage() {
     }
     const planNames = new Set(rows.map((r) => r.plan_name).filter(Boolean) as string[]);
     const paid = rows.filter((r) => r.plan_name && r.plan_name.toLowerCase() !== "free").length;
+    const waiting = rows.filter((r) => !r.plan_name).length;
+    const weekAgo = Date.now() - 7 * 86400000;
+    const signed7d = rows.filter((r) => {
+      const t = r.created_at ? Date.parse(r.created_at) : NaN;
+      return !Number.isNaN(t) && t >= weekAgo;
+    }).length;
     return { total: rows.length, active, accounts, openPos, stake, signals30, signalsOpen,
-             planCount: planNames.size, paid };
+             planCount: planNames.size, paid, waiting, signed7d };
   }, [rows]);
 
   const planOptions = useMemo(() => {
@@ -301,17 +324,21 @@ export default function CrmPage() {
 
   useEffect(() => {
     if (!selectedRow) return;
+    // Raw granted tier (not effective_tier): an expired window must not
+    // overwrite the record of what was actually granted on save.
     setLicTier(selectedRow.license?.tier || "standard");
     setLicEnabled(selectedRow.license?.enabled !== false);
+    setLicDuration("nochange");
   }, [selectedRow]);
 
-  const runAction = async (fn: () => Promise<unknown>, okText: string) => {
+  const runAction = async (fn: () => Promise<unknown>,
+                           okText: string | ((res: unknown) => string)) => {
     if (!selectedId) return;
     setActionBusy(true);
     setActionMsg(null);
     try {
-      await fn();
-      setActionMsg({ ok: true, text: okText });
+      const res = await fn();
+      setActionMsg({ ok: true, text: typeof okText === "function" ? okText(res) : okText });
       await loadAll(true);
       await fetchDetail(selectedId);
     } catch (e: any) {
@@ -398,8 +425,10 @@ export default function CrmPage() {
       )}
 
       {/* KPI strip (ptah TopStatsOverview pattern) */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
         {[
+          { label: "Waiting list", value: String(kpi.waiting),
+            sub: `${kpi.signed7d} signed up in 7d · no plan yet` },
           { label: "Total clients", value: String(kpi.total),
             sub: `${kpi.active} active subscriptions` },
           { label: "Broker accounts", value: String(kpi.accounts),
@@ -534,9 +563,14 @@ export default function CrmPage() {
                       {fmtDate(r.current_period_end)}
                     </td>
                     <td className="py-2.5 px-3 text-[10px] font-mono">
-                      <span className={r.license?.enabled === false ? "text-rose-400" : "text-zinc-400"}>
-                        {r.license?.tier || "standard"}
+                      <span
+                        className={r.license?.enabled === false || r.license?.expired ? "text-rose-400" : "text-zinc-400"}
+                        title={r.license?.expires_at ? `until ${fmtDate(r.license.expires_at)}` : undefined}
+                      >
+                        {r.license?.effective_tier || r.license?.tier || "standard"}
+                        {r.license?.expired && " (expired)"}
                         {r.license?.enabled === false && " (off)"}
+                        {r.license?.expires_at && !r.license?.expired && ` · ${fmtDate(r.license.expires_at)}`}
                       </span>
                     </td>
                     <td className="py-2.5 px-3 text-right text-[10px] font-mono text-zinc-400">
@@ -693,6 +727,23 @@ export default function CrmPage() {
                           ))}
                         </select>
                       </label>
+                      <label className="space-y-1">
+                        <span className="block text-[9px] font-mono uppercase text-zinc-500">Grant window</span>
+                        <select
+                          value={licDuration}
+                          onChange={(e) => setLicDuration(e.target.value)}
+                          className={selectCls}
+                          title="Time-limited grant; the customer is emailed on save"
+                        >
+                          <option value="nochange">— no change —</option>
+                          <option value="1w">1 week</option>
+                          <option value="2w">2 weeks</option>
+                          <option value="1mo">1 month</option>
+                          <option value="6mo">6 months</option>
+                          <option value="12m">12 months</option>
+                          <option value="none">No expiry (permanent)</option>
+                        </select>
+                      </label>
                       <label className="flex items-center gap-2 pb-1.5 cursor-pointer">
                         <input
                           type="checkbox"
@@ -706,12 +757,23 @@ export default function CrmPage() {
                         disabled={actionBusy}
                         onClick={() =>
                           runAction(
-                            () =>
-                              apiClient.put(
+                            async () => {
+                              const body: Record<string, unknown> = { tier: licTier, enabled: licEnabled };
+                              if (licDuration !== "nochange") body.duration = licDuration;
+                              const r: any = await apiClient.put(
                                 `/api/v1/admin/licenses/${encodeURIComponent(selectedId!)}`,
-                                { tier: licTier, enabled: licEnabled }
-                              ),
-                            `License updated → ${licTier} (${licEnabled ? "enabled" : "disabled"})`
+                                body
+                              );
+                              return r?.data ?? r;
+                            },
+                            (res: any) => {
+                              const until = res?.expires_at
+                                ? ` until ${fmtDate(res.expires_at)}`
+                                : res?.tier && res.tier !== "standard" ? " (no expiry)" : "";
+                              const mail = res?.email_sent ? " · grant email sent" : "";
+                              const off = licEnabled ? "" : " · disabled";
+                              return `License → ${res?.tier ?? licTier}${until}${off}${mail}`;
+                            }
                           )
                         }
                         className={btnPrimary}
@@ -719,6 +781,14 @@ export default function CrmPage() {
                         SAVE LICENSE
                       </button>
                     </div>
+                    {selectedRow?.license?.expires_at && (
+                      <div className="text-[10px] font-mono text-zinc-500">
+                        Current window:{" "}
+                        {selectedRow.license.expired
+                          ? `expired ${fmtDate(selectedRow.license.expires_at)} — effective tier is standard`
+                          : `until ${fmtDate(selectedRow.license.expires_at)}`}
+                      </div>
+                    )}
                   </div>
 
                   {/* Broker accounts (live reads via trading/overview) */}

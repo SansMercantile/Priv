@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link2, Activity } from "lucide-react";
-import apiClient from "../api/apiClient";
+import { probeAdmin } from "../api/adminProbe";
 import Connections from "./Connections";
 import DataIngestion from "./DataIngestion";
 
@@ -16,13 +16,10 @@ export default function ConnectionsSection({ demoMode }: { demoMode?: boolean })
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res: any = await apiClient.get("/api/v1/admin/whoami");
-        if (!cancelled && res?.data?.data?.admin) setIsAdmin(true);
-      } catch (_) {
-        /* stay non-admin: no Data Ingest tab */
-      } finally {
-        if (!cancelled) setChecked(true);
+      const admin = await probeAdmin();
+      if (!cancelled) {
+        setIsAdmin(admin);
+        setChecked(true);
       }
     })();
     return () => {

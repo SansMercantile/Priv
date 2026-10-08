@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link2, Globe, Server, Radio, ShieldCheck, Play, ArrowRight, Activity, Brain, Cpu, Landmark, Cloud, Database, Layers, Zap, Sparkles, RefreshCw, CheckCircle2, Terminal } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../api/apiClient";
+import { probeAdmin } from "../api/adminProbe";
 import ClientConnections from "./ClientConnections";
 import { TaxPortalRow, ExchangeRow } from "./ConnectionRows";
 
@@ -156,16 +157,18 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
   const [isAdmin, setIsAdmin] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const res: any = await apiClient.get('/api/v1/admin/whoami');
-        if (!cancelled && res?.data?.data?.admin) setIsAdmin(true);
-      } catch (_) {
-        /* stay non-admin */
-      }
-    })();
+    // probeAdmin retries once per call; the interval re-probes so an
+    // admin whose first probe lost a race (Auth0 blip, token refresh)
+    // sees the admin surfaces without a page reload.
+    const syncAdmin = async () => {
+      const admin = await probeAdmin();
+      if (!cancelled) setIsAdmin(admin);
+    };
+    syncAdmin();
+    const interval = setInterval(syncAdmin, 60000);
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
   }, []);
   const isInstitutional = isAdmin || nodeTier === "autonomous";
