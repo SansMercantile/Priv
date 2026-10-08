@@ -17,6 +17,8 @@ import {
 } from "./storage";
 
 const DERIV_APP_ID = "340CMkSyVrWLSlXnzSaIP"; // PRIVCore - real OAuth-type app, registered redirect: https://priv.sansmercantile.com
+export const DERIV_REFERRAL_TOKEN = "RGQ4HDEG7JR4";
+export const DERIV_SIGNUP_URL = `https://t.deriv.link?t=${DERIV_REFERRAL_TOKEN}`;
 const AUTH_BASE = "https://auth.deriv.com/oauth2";
 const REDIRECT_URI = window.location.origin + "/"; // must exactly match Deriv's registered Redirect URL, trailing slash included
 // Set just before navigating to Deriv so the return leg can tell "came
@@ -61,6 +63,7 @@ async function buildPkceParams(): Promise<URLSearchParams> {
     state: csrfToken,
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
+    t: DERIV_REFERRAL_TOKEN,
   });
 }
 

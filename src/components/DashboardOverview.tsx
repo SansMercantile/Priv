@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBrokerConnections } from "../lib/useBrokerConnections";
 import { userHeader } from "../lib/userHeader";
+import { DERIV_SIGNUP_URL } from "../lib/derivAuth/oauth";
 import DerivConnectCard from "./DerivConnectCard";
 import { 
   DollarSign, 
@@ -701,7 +702,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
           <div className="pt-2 max-w-md mx-auto text-left">
             <DerivConnectCard />
             <div className="mt-3 text-[11px] text-zinc-500 font-mono text-center">
-              <a href="https://deriv.com/signup" target="_blank" rel="noopener noreferrer" className="underline">Don't have an account? Sign up</a>
+              <a href={DERIV_SIGNUP_URL} target="_blank" rel="noopener noreferrer" className="underline">Don't have an account? Sign up</a>
             </div>
           </div>
         </div>
