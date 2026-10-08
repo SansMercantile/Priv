@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { History as HistoryIcon, Search, RefreshCw, AlertTriangle, BarChart2, Camera, Trash2, Eye } from "lucide-react";
 import Analytics from "./Analytics";
+import TradeAudit from "./TradeAudit";
 import apiClient from "../api/apiClient";
 import { userHeader } from "../lib/userHeader";
 
@@ -173,6 +174,9 @@ export default function History({ demoMode }: { demoMode?: boolean }) {
           </table>
         </div>
       </div>
+
+      {/* Trade Audit (B2): monitors, close outcomes, lifecycle trail. */}
+      <TradeAudit />
 
       {/* Diagnostics Log now lives here instead of its own sidebar tab. */}
       <div className="pt-4 border-t border-white/10">
