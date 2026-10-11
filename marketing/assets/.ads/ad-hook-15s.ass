@@ -1,0 +1,20 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+YCbCr Matrix: TV.709
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Cap,Segoe UI Black,84,&HFFFFFF&,&H0000FFFF,&H00270E0A&,&H80000000&,-1,0,0,0,100,100,1,0,1,7,3,2,64,64,576,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.12,0:00:02.15,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}NOBODY TAUGHT YOU THIS
+Dialogue: 0,0:00:02.15,0:00:02.89,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}IN DEMO.
+Dialogue: 0,0:00:02.95,0:00:05.29,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}MOST PEOPLE LEARN IT
+Dialogue: 0,0:00:05.29,0:00:07.29,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}AFTER A BAD WEEK.
+Dialogue: 0,0:00:07.35,0:00:09.31,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}SO {\1c&H37AFD4&}PRIV{\1c&HFFFFFF&} WRITES THE
+Dialogue: 0,0:00:09.31,0:00:11.71,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}{\1c&H37AFD4&}EXIT{\1c&HFFFFFF&} BEFORE THE {\1c&H37AFD4&}ENTRY.{\1c&HFFFFFF&}

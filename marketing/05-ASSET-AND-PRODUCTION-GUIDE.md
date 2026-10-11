@@ -15,23 +15,45 @@ marketing/
 ├── 03-POSTER-GALLERY.md
 ├── 04-COPY-BANK.md
 ├── 05-ASSET-AND-PRODUCTION-GUIDE.md
+├── 06-ZEELY-GROWTH-PLAYBOOK.md   zeely.ai teardown + growth runtime record
 ├── build/
 │   ├── brand.py              design tokens, fonts, footer lock-up, grain, glow
-│   ├── backgrounds.py         Bedrock plate generator + load() cover-crop loader
-│   ├── posters.py             the compositor: render(), bodies, body_well()
-│   ├── poster_specs.py        14 designs, tier/platform tables, scrim overrides
-│   ├── run_posters.py         batch render  → assets/posters/
-│   ├── audit.py               layout audit  → prints ALL CLEAR or the gaps
-│   ├── probe.py               geometry probe for the signal + tiers bodies
-│   ├── gallery.py             → 03-POSTER-GALLERY.md
-│   ├── videos.py              scene table, TTS, Ken Burns, assemble
-│   └── storyboard_table.py    → 02-VIDEO-SCRIPTS-AND-STORYBOARDS.md
+│   ├── backgrounds.py        Bedrock plate generator + load() cover-crop loader
+│   ├── posters.py            the compositor: render(), bodies, body_well()
+│   ├── poster_specs.py       14 designs, tier/platform tables, scrim overrides
+│   ├── run_posters.py        batch render  → assets/posters/
+│   ├── audit.py              layout audit  → prints ALL CLEAR or the gaps
+│   ├── probe.py              geometry probe for the signal + tiers bodies
+│   ├── gallery.py            → 03-POSTER-GALLERY.md
+│   ├── videos.py             scene table, TTS, Ken Burns, assemble
+│   ├── ads.py                Creatify-style spots: captions, CTA, end card, -13 LUFS
+│   ├── storyboard_table.py   → 02-VIDEO-SCRIPTS-AND-STORYBOARDS.md
+│   ├── deploy_growth.py      zip + IAM + create/update pr-growth-agent + rule
+│   └── growth/               the Zeely growth agent package
+│       ├── stats.py          verified facts, guard(), risk disclaimer
+│       ├── hooks.py          130+ hooks, 8 frameworks, score(), safe_area_lines()
+│       ├── experiments.py    variant matrix, predict(), select(), ledger
+│       ├── pages.py          17-page CATALOG, render(), JSON-LD, sitemap
+│       ├── social.py         6 platforms, calendar(), carousel(), disclosure
+│       ├── paid.py           Meta/TikTok briefs, always PAUSED, >=3 variants
+│       ├── outreach.py       press, affiliates, creators — drafts only
+│       ├── channels.py       mode gates, GitHub/SSM/S3 publish
+│       ├── agent.py          plan() / run() / report_line() / hydrate from S3
+│       └── lambda_function.py  AWS entrypoint (parks state in /tmp)
 └── assets/
-    ├── backgrounds/           18 AI plates (text-free)
+    ├── brand/priv-mark.png      THE mark (pink diamond) — brand.py::logo_mark()
+    │                             trims its margin, adds the gold ring, footers it
+    ├── backgrounds/           26 AI plates (text-free: 18 campaign + 8 neon ad)
     ├── posters/{feed,story,wide,link,thumb}/   38 JPEGs
     ├── storyboards/<spot>/scene-NN.jpg         one still per scene
-    ├── voiceover/<spot>/scene-NN.wav           one stem per scene
-    └── videos/*.mp4           5 finished spots
+    ├── voiceover/<spot>/scene-NN.{wav,m4a}   one stem per scene
+    │                             .m4a = hand-recorded take (wins over the TTS .wav),
+    │                             silence-trimmed into assets/.frames/ on first use
+    ├── videos/*.mp4           8 finished spots (5 campaign + 3 ad)
+    ├── pages/                 17 landing pages + sitemap.xml (live on the site)
+    └── growth/
+        ├── outbox/            approval queue: owned/social/paid/outreach JSON
+        └── ledger.json        shared A/B variant ledger (mirrored to S3)
 ```
 
 ## 2. Toolchain
@@ -40,7 +62,7 @@ marketing/
 | --- | --- |
 | Python | `C:\Users\kpasc\.bridge\venv\Scripts\python.exe` (Pillow 12.3, boto3) — plain `python`/`python3` are **not** installed |
 | Video | ffmpeg 8.1.1 (gyan full build), on PATH as `ffmpeg` |
-| Voice | Windows SAPI — `Microsoft David Desktop`, rate −1, via `System.Speech` |
+| Voice | Windows SAPI — `Microsoft David Desktop`, rate −1, via `System.Speech`; a recorded `scene-NN.m4a` in the same folder wins over the synthesized `.wav` |
 | Art | AWS Bedrock `stability.stable-image-ultra-v1:1` in `us-west-2` |
 | Fonts | `seguibl.ttf` (display) · `segoeuib/b.ttf` · `consola/b.ttf` (mono) — all from `C:\Windows\Fonts\` |
 
@@ -60,9 +82,12 @@ cd C:\Users\kpasc\source\repos\Priv\marketing\build
 & $py audit.py                       # layout gate -> ALL CLEAR
 & $py probe.py                       # geometry probe
 & $py gallery.py                     # regenerate 03
-& $py videos.py                      # all 5 spots
+& $py videos.py                      # all 5 campaign spots
 & $py videos.py hero-30s             # or one spot
+& $py ads.py                         # all 3 Creatify-style ad spots
+& $py ads.py ad-hook-15s             # or one ad spot
 & $py storyboard_table.py            # regenerate 02
+& $py deploy_growth.py               # deploy the growth agent to AWS
 ```
 
 Plates are already generated; `backgrounds.py` only calls Bedrock if a file is
@@ -76,11 +101,16 @@ missing, so a re-render never costs image credits.
 | Geometry | `probe.py` | `probe ok` — signal ticket and tier cards inside their bounds |
 | File count | `gallery.py` | `38 files, 14 designs` |
 | Video integrity | `ffprobe` | correct W×H, `h264` + `aac`, expected duration |
-| Loudness | `ffmpeg -af ebur128` | −14 to −16 LUFS integrated |
-| Voice coverage | `scan.py` (temp) | non-silent in every 3 s window |
+| Loudness | `ffmpeg -af ebur128` | −13.5 to −14.5 LUFS (campaign spots) · −13.0 to −13.5 LUFS (ad spots) |
+| Voice coverage | `scan.py` (temp) | non-silent in every 3 s window, and speech inside every voiced scene |
+| Takes | build log | every voiced scene prints `[take m4a trimmed …]`, never `[tts]` |
+| Mark | pixel probe on the footer band | pink diamond + gold ring present, no carnation |
 
-Current state: **all gates pass**. Durations — bumper 5.95 s · teaser 14.73 s ·
-hero 30.15 s (both orientations) · explainer 59.16 s.
+Current state: **all gates pass**. Durations — bumper 5.97 s (ships silent) ·
+teaser 15.87 s · hero 29.73 s (both orientations) · explainer 63.77 s ·
+ad-hook 16.00 s · ad-proof 33.30 s · ad-desk 19.10 s. Lengths are now set by
+the recorded takes, so spots run slightly past their nominal targets rather
+than clipping a line; see `02` for the per-scene numbers.
 
 ## 5. Pipeline notes (hard-won)
 
@@ -164,10 +194,17 @@ print([r["State"] for r in ev.list_rules()["Rules"]
 # -> ['ENABLED', 'ENABLED']
 
 lm = boto3.client("lambda", region_name="us-east-1")
-for fn in ("pr-content-engine", "pr-website-blog-engine"):
+for fn in ("pr-content-engine", "pr-website-blog-engine", "pr-growth-agent"):
     cfg = lm.get_function_configuration(FunctionName=fn)
     print(fn, cfg["State"], cfg["LastUpdateStatus"])
+
+ev = boto3.client("events", region_name="us-east-1")
+print(ev.describe_rule(Name="pr-growth-agent-schedule")["State"])
+# -> ENABLED
 ```
+
+Growth agent health: read the newest report from `s3://pr-growth-agent/reports/`
+— `blocked_by_compliance` must be `0`.
 
 ## 7. Known tool caveat
 

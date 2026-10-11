@@ -1,0 +1,29 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+YCbCr Matrix: TV.709
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Cap,Segoe UI Black,84,&HFFFFFF&,&H0000FFFF,&H00270E0A&,&H80000000&,-1,0,0,0,100,100,1,0,1,7,3,2,64,64,576,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.12,0:00:02.57,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}NOBODY TAUGHT YOU THIS
+Dialogue: 0,0:00:02.57,0:00:03.46,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}IN DEMO.
+Dialogue: 0,0:00:03.52,0:00:04.99,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}ONE MARKET.
+Dialogue: 0,0:00:04.99,0:00:07.27,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}{\1c&H37AFD4&}SEVEN{\1c&HFFFFFF&} {\1c&H37AFD4&}TIMEFRAMES.{\1c&HFFFFFF&}
+Dialogue: 0,0:00:07.33,0:00:09.33,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}WHEN THEY {\1c&H37AFD4&}DISAGREE,{\1c&HFFFFFF&}
+Dialogue: 0,0:00:09.33,0:00:11.86,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}THAT DISAGREEMENT IS THE
+Dialogue: 0,0:00:11.86,0:00:12.59,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}{\1c&H37AFD4&}SIGNAL.{\1c&HFFFFFF&}
+Dialogue: 0,0:00:12.65,0:00:15.79,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}EVERY TICKET SHIPS {\1c&H37AFD4&}ENTRY,{\1c&HFFFFFF&}
+Dialogue: 0,0:00:15.79,0:00:17.93,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}TWO {\1c&H37AFD4&}TARGETS{\1c&HFFFFFF&} AND A
+Dialogue: 0,0:00:17.93,0:00:18.55,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}{\1c&H37AFD4&}STOP.{\1c&HFFFFFF&}
+Dialogue: 0,0:00:18.61,0:00:21.59,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}A TWENTY-EIGHT SECOND DECISION
+Dialogue: 0,0:00:21.59,0:00:22.18,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}CYCLE,
+Dialogue: 0,0:00:22.18,0:00:23.97,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}{\1c&H37AFD4&}AUDITED{\1c&HFFFFFF&} EVERY RUN.
+Dialogue: 0,0:00:24.03,0:00:26.24,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}YOUR MONEY {\1c&H37AFD4&}NEVER{\1c&HFFFFFF&} LEAVES
+Dialogue: 0,0:00:26.24,0:00:27.79,Cap,,0,0,0,,{\fad(65,65)\fscx124\fscy124\t(0,110,\fscx100\fscy100)}YOUR OWN {\1c&H37AFD4&}BROKER.{\1c&HFFFFFF&}

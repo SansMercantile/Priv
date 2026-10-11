@@ -16,20 +16,26 @@
 | Brand system for assets | **done** | `build/brand.py` — gold/navy/cyan, Segoe UI Black display, mono data type |
 | Art direction plates | **done** | 18 AI plates, text-free, 5 landscape / 5 vertical / 8 portrait |
 | Poster system | **done** | 14 designs × 1–4 formats = 38 files, layout audit `ALL CLEAR` |
-| Video system | **done** | 5 spots (6 s → 59 s), voice-over, Ken Burns cut, −14 LUFS master |
+| Video system | **done** | 5 campaign spots (6 s → 64 s) + 3 Creatify-style ad spots (16 s → 33 s), recorded voice-over, −13 to −14 LUFS masters |
 | Storyboards | **done** | one still per scene, same compositor as the posters |
-| Documentation | **done** | this file plus 01–05 |
+| Documentation | **done** | this file plus 01–06 |
+| Zeely strategy teardown | **done** | `06-ZEELY-GROWTH-PLAYBOOK.md` — 18 primitives, module map, runtime spec |
+| Growth agent package | **done** | `build/growth/` — hooks, pages, social, paid, outreach, channels, agent |
+| Growth agent on AWS | **done** | `pr-growth-agent` + `pr-growth-agent-schedule` `rate(12 hours)` ENABLED |
+| Owned pages live | **done** | 18 files at `public/growth/` in `SansMercantile/Nexus` → `www.sansmercantile.com/growth/…` |
+| Growth skill | **done** | `~/.agents/skills/priv-growth-agent/` — workflow, module map, AWS reference |
 
 ---
 
-## The six deliverables
+## The seven deliverables
 
 1. **`00-ROADMAP.md`** — this file: status, sequencing, what is left.
 2. **`01-CAMPAIGN-PLAN.md`** — positioning, pillars, channels, 6-week rollout, KPIs.
-3. **`02-VIDEO-SCRIPTS-AND-STORYBOARDS.md`** — five finished spots with per-scene timings and voice-over.
+3. **`02-VIDEO-SCRIPTS-AND-STORYBOARDS.md`** — eight finished spots with per-scene timings and voice-over.
 4. **`03-POSTER-GALLERY.md`** — auto-index of all 38 posters with format, size and plate.
 5. **`04-COPY-BANK.md`** — headlines, tier copy, captions, subject lines — the words the assets are built from.
 6. **`05-ASSET-AND-PRODUCTION-GUIDE.md`** — folder map, how to re-render, QA gates, and the AWS reactivation record.
+7. **`06-ZEELY-GROWTH-PLAYBOOK.md`** — the zeely.ai teardown, the `build/growth/` module map, and the deployed `pr-growth-agent` runtime.
 
 ---
 
@@ -39,19 +45,25 @@
 
 - AWS reactivation and bug fixes (below), so publishing keeps running unattended.
 - Full asset factory: plates → posters → videos → storyboards → copy bank.
-- Docs 00–05.
+- Docs 00–06.
+- Zeely growth agent: `build/growth/` package, `pr-growth-agent` Lambda,
+  `rate(12 hours)` EventBridge rule, S3 ledger, and the 17 landing pages
+  already pushed live to `www.sansmercantile.com/growth/`.
 
 **Week 1 — publish**
 
 - Drop the feed set (12 designs × 1080×1350) into the content engine's image slot.
 - Ship `priv-hero-30s-1920x1080.mp4` as the homepage hero loop (muted, autoplay, playsinline).
 - Ship `priv-teaser-15s-vertical-1080x1920.mp4` as the first paid-social cut.
+- Review the growth agent's outbox and promote `CH_SOCIAL` to `publish`.
 
 **Week 2 — measure**
 
 - Rotate the story set (12 × 1080×1920) through Reels/TikTok/Shorts.
 - A/B the two strongest feed headlines: *Entry. Two targets. One stop.* vs *Prove it before you risk it.*
 - Ship `priv-explainer-60s-1920x1080.mp4` to the landing page and to YouTube.
+- Ship `priv-ad-proof-30s-vertical-1080x1920.mp4` as the first paid-social cut
+  (caption-led, end card, −13 LUFS) alongside `priv-ad-hook-15s-vertical`.
 
 **Week 3–4 — extend**
 
@@ -86,10 +98,26 @@ Both deployed (`CodeSha256 dFlx0kuzUKLMSY5D1Tx7QrmJy7WEdXy/8jeLeHzKejU=`). Round
 
 Live scoped invoke `{"only_product":"priv"}` returned **PRIV Blog 52/52 complete**.
 
+### Growth agent (added in the same pass)
+
+| Resource | Schedule / state | Notes |
+| --- | --- | --- |
+| `pr-growth-agent` (Lambda) | python3.12, 512 MB, 900 s, `DRY_RUN=false` | `CH_OWNED=publish`; social/paid/outreach `prepare` |
+| `pr-growth-agent-schedule` (rule) | `rate(12 hours)`, **ENABLED** | input `{"source":"eventbridge","hydrate":true}` |
+| `pr-growth-agent` (S3 bucket) | private, full public-access block | `ledger.json` shared across runs, `reports/<ts>.json` |
+| `growth-agent-s3` (IAM inline) | on `sans-mercantile-clickup-monitor-role` | the role previously allowed S3 on one unrelated bucket only |
+
+Deployed with `build/deploy_growth.py`, which zips `growth/**` plus
+`lambda_function.py`, ensures the bucket and IAM policy, create/updates the
+function and wires the rule. First run published 18 landing pages to
+`SansMercantile/Nexus` main in 11.83 s with `blocked 0`.
+
 ---
 
 ## Open items
 
+- **Growth channels still staged.** `CH_SOCIAL`, `CH_PAID`, `CH_OUTREACH` are `prepare` by design — review `assets/growth/outbox/`, then raise them one at a time. Paid never spends unattended; outreach has no send path.
+- **Prometheus metrics for the agent.** The five-number report lands in S3 only; no dashboard yet.
 - **Music beds.** The four voiced spots are voice-only. Drop a licensed bed under them at −22 LUFS if a platform wants music.
 - **Portrait crops of the landscape videos.** Not needed yet: `hero-30s-vertical` is a real 1080×1920 render, not a crop.
 - **Live data in stat rows.** `152 backtest runs` and `45 boards` are static copy today; wire them to the product API before they go stale.

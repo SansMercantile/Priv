@@ -1,4 +1,4 @@
-const CACHE_NAME = "priv-core-shell-v1";
+const CACHE_NAME = "priv-core-shell-v2";
 const APP_SHELL = "/";
 const STATIC_ASSET = /\.(?:avif|css|gif|ico|jpe?g|js|png|svg|webp|woff2?)$/i;
 

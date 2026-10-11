@@ -30,10 +30,10 @@ _Priv reads price action across indices, synthetics, commodities and shares — 
 
 | Format | File | Size |
 | --- | --- | --- |
-| `feed` (1080x1350) | `assets/posters/feed/priv-launch-feed.jpg` | 344 KB |
+| `feed` (1080x1350) | `assets/posters/feed/priv-launch-feed.jpg` | 345 KB |
 | `story` (1080x1920) | `assets/posters/story/priv-launch-story.jpg` | 446 KB |
-| `wide` (1920x1080) | `assets/posters/wide/priv-launch-wide.jpg` | 449 KB |
-| `link` (1200x628) | `assets/posters/link/priv-launch-link.jpg` | 188 KB |
+| `wide` (1920x1080) | `assets/posters/wide/priv-launch-wide.jpg` | 450 KB |
+| `link` (1200x628) | `assets/posters/link/priv-launch-link.jpg` | 189 KB |
 
 ### `signals-live`
 
@@ -48,8 +48,8 @@ _Every setup ships complete: entry, TP1, TP2 and a stop that moves to breakeven 
 | Format | File | Size |
 | --- | --- | --- |
 | `feed` (1080x1350) | `assets/posters/feed/priv-signals-live-feed.jpg` | 357 KB |
-| `story` (1080x1920) | `assets/posters/story/priv-signals-live-story.jpg` | 470 KB |
-| `wide` (1920x1080) | `assets/posters/wide/priv-signals-live-wide.jpg` | 442 KB |
+| `story` (1080x1920) | `assets/posters/story/priv-signals-live-story.jpg` | 471 KB |
+| `wide` (1920x1080) | `assets/posters/wide/priv-signals-live-wide.jpg` | 443 KB |
 
 ### `timeframes`
 
@@ -64,9 +64,9 @@ _The same instrument read from one minute to one day — divergent reads surface
 
 | Format | File | Size |
 | --- | --- | --- |
-| `feed` (1080x1350) | `assets/posters/feed/priv-timeframes-feed.jpg` | 335 KB |
+| `feed` (1080x1350) | `assets/posters/feed/priv-timeframes-feed.jpg` | 336 KB |
 | `story` (1080x1920) | `assets/posters/story/priv-timeframes-story.jpg` | 440 KB |
-| `wide` (1920x1080) | `assets/posters/wide/priv-timeframes-wide.jpg` | 444 KB |
+| `wide` (1920x1080) | `assets/posters/wide/priv-timeframes-wide.jpg` | 445 KB |
 
 ### `autotrader`
 
@@ -81,7 +81,7 @@ _Your main strategy drives every cycle; the multi-agent quorum backstops it._
 | Format | File | Size |
 | --- | --- | --- |
 | `feed` (1080x1350) | `assets/posters/feed/priv-autotrader-feed.jpg` | 405 KB |
-| `story` (1080x1920) | `assets/posters/story/priv-autotrader-story.jpg` | 506 KB |
+| `story` (1080x1920) | `assets/posters/story/priv-autotrader-story.jpg` | 507 KB |
 | `wide` (1920x1080) | `assets/posters/wide/priv-autotrader-wide.jpg` | 572 KB |
 
 ### `strategy-lab`
@@ -97,9 +97,9 @@ _Every strategy backtested on real candles — pinned boards, run history and re
 
 | Format | File | Size |
 | --- | --- | --- |
-| `feed` (1080x1350) | `assets/posters/feed/priv-strategy-lab-feed.jpg` | 329 KB |
+| `feed` (1080x1350) | `assets/posters/feed/priv-strategy-lab-feed.jpg` | 330 KB |
 | `story` (1080x1920) | `assets/posters/story/priv-strategy-lab-story.jpg` | 420 KB |
-| `wide` (1920x1080) | `assets/posters/wide/priv-strategy-lab-wide.jpg` | 429 KB |
+| `wide` (1920x1080) | `assets/posters/wide/priv-strategy-lab-wide.jpg` | 430 KB |
 
 ### `ai-desk`
 
@@ -130,9 +130,9 @@ _One account, one live feed — from a full desk setup to your pocket._
 
 | Format | File | Size |
 | --- | --- | --- |
-| `feed` (1080x1350) | `assets/posters/feed/priv-platforms-feed.jpg` | 338 KB |
+| `feed` (1080x1350) | `assets/posters/feed/priv-platforms-feed.jpg` | 339 KB |
 | `story` (1080x1920) | `assets/posters/story/priv-platforms-story.jpg` | 439 KB |
-| `wide` (1920x1080) | `assets/posters/wide/priv-platforms-wide.jpg` | 450 KB |
+| `wide` (1920x1080) | `assets/posters/wide/priv-platforms-wide.jpg` | 451 KB |
 
 ### `control`
 
@@ -147,8 +147,8 @@ _Priv connects to your own broker through official OAuth._
 | Format | File | Size |
 | --- | --- | --- |
 | `feed` (1080x1350) | `assets/posters/feed/priv-control-feed.jpg` | 406 KB |
-| `story` (1080x1920) | `assets/posters/story/priv-control-story.jpg` | 518 KB |
-| `wide` (1920x1080) | `assets/posters/wide/priv-control-wide.jpg` | 553 KB |
+| `story` (1080x1920) | `assets/posters/story/priv-control-story.jpg` | 519 KB |
+| `wide` (1920x1080) | `assets/posters/wide/priv-control-wide.jpg` | 554 KB |
 
 ### `alerts`
 
@@ -163,7 +163,7 @@ _Entry, both targets and the stop — pushed the moment they complete._
 
 | Format | File | Size |
 | --- | --- | --- |
-| `feed` (1080x1350) | `assets/posters/feed/priv-alerts-feed.jpg` | 407 KB |
+| `feed` (1080x1350) | `assets/posters/feed/priv-alerts-feed.jpg` | 408 KB |
 | `story` (1080x1920) | `assets/posters/story/priv-alerts-story.jpg` | 526 KB |
 
 ### `pricing`
@@ -179,8 +179,8 @@ _Start free. Upgrade when the signals start paying for themselves. Sovereign $14
 | Format | File | Size |
 | --- | --- | --- |
 | `feed` (1080x1350) | `assets/posters/feed/priv-pricing-feed.jpg` | 370 KB |
-| `story` (1080x1920) | `assets/posters/story/priv-pricing-story.jpg` | 476 KB |
-| `wide` (1920x1080) | `assets/posters/wide/priv-pricing-wide.jpg` | 473 KB |
+| `story` (1080x1920) | `assets/posters/story/priv-pricing-story.jpg` | 477 KB |
+| `wide` (1920x1080) | `assets/posters/wide/priv-pricing-wide.jpg` | 474 KB |
 | `link` (1200x628) | `assets/posters/link/priv-pricing-link.jpg` | 182 KB |
 
 ### `security`
@@ -195,7 +195,7 @@ _Independently audited, then audited again._
 
 | Format | File | Size |
 | --- | --- | --- |
-| `feed` (1080x1350) | `assets/posters/feed/priv-security-feed.jpg` | 403 KB |
+| `feed` (1080x1350) | `assets/posters/feed/priv-security-feed.jpg` | 404 KB |
 | `story` (1080x1920) | `assets/posters/story/priv-security-story.jpg` | 516 KB |
 
 ### `brand`
@@ -212,8 +212,8 @@ _Priv is the AI trading terminal from Sans Mercantile — signals, strategy test
 | Format | File | Size |
 | --- | --- | --- |
 | `feed` (1080x1350) | `assets/posters/feed/priv-brand-feed.jpg` | 423 KB |
-| `story` (1080x1920) | `assets/posters/story/priv-brand-story.jpg` | 536 KB |
-| `wide` (1920x1080) | `assets/posters/wide/priv-brand-wide.jpg` | 522 KB |
+| `story` (1080x1920) | `assets/posters/story/priv-brand-story.jpg` | 537 KB |
+| `wide` (1920x1080) | `assets/posters/wide/priv-brand-wide.jpg` | 523 KB |
 
 ### `thumb-signals`
 

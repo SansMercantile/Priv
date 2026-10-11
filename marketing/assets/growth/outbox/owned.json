@@ -1,0 +1,24 @@
+{
+  "files": [
+    "public/growth/compare/priv-vs-copy-trading.html",
+    "public/growth/compare/priv-vs-manual-trading.html",
+    "public/growth/compare/priv-vs-signal-groups.html",
+    "public/growth/features/autonomous-execution.html",
+    "public/growth/features/custody-and-control.html",
+    "public/growth/features/live-signals.html",
+    "public/growth/features/platforms.html",
+    "public/growth/features/strategy-lab.html",
+    "public/growth/partners.html",
+    "public/growth/press/media-kit.html",
+    "public/growth/risk.html",
+    "public/growth/sitemap.xml",
+    "public/growth/tool/backtest-explainer.html",
+    "public/growth/tool/timeframe-picker.html",
+    "public/growth/trust/reviews.html",
+    "public/growth/usecase/night-shift.html",
+    "public/growth/usecase/part-time-trader.html",
+    "public/growth/usecase/swing-trader.html"
+  ],
+  "message": "growth: refresh 18 landing pages (2026-10-08)",
+  "target": "SansMercantile/Nexus@main"
+}

@@ -89,5 +89,8 @@ layer on top of that stream, not a replacement for it.
 - **Prices are a single source of truth.** Live tiers are Free $0, Pro $29,
   Elite $79, Sovereign $149, Autonomous $199. They appear in `04-COPY-BANK.md`,
   `poster_specs.py`, and the pricing poster — change all three together.
-- **The carnation is the mark.** Red flower, gold ring, `PRIV` wordmark, URL
-  right — `brand.footer()` draws it on every asset. Never restyle it locally.
+- **The pink diamond is the mark.** `assets/brand/priv-mark.png` — pink
+  `#f00060` diamond, rose-gold inner, white core — inside the gold ring,
+  `PRIV` wordmark, URL right. `brand.footer()` draws it on every asset, so
+  `brand.py::logo_mark()` is the single source (it trims the mark's own
+  transparent margin and re-centres it). Never restyle it locally.
