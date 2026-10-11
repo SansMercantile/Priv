@@ -188,6 +188,7 @@ function TradingTerminalInner() {
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [account, setAccount] = useState<AccountInfo | null>(null);
   const [positions, setPositions] = useState<OpenPosition[]>([]);
+  const [positionsError, setPositionsError] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   // Active Deriv account for the current demo toggle (loginid for display,
   // broker id for all backend calls). Re-resolved on every poll so flipping
@@ -400,20 +401,34 @@ function TradingTerminalInner() {
     positionTargetsRef.current.forEach(push);
     if (!targets.length) {
       setPositions([]);
+      setPositionsError(null);
       return;
     }
     try {
       const merged: OpenPosition[] = [];
+      let failures = 0;
+      let lastDetail = "";
       for (const t of targets) {
         const res = await fetch(`/api/brokers/positions?broker_id=${encodeURIComponent(t)}`, {
           headers: await userHeader(),
         });
-        if (!res.ok) continue;
+        if (!res.ok) {
+          failures++;
+          const body = await res.json().catch(() => null);
+          lastDetail = body?.detail || body?.error || `HTTP ${res.status}`;
+          continue;
+        }
         const data = await res.json();
         if (Array.isArray(data)) merged.push(...data.map((p: OpenPosition) => ({ ...p, broker_id: t })));
       }
+      // Every broker's positions call failed: that's an error, not an
+      // empty book. The old code swallowed it and the panel showed
+      // "No open positions." as if the account were flat.
+      setPositionsError(failures === targets.length ? lastDetail || "Positions feed unreachable." : null);
       setPositions(merged);
-    } catch {}
+    } catch {
+      setPositionsError("Positions feed unreachable.");
+    }
   };
 
   const fetchWorking = async (_bid: string | null) => {
@@ -1407,7 +1422,11 @@ function TradingTerminalInner() {
           <div className="flex items-center justify-between pb-3 border-b border-white/5 mb-3">
             <span className="font-mono text-[10px] text-zinc-500 tracking-wider">OPEN POSITIONS ({positions.length})</span>
           </div>
-          {positions.length === 0 ? (
+          {positionsError && positions.length === 0 ? (
+            <div className="py-8 text-center font-mono text-[11px] text-amber-500/80">
+              Positions feed unavailable — {positionsError}
+            </div>
+          ) : positions.length === 0 ? (
             <div className="py-8 text-center font-mono text-[11px] text-zinc-600">No open positions.</div>
           ) : (
             <div className="space-y-2">

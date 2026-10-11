@@ -73,6 +73,10 @@ export default function LoginGate({ children }: LoginGateProps) {
   const { isAuthenticated, isLoading, error, user, getAccessTokenSilently, loginWithRedirect } = useAuth0();
   const [derivConnected, setDerivConnected] = useState(false);
   const [derivChecked, setDerivChecked] = useState(false);
+  // True once the user chooses "continue anyway" on an Auth0 error screen
+  // (declared up here with the other hooks so the early-return below can
+  // safely consult it).
+  const [dismissedAuthError, setDismissedAuthError] = useState(false);
   const linkedAnonymousRef = useRef(false);
 
   // Registers the real token getter for apiClient.ts (a plain module that
@@ -389,11 +393,37 @@ export default function LoginGate({ children }: LoginGateProps) {
     );
   }
 
-  if (error) {
+  // Dead-end fix: an Auth0 error used to render a full-screen message
+  // with no escape -- the user was stuck until a hard refresh. Now:
+  // retry re-runs the Auth0 flow, and "continue anyway" lets them into
+  // the app signed-out (the backend enforces verified identity where it
+  // matters, and demo mode still works).
+  if (error && !dismissedAuthError) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center px-4">
-        <div className="text-rose-300 text-sm font-mono max-w-md text-center">
-          Authentication error: {error.message}
+        <div className="max-w-md text-center space-y-4">
+          <div className="text-rose-300 text-sm font-mono">
+            Authentication error: {error.message}
+          </div>
+          <p className="text-zinc-500 text-xs font-mono">
+            You can retry signing in, or continue to the app without a
+            session (demo mode works; account actions will ask you to
+            sign in again).
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => loginWithRedirect()}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono rounded transition-colors cursor-pointer"
+            >
+              Retry sign-in
+            </button>
+            <button
+              onClick={() => setDismissedAuthError(true)}
+              className="px-4 py-2 border border-white/10 text-zinc-400 hover:text-white text-xs font-mono rounded transition-colors cursor-pointer"
+            >
+              Continue anyway
+            </button>
+          </div>
         </div>
       </div>
     );

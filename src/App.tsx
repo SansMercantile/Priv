@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { Loader2 } from "lucide-react";
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 import { Toaster } from "./components/ui/toaster";
 import Sidebar from "./components/Sidebar";
@@ -19,6 +20,7 @@ import Celebrations from "./components/Celebrations";
 import ProfilePage from "./components/profile/ProfilePage";
 import KycAdminReviewPage from "./components/profile/KycAdminReviewPage";
 import CrmPage from "./components/CrmPage";
+import MarketingStudio from "./components/MarketingStudio";
 import UnifiedAssistant from "./ui/UnifiedAssistant";
 import GuidedWalkthrough from "./components/GuidedWalkthrough";
 import LoginGate from "./components/auth/LoginGate";
@@ -54,7 +56,13 @@ function RequireAdmin({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, []);
-  if (state === "loading") return null;
+  if (state === "loading") {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
+      </div>
+    );
+  }
   return state === "ok" ? <>{children}</> : <Navigate to="/dashboard" replace />;
 }
 
@@ -82,7 +90,13 @@ function RequirePaying({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, []);
-  if (state === "loading") return null;
+  if (state === "loading") {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
+      </div>
+    );
+  }
   return state === "ok" ? <>{children}</> : <Navigate to="/dashboard/billing" replace />;
 }
 
@@ -238,7 +252,12 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
                     a descendant <Routes> at the bare "/" (Deriv's registered
                     redirect) trips React Router's "parent route has no
                     trailing /*" warning and can never match anything -- the
-                    return leg needs LoginGate, not these routes. */}
+                    return leg needs LoginGate, not these routes. Any other
+                    non-/dashboard deep link (e.g. old /terminal bookmarks)
+                    redirects home instead of rendering an empty shell. */}
+                {!location.pathname.startsWith("/dashboard") && location.pathname !== "/" && (
+                  <Navigate to="/dashboard" replace />
+                )}
                 {location.pathname.startsWith("/dashboard") && (
                 <Routes>
                   <Route path="/dashboard" element={<Dashboard demoMode={demoMode} />} />
@@ -265,10 +284,16 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
                   <Route path="/dashboard/connections" element={<ConnectionsSection demoMode={demoMode} />} />
                   <Route path="/dashboard/billing" element={<Billing demoMode={demoMode} />} />
                   <Route path="/dashboard/profile" element={<ProfilePage demoMode={demoMode} />} />
-                  <Route path="/dashboard/admin/kyc" element={<KycAdminReviewPage />} />
+                  {/* KYC review is admin-only (same rule as Security/CRM;
+                      the direct-URL path used to be unguarded). */}
+                  <Route path="/dashboard/admin/kyc" element={<RequireAdmin><KycAdminReviewPage /></RequireAdmin>} />
                   {/* Client CRM is admin-only (sidebar hides it from
                       clients; this guard closes the direct-URL path). */}
                   <Route path="/dashboard/crm" element={<RequireAdmin><CrmPage /></RequireAdmin>} />
+                  {/* Marketing Studio: local poster/video compositor plus the
+                      Creatify cloud (REST + MCP). Admin-only -- it renders
+                      campaign assets and spends cloud credits. */}
+                  <Route path="/dashboard/marketing" element={<RequireAdmin><MarketingStudio /></RequireAdmin>} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </Routes>
                 )}

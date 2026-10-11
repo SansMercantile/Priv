@@ -134,6 +134,7 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [realArticles, setRealArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [articlesError, setArticlesError] = useState<string | null>(null);
 
   // Analysis Modal States
   const [selectedAnalysis, setSelectedAnalysis] = useState<any | null>(null);
@@ -243,8 +244,9 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
             }
           }
           
-          const sentimentOptions: Array<"Bullish" | "Neutral" | "Bearish"> = ["Bullish", "Neutral", "Neutral", "Bearish"];
-          const sentiment = sentimentOptions[Math.floor(Math.sin(i) * 2 + 2)] || "Neutral";
+          // RSS gives no sentiment signal -- report Neutral honestly
+          // rather than inventing one from the article index.
+          const sentiment = "Neutral";
           
           parsed.push({
             id: i + 500,
@@ -260,8 +262,12 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
         
         if (parsed.length > 0) {
           setRealArticles(parsed);
+          setArticlesError(null);
           return;
         }
+        // Fetch "succeeded" but yielded nothing usable (proxy error page,
+        // empty RSS, etc.) -- treat as a failed live feed.
+        setArticlesError("Live feed returned no usable headlines.");
       } catch (err) {
         console.warn("Failed fetching live Yahoo headlines, falling back to REST schema:", err);
       }
@@ -285,7 +291,7 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
                 const date = new Date(art.published);
                 const diffMs = Date.now() - date.getTime();
                 const diffMins = Math.floor(diffMs / 60000);
-                const diffHours = Math.floor(diffMins / 600);
+                const diffHours = Math.floor(diffMins / 60);
                 if (diffMins < 60 && diffMins > 0) {
                   timeStr = `${diffMins}m ago`;
                 } else if (diffHours < 24 && diffHours > 0) {
@@ -307,9 +313,15 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
               };
             });
             setRealArticles(formatted);
+            setArticlesError(null);
+            return;
           }
+          setArticlesError("REST fallback returned no articles.");
         })
-        .catch(err => console.error("Error fetching live briefs:", err));
+        .catch(err => {
+          console.error("Error fetching live briefs:", err);
+          setArticlesError("Live brief feed unreachable.");
+        });
     };
 
     fetchRealRssNews().finally(() => setLoading(false));
@@ -368,7 +380,18 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
     }
   ];
 
-  const articles = realArticles.length > 0 ? [...realArticles, ...defaultArticles] : defaultArticles;
+  // Live feed first. The hardcoded defaultArticles block below is
+  // demo-mode-only filler, clearly labeled SIMULATED -- it used to be
+  // silently concatenated behind every live feed (fabricated headlines
+  // presented as real alongside genuine ones). With no live feed and no
+  // demo mode, the list renders an honest empty state instead.
+  const labeledDemoArticles: Article[] = defaultArticles.map(a => ({
+    ...a,
+    source: `[SIMULATED] ${a.source}`,
+  }));
+  const articles = realArticles.length > 0
+    ? realArticles
+    : (demoMode !== false ? labeledDemoArticles : []);
 
   const filteredArticles = articles.filter(art => {
     const matchesFilter = filter === "All" || art.tags.some(category => category.toLowerCase() === filter.toLowerCase()) || art.tags.includes(filter) || art.sentiment === filter;
@@ -498,7 +521,22 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
           <div className="space-y-6">
             {filteredArticles.length === 0 ? (
               <div className="p-12 text-center rounded border border-white/10 bg-neutral-900/10 font-mono text-xs text-stone-500">
-                No active briefs found matching filter query in current timeline epoch.
+                {articlesError ? (
+                  <div className="space-y-3">
+                    <p className="text-amber-500/80">{articlesError}</p>
+                    <p>Live intelligence feed unavailable. No simulated briefs are substituted.</p>
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="px-3 py-1.5 rounded border border-white/10 text-white/70 hover:text-white hover:border-white/20 transition-colors cursor-pointer"
+                    >
+                      Retry feed
+                    </button>
+                  </div>
+                ) : filter !== "All" || searchQuery ? (
+                  "No active briefs found matching filter query in current timeline epoch."
+                ) : (
+                  "No briefs in the live feed right now."
+                )}
               </div>
             ) : (
               filteredArticles.map((art) => (

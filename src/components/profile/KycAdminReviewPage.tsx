@@ -31,67 +31,19 @@ interface KycApplication {
   notes?: string;
 }
 
-const DEFAULT_APPLICANTS: KycApplication[] = [
-  {
-    id: 'KYC-8491-92',
-    fullName: 'David Sterling Vance',
-    email: 'd.vance@sterlingholding.co.uk',
-    dob: '1979-04-12',
-    nationality: 'British',
-    documentType: 'Passport',
-    documentNumber: 'GBR-39820-21',
-    incomeRange: 'R500k–R1m',
-    netWorthRange: '> R1m',
-    tradingExperience: '5+ years',
-    submittedAt: 'Today, 06:14 AM',
-    status: 'pending',
-    documents: [
-      { type: 'Passport / ID Front', url: '#', filename: 'passport_vance_2026.pdf' },
-      { type: 'Proof of Address', url: '#', filename: 'london_gas_bill_apr2026.png' }
-    ]
-  },
-  {
-    id: 'KYC-3029-41',
-    fullName: 'Yuki Nakamura',
-    email: 'yuki_nakamura@tokyo-ventures.jp',
-    dob: '1991-11-28',
-    nationality: 'Japanese',
-    documentType: 'National ID card',
-    documentNumber: 'JPN-904294',
-    incomeRange: '> R1m',
-    netWorthRange: '> R1m',
-    tradingExperience: '3–5 years',
-    submittedAt: 'Yesterday, 04:30 PM',
-    status: 'pending',
-    documents: [
-      { type: 'Passport / ID Front', url: '#', filename: 'nakamura_id_front.png' },
-      { type: 'ID card Back', url: '#', filename: 'nakamura_id_back.png' },
-      { type: 'Proof of Address', url: '#', filename: 'shibuya_tax_receipt.pdf' }
-    ]
-  },
-  {
-    id: 'KYC-1294-08',
-    fullName: 'Sariyah Al-Ahmad',
-    email: 'sariyah@al-ahmad.me',
-    dob: '1985-08-04',
-    nationality: 'Emirati',
-    documentType: 'Passport',
-    documentNumber: 'ARE-1084-29',
-    incomeRange: 'R200k–R500k',
-    netWorthRange: 'R500k–R1m',
-    tradingExperience: '1–3 years',
-    submittedAt: 'May 23, 11:21 AM',
-    status: 'approved',
-    notes: 'Verified via secure automated AML scan. No matching records on sanctions blacklist database.',
-    documents: [
-      { type: 'Passport / ID Front', url: '#', filename: 'sariyah_passport_scan.jpg' }
-    ]
-  }
-];
+// NOTE: This page renders ONLY data returned by the backend (or a cache of
+// that same data previously synced into localStorage). It used to seed a
+// DEFAULT_APPLICANTS array of invented people/documents whenever the
+// backend pull failed -- fabricated KYC records shown to a compliance
+// reviewer as if they were real. On failure it now surfaces an error
+// banner and shows an empty (or previously-synced) queue instead.
 
 export default function KycAdminReviewPage() {
   const [pendingKyc, setPendingKyc] = useState<KycApplication[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [selectedUser, setSelectedUser] = useState<KycApplication | null>(null);
   const [reviewAction, setReviewAction] = useState({ status: 'approved', notes: '' });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -102,29 +54,31 @@ export default function KycAdminReviewPage() {
 
   const fetchPendingKyc = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       // First, try loading from node backend
       const res = await apiClient.get('/api/admin/kyc/pending');
       if (res.data && Array.isArray(res.data)) {
         setPendingKyc(res.data);
-        // Sync local storage as backup channel
+        // Sync local storage as backup channel (real synced data only)
         localStorage.setItem("kyc_applications_queue", JSON.stringify(res.data));
       } else {
         throw new Error("No backend data");
       }
     } catch (error) {
-      console.warn('Backend KYC pending pull failed, loading fallback local database.');
-      // Direct load from local storage
+      console.warn('Backend KYC pending pull failed:', error);
+      setFetchError('Compliance ledger unavailable. Showing only previously-synced records — never invented ones.');
+      // Last-resort cache: data THIS browser actually pulled earlier.
       const savedQueue = localStorage.getItem("kyc_applications_queue");
       if (savedQueue) {
         try {
-          setPendingKyc(JSON.parse(savedQueue));
+          const parsed = JSON.parse(savedQueue);
+          setPendingKyc(Array.isArray(parsed) ? parsed : []);
         } catch (_) {
-          setPendingKyc(DEFAULT_APPLICANTS);
+          setPendingKyc([]);
         }
       } else {
-        setPendingKyc(DEFAULT_APPLICANTS);
-        localStorage.setItem("kyc_applications_queue", JSON.stringify(DEFAULT_APPLICANTS));
+        setPendingKyc([]);
       }
     } finally {
       setLoading(false);
@@ -132,20 +86,21 @@ export default function KycAdminReviewPage() {
   };
 
   const handleDecision = async () => {
-    if (!selectedUser) return;
-    
-    // Optimistically update status to show change quickly
-    const prevStatus = selectedUser.status;
-    const updatedUser = { ...selectedUser, status: reviewAction.status as any, notes: reviewAction.notes };
-
+    if (!selectedUser || submitting) return;
+    setSubmitting(true);
+    setDecisionError(null);
     try {
-      // Direct post to backend and save status
+      // Backend is the sole source of truth for a decision. The old code
+      // caught every failure and still reported the decision as applied
+      // (localStorage-only) -- a compliance reviewer would believe a
+      // rejection was recorded when it never reached the ledger.
       await apiClient.post(`/api/admin/kyc/review`, {
         userId: selectedUser.id,
         status: reviewAction.status,
         notes: reviewAction.notes,
       });
-      // also write to localStorage for complete offline-resilience
+      // Mirror into the synced cache so the queue refresh reads the
+      // updated status even if the next backend pull lags.
       const savedQueue = localStorage.getItem("kyc_applications_queue") || "[]";
       try {
         const list = JSON.parse(savedQueue) as KycApplication[];
@@ -156,35 +111,27 @@ export default function KycAdminReviewPage() {
           localStorage.setItem("kyc_applications_queue", JSON.stringify(list));
         }
       } catch (_) {}
-      
+
       // If it's the current user's submission, update their active KYC status in local storage
       const userEmailFromMemory = localStorage.getItem("xm_account_email") || "";
       if (selectedUser.email === userEmailFromMemory) {
         localStorage.setItem("xm_kyc_status", reviewAction.status);
       }
 
-    } catch (error) {
-      console.warn('Backend decision update failed, applying local state persistence:', error);
-      const savedQueue = localStorage.getItem("kyc_applications_queue") || "[]";
-      try {
-        const list = JSON.parse(savedQueue) as KycApplication[];
-        const idx = list.findIndex(u => u.id === selectedUser.id);
-        if (idx !== -1) {
-          list[idx].status = reviewAction.status as any;
-          list[idx].notes = reviewAction.notes;
-          localStorage.setItem("kyc_applications_queue", JSON.stringify(list));
-        }
-        
-        const userEmailFromMemory = localStorage.getItem("xm_account_email") || "";
-        if (selectedUser.email === userEmailFromMemory) {
-          localStorage.setItem("xm_kyc_status", reviewAction.status);
-        }
-      } catch (_) {}
+      setReviewAction({ status: 'approved', notes: '' });
+      setSelectedUser({ ...selectedUser, status: reviewAction.status as any, notes: reviewAction.notes });
+      setRefreshTrigger(prev => prev + 1);
+    } catch (error: any) {
+      console.error('Decision rejected by backend:', error);
+      const detail = error?.response?.data?.detail;
+      setDecisionError(
+        typeof detail === 'string' && detail
+          ? `Decision NOT recorded — backend rejected it: ${detail}`
+          : 'Decision NOT recorded — the compliance ledger rejected the request. Nothing was changed.'
+      );
+    } finally {
+      setSubmitting(false);
     }
-
-    setReviewAction({ status: 'approved', notes: '' });
-    setSelectedUser(updatedUser);
-    setRefreshTrigger(prev => prev + 1);
   };
 
   const getStatusBadge = (status: string) => {
@@ -238,6 +185,18 @@ export default function KycAdminReviewPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Backend failure notice — replaces the old silent fabricated queue */}
+          {fetchError && (
+            <div className="lg:col-span-3 p-3.5 bg-amber-950/20 border border-amber-900/40 rounded-lg text-[11px] font-mono text-amber-400 flex items-center justify-between gap-3">
+              <span>{fetchError}</span>
+              <button
+                onClick={() => setRefreshTrigger(prev => prev + 1)}
+                className="px-2.5 py-1 border border-amber-900/60 rounded text-amber-300 hover:bg-amber-900/30 transition cursor-pointer shrink-0"
+              >
+                Retry
+              </button>
+            </div>
+          )}
           
           {/* Applications Left Column */}
           <div className="bg-zinc-950/40 p-4 rounded-xl border border-zinc-800/60 flex flex-col h-[74vh]">
@@ -396,6 +355,12 @@ export default function KycAdminReviewPage() {
                   <h4 className="text-sm font-serif italic text-white flex items-center gap-1.5">
                     <UserCheck className="w-4 h-4 text-rose-500" /> Admin Compliance Judgement
                   </h4>
+
+                  {decisionError && (
+                    <div className="p-3 bg-rose-950/30 border border-rose-900/50 rounded-lg text-[11px] font-mono text-rose-400">
+                      {decisionError}
+                    </div>
+                  )}
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -415,10 +380,19 @@ export default function KycAdminReviewPage() {
                     <div className="flex items-end">
                       <button 
                         onClick={handleDecision}
-                        className="w-full p-2.5 bg-[#e11d48] hover:bg-rose-500 text-white font-mono text-xs font-bold rounded transition-colors flex items-center justify-center gap-1.5 shadow-[0_4px_12px_rgba(225,29,72,0.15)] cursor-pointer"
+                        disabled={submitting}
+                        className={`w-full p-2.5 bg-[#e11d48] hover:bg-rose-500 text-white font-mono text-xs font-bold rounded transition-colors flex items-center justify-center gap-1.5 shadow-[0_4px_12px_rgba(225,29,72,0.15)] cursor-pointer ${submitting ? 'opacity-60 pointer-events-none' : ''}`}
                       >
-                        {reviewAction.status === 'approved' ? <Check className="w-4 h-4" /> : reviewAction.status === 'rejected' ? <X className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
-                        Apply Decision Status
+                        {submitting ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" /> Recording…
+                          </>
+                        ) : (
+                          <>
+                            {reviewAction.status === 'approved' ? <Check className="w-4 h-4" /> : reviewAction.status === 'rejected' ? <X className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+                            Apply Decision Status
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>

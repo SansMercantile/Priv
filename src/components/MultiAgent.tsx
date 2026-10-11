@@ -537,6 +537,7 @@ export const MultiAgent: React.FC<{ demoMode?: boolean }> = () => {
   const [adkAgents, setAdkAgents] = useState<any[]>([]);
   const [swarmRunning, setSwarmRunning] = useState(false);
   const [swarmResult, setSwarmResult] = useState<any>(null);
+  const [swarmError, setSwarmError] = useState<string | null>(null);
 
   const [escalateTopic, setEscalateTopic] = useState("Corporate Strategy");
   const [escalateLog, setEscalateLog] = useState<string>("");
@@ -551,10 +552,14 @@ export const MultiAgent: React.FC<{ demoMode?: boolean }> = () => {
       .catch(() => {});
   }, []);
 
-  // Dispatch full ADK swarm analysis
+  // Dispatch the ADK swarm analysis. NOTE: this hits the Express route in
+  // server.ts (POST /api/v1/agents/swarm), not the Python backend -- the
+  // contract audit flagged it as a 404 only because it checked the Python
+  // OpenAPI. Kept on the Express route; failures are surfaced, not hidden.
   const runSwarmAnalysis = async () => {
     setSwarmRunning(true);
     setSwarmResult(null);
+    setSwarmError(null);
     try {
       const r = await fetch("/api/v1/agents/swarm", {
         method: "POST",
@@ -566,10 +571,18 @@ export const MultiAgent: React.FC<{ demoMode?: boolean }> = () => {
           leverage: 20,
         }),
       });
+      if (!r.ok) {
+        const detail = await r.json().catch(() => null);
+        throw new Error(detail?.detail || detail?.error || `HTTP ${r.status}`);
+      }
       const data = await r.json();
+      if (!data?.success && !data?.synthesis) {
+        throw new Error("Swarm returned an unexpected payload.");
+      }
       setSwarmResult(data);
-    } catch (e) {
+    } catch (e: any) {
       console.warn("Swarm dispatch failed:", e);
+      setSwarmError(e?.message || "Swarm dispatch failed.");
     } finally {
       setSwarmRunning(false);
     }
@@ -1007,6 +1020,11 @@ Subject: SARS / GRA Tax clearance.
           </button>
 
           {/* Swarm result */}
+          {swarmError && (
+            <div className="bg-rose-950/20 border border-rose-900/40 rounded-lg p-3 font-mono text-xs text-rose-400 mb-4">
+              Swarm dispatch failed: {swarmError}
+            </div>
+          )}
           {swarmResult && (
             <div className="bg-black/40 border border-emerald-500/20 rounded-lg p-4 font-mono text-xs space-y-2">
               <div className="flex items-center justify-between border-b border-white/5 pb-2">
