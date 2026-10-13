@@ -10,12 +10,7 @@ import {
   TrendingDown, 
   Users, 
   Activity, 
-  ShieldCheck, 
-  Zap,
   Activity as DiagnosticIcon,
-  HardDrive,
-  Cpu,
-  Terminal,
   BrainCircuit,
   Lock,
   Coins
@@ -158,56 +153,43 @@ interface LogAction {
 
 export const ActiveConsoleLog: React.FC = () => {
   const [logs, setLogs] = useState<LogAction[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  const templates = [
-    { type: "agi", message: "AGI Core processed emotional sentiment analysis", agent: "Empathy Engine" },
-    { type: "agent", message: "Quantitative Agent identified arbitrage opportunity", agent: "Quant-Alpha-7" },
-    { type: "data", message: "Ingested 2.3K new market data points", agent: "Data Fusion" },
-    { type: "security", message: "Zero-knowledge proof verification completed", agent: "ZKP Verifier" },
-    { type: "execution", message: "High-frequency trade executed in 0.002s", agent: "Execution Engine" },
-    { type: "agi", message: "Unified Consciousness updated strategy weights", agent: "AGI Core" },
-    { type: "agent", message: "Risk Agent adjusted position sizing", agent: "Risk-Guardian" },
-    { type: "data", message: "Alternative data source integrated", agent: "IoT Ingestor" },
-    { type: "security", message: "Blockchain logger recorded 47 transactions", agent: "Immutable Logger" },
-    { type: "execution", message: "CPPN Evolver discovered new pattern", agent: "Pattern Evolver" }
-  ];
-
-  const categoryStyles = {
-    agi: { color: "text-white/80", bg: "bg-white/[0.03]", border: "border-white/10" },
-    agent: { color: "text-white/80", bg: "bg-white/[0.03]", border: "border-white/10" },
-    data: { color: "text-white/80", bg: "bg-white/[0.03]", border: "border-white/10" },
-    security: { color: "text-white/80", bg: "bg-white/[0.03]", border: "border-white/10" },
-    execution: { color: "text-white/80", bg: "bg-white/[0.03]", border: "border-white/10" }
-  };
-
+  // Real agent activity from the backend (/api/v1/agents/activity).
+  // A random template generator ("AGI Core processed emotional
+  // sentiment analysis" etc.) used to fabricate this feed every 4-8s;
+  // it now renders exactly what the orchestrator reports, or an honest
+  // empty/error state.
   useEffect(() => {
-    // Generate initial logs
-    const initial = Array.from({ length: 6 }, (_, i) => {
-      const templ = templates[Math.floor(Math.random() * templates.length)];
-      return {
-        id: i,
-        type: templ.type as any,
-        message: templ.message,
-        agent: templ.agent,
-        timestamp: Date.now() - i * 15000
-      };
-    });
-    setLogs(initial);
-
-    // Scroll timer for new logs
-    const interval = setInterval(() => {
-      const templ = templates[Math.floor(Math.random() * templates.length)];
-      const nextLogItem: LogAction = {
-        id: Date.now(),
-        type: templ.type as any,
-        message: templ.message,
-        agent: templ.agent,
-        timestamp: Date.now()
-      };
-      setLogs(prev => [nextLogItem, ...prev.slice(0, 9)]);
-    }, Math.random() * 4000 + 4000);
-
-    return () => clearInterval(interval);
+    let isMounted = true;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/v1/agents/activity?limit=10");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!isMounted) return;
+        const items: any[] = data?.data?.activities || data?.activities || [];
+        setLogs(items.slice(0, 10).map((a: any, i: number) => ({
+          id: i,
+          type: "agent",
+          message: a.description || `${a.agent_name || "Agent"} is ${a.status || "idle"}`,
+          agent: a.agent_name || a.agent_id || "agent",
+          timestamp: a.timestamp ? Date.parse(a.timestamp) || Date.now() : Date.now(),
+        })));
+        setError(null);
+      } catch (e: any) {
+        if (isMounted) {
+          setLogs([]);
+          setError(e?.message || "Activity endpoint unreachable.");
+        }
+      }
+    };
+    load();
+    const interval = setInterval(load, 15000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const timeDiffStr = (time: number) => {
@@ -225,12 +207,14 @@ export const ActiveConsoleLog: React.FC = () => {
       </h3>
       
       <div className="flex-1 space-y-3 overflow-y-auto max-h-[350px] scrollbar-hide">
-        {logs.map((item) => {
-          const style = categoryStyles[item.type] || categoryStyles.data;
-          return (
-            <div 
-              key={item.id} 
-              className={`flex items-center justify-between p-3 rounded border ${style.border} ${style.bg} transition-all duration-300 hover:bg-white/[0.04]`}
+        {error ? (
+          <p className="text-xs text-zinc-500 font-mono">Agent activity unavailable: {error}</p>
+        ) : logs.length === 0 ? (
+          <p className="text-xs text-zinc-500 font-mono">No agent activity reported yet.</p>
+        ) : logs.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-center justify-between p-3 rounded border border-white/10 bg-white/[0.03] transition-all duration-300 hover:bg-white/[0.04]"
             >
               <div className="flex items-center space-x-3 min-w-0">
                 <div className="w-1 h-1 bg-white/40 rounded-full flex-shrink-0" />
@@ -240,7 +224,6 @@ export const ActiveConsoleLog: React.FC = () => {
                   </p>
                   <p className="text-[9px] text-white/40 font-mono flex items-center">
                     <span className="font-bold mr-2 text-white/60">[{item.agent}]</span>
-                    <span>TYPE: {item.type.toUpperCase()}</span>
                   </p>
                 </div>
               </div>
@@ -248,8 +231,7 @@ export const ActiveConsoleLog: React.FC = () => {
                 {timeDiffStr(item.timestamp)}
               </div>
             </div>
-          );
-        })}
+          ))}
       </div>
     </div>
   );
@@ -299,19 +281,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
   const navigate = useNavigate();
   const { hasRealDeriv, hasDemoDeriv, connections: brokerConnections, loading: brokerLoading } = useBrokerConnections();
 
-  const isLiveMode = localStorage.getItem("demoMode") === "false";
-  const isBinanceConnected = !isLiveMode || localStorage.getItem("ex_conn_binance") === "true";
-  const isCoinbaseConnected = !isLiveMode || localStorage.getItem("ex_conn_coinbase") === "true";
-  const isHmrcConnected = !isLiveMode || localStorage.getItem("tax_conn_hmrc") === "true";
-
   const [livePositions, setLivePositions] = useState<any[]>([]);
   const [xmId, setXmId] = useState<string>("");
   const [xmServer, setXmServer] = useState<string>("");
   const [xmBalance, setXmBalance] = useState<number>(0);
 
   // Bloomberg S&P live linked parameters
-  const [credits, setCredits] = useState<number>(() => {
-    return parseFloat(localStorage.getItem("xm_usage_credits") || "842.15");
+  const [credits, setCredits] = useState<number | null>(() => {
+    const raw = localStorage.getItem("xm_usage_credits");
+    const n = raw == null ? NaN : parseFloat(raw);
+    return Number.isFinite(n) ? n : null;
   });
   const [riskAppetite, setRiskAppetite] = useState<string>(() => {
     return localStorage.getItem("xm_user_risk_appetite") || "Aggressive";
@@ -319,16 +298,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
   const [leverage, setLeverage] = useState<number>(() => {
     return parseInt(localStorage.getItem("xm_profile_leverage") || "20");
   });
-  const [advisorStance, setAdvisorStance] = useState<string>("balanced");
 
   useEffect(() => {
     const handleSync = () => {
-      const liveCreds = parseFloat(localStorage.getItem("xm_usage_credits") || "842.15");
-      const liveRisk = localStorage.getItem("xm_user_risk_appetite") || "Aggressive";
-      const liveLeverage = parseInt(localStorage.getItem("xm_profile_leverage") || "20");
-      setCredits(liveCreds);
-      setRiskAppetite(liveRisk);
-      setLeverage(liveLeverage);
+      const raw = localStorage.getItem("xm_usage_credits");
+      const n = raw == null ? NaN : parseFloat(raw);
+      setCredits(Number.isFinite(n) ? n : null);
+      setRiskAppetite(localStorage.getItem("xm_user_risk_appetite") || "Aggressive");
+      setLeverage(parseInt(localStorage.getItem("xm_profile_leverage") || "20"));
     };
     
     handleSync();
@@ -339,17 +316,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
       window.removeEventListener('storage', handleSync);
     };
   }, []);
-
-  // Map user risk tolerance automatically to SANS Advisor stance defaults
-  useEffect(() => {
-    if (riskAppetite === "Conservative") {
-      setAdvisorStance("conservative");
-    } else if (riskAppetite === "Moderate") {
-      setAdvisorStance("balanced");
-    } else {
-      setAdvisorStance("aggressive");
-    }
-  }, [riskAppetite]);
 
   // Real open positions across ALL of the caller's linked accounts
   // (uid-scoped GET /api/v1/portfolio/positions), replacing the dead
@@ -673,10 +639,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
   // which is how active/total could disagree. One source now.)
 
   const getSovereignGrade = () => {
-    if (riskAppetite === "Conservative") return { g: "AAA GRADE", desc: "Capital Shielded", color: "text-emerald-400 border-emerald-900/50 bg-emerald-950/30" };
-    if (riskAppetite === "Moderate") return { g: "A- GRADE", desc: "Optimal Balance", color: "text-sky-450 border-sky-900/50 bg-sky-950/30" };
-    if (riskAppetite === "Aggressive") return { g: "BB+ GRADE", desc: "Speculative Spread", color: "text-[#e11d48] border-rose-900/50 bg-rose-950/30" };
-    return { g: "CCC+ LEVERAGED", desc: "High-Yield HFT", color: "text-amber-500 border-amber-900/50 bg-amber-950/30" };
+    if (riskAppetite === "Conservative") return { g: "CONSERVATIVE", desc: "Capital Shielded", color: "text-emerald-400 border-emerald-900/50 bg-emerald-950/30" };
+    if (riskAppetite === "Moderate") return { g: "MODERATE", desc: "Optimal Balance", color: "text-sky-450 border-sky-900/50 bg-sky-950/30" };
+    return { g: "AGGRESSIVE", desc: "Speculative Spread", color: "text-[#e11d48] border-rose-900/50 bg-rose-950/30" };
   };
   const gradeInfo = getSovereignGrade();
 
@@ -724,10 +689,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
           </p>
         </div>
         
-        {/* Bloomberg-class Sovereign Header Rail */}
+        {/* Header rail */}
         <div className="flex flex-wrap items-center gap-2.5">
           <div className={`px-2.5 py-1.5 border rounded font-mono text-[9px] flex flex-col justify-center ${gradeInfo.color}`}>
-            <span className="text-zinc-500 leading-none mb-0.5 text-[8px] uppercase font-black">SOVEREIGN RISK CLASS</span>
+            <span className="text-zinc-500 leading-none mb-0.5 text-[8px] uppercase font-black">RISK APPETITE</span>
             <strong className="font-extrabold leading-none">{gradeInfo.g}</strong>
           </div>
 
@@ -738,12 +703,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
 
           <div className="px-2.5 py-1.5 border border-rose-950/30 bg-rose-950/15 text-rose-450 rounded font-mono text-[9px] flex flex-col justify-center">
             <span className="text-zinc-500 leading-none mb-0.5 text-[8px] uppercase">GAS FUEL RESERVES</span>
-            <strong className="font-extrabold leading-none">{credits.toFixed(2)} PRIV</strong>
-          </div>
-
-          <div className="px-3 py-2.5 bg-white/5 rounded border border-white/10 flex items-center space-x-1.5 font-mono text-[10px] font-black h-full">
-            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-white/70 uppercase">NODE: ACTIVE</span>
+            <strong className="font-extrabold leading-none">{credits == null ? "—" : `${credits.toFixed(2)} PRIV`}</strong>
           </div>
         </div>
       </div>
@@ -840,35 +800,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
           onClick={() => setActiveSection("data-ingestion")}
         />
         <MetricCard
-          title="Risk Score"
-          value={
-            riskAppetite === "Conservative" 
-              ? "15.2/100" 
-              : riskAppetite === "Moderate" 
-                ? "32.4/100" 
-                : riskAppetite === "Aggressive" 
-                  ? "58.4/100" 
-                  : "88.2/100"
-          }
-          change={
-            riskAppetite === "Conservative" 
-              ? "AAA Grade Capital Protection" 
-              : riskAppetite === "Moderate" 
-                ? "A- Sharpe Optimized" 
-                : riskAppetite === "Aggressive" 
-                  ? "BB+ Speculative Spread" 
-                  : "CCC+ Leveraged Exposure"
-          }
-          icon={ShieldCheck}
-          trend={riskAppetite === "Conservative" ? "stable" : "up"}
+          title="Risk Appetite"
+          value={riskAppetite || "—"}
+          change="from your profile settings"
+          icon={Users}
+          trend="stable"
           color={
             riskAppetite === "Conservative" 
               ? "green" 
               : riskAppetite === "Moderate" 
                 ? "blue" 
-                : riskAppetite === "Aggressive" 
-                  ? "yellow" 
-                  : "red"
+                : "red"
           }
           onClick={() => setActiveSection("security")}
         />
@@ -876,7 +818,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
           title="Execution Spd"
           value={stats.executionSpeed === null ? "—" : `${stats.executionSpeed.toFixed(3)}s`}
           change="avg balance-API round-trip"
-          icon={Zap}
+          icon={Activity}
           trend="stable"
           color="green"
         />
@@ -963,25 +905,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-white/5 gap-3">
           <div>
             <h3 className="text-lg font-serif italic text-white flex items-center font-normal">
-              <BrainCircuit className="w-5 h-5 mr-2 text-[#FF6B35] animate-pulse" />
-              Sovereign AI Financial Advisor
+              <BrainCircuit className="w-5 h-5 mr-2 text-[#FF6B35]" />
+              Financial Advisor
             </h3>
             <p className="text-white/40 text-xs mt-0.5 font-light font-mono">
-              Unifies active front-end balances, linked tax platforms, and backend execution rules to determine the best financial outcome.
+              Portfolio and tax guidance is still being built and does not currently perform any real analysis.
             </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono text-stone-500 uppercase">Advisor Stance:</span>
-            <select
-              id="advisorStanceSelect"
-              value={advisorStance}
-              onChange={(e) => setAdvisorStance(e.target.value)}
-              className="bg-neutral-950 border border-[#e11d48]/30 rounded px-2.5 py-1 text-xs text-rose-450 focus:outline-none focus:border-rose-500 font-mono font-bold"
-            >
-              <option value="conservative">Conservative (Shield Capital)</option>
-              <option value="balanced">Dynamic Growth (Balanced P&L)</option>
-              <option value="aggressive">Sovereign Arbitrage (Max Leverage)</option>
-            </select>
           </div>
         </div>
 
@@ -1024,48 +953,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
                 </span>
                 <span className="text-[9px] font-mono text-zinc-500 uppercase">
                   {(hasRealDeriv || hasDemoDeriv) ? (hasRealDeriv ? "Real Account" : "Demo Account") : "Auth Standby"}
-                </span>
-              </div>
-            </div>
-
-            {/* Binance Exchange Node */}
-            <div className="flex items-center justify-between p-3 rounded bg-neutral-950/60 border border-white/5 hover:border-white/15 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className={`w-2 h-2 rounded-full ${isBinanceConnected ? "bg-emerald-500 animate-pulse" : "bg-zinc-600 animate-pulse"}`} />
-                <div>
-                  <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">Binance Exchange Node</h4>
-                  <span className="text-[10px] font-mono text-zinc-500 mt-0.5 uppercase block">
-                    {isBinanceConnected ? "Active Ledger Node • API Sync" : "Awaiting API Key Inbound"}
-                  </span>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className={`text-sm font-mono font-bold block ${isBinanceConnected ? "text-white" : "text-zinc-650"}`}>
-                  {isBinanceConnected ? "Not yet wired" : "$0.00"}
-                </span>
-                <span className={`text-[9px] font-mono uppercase block ${isBinanceConnected ? "text-emerald-500" : "text-zinc-500"}`}>
-                  {isBinanceConnected ? "Active Sync" : "Not Linked"}
-                </span>
-              </div>
-            </div>
-
-            {/* Coinbase custodial node */}
-            <div className="flex items-center justify-between p-3 rounded bg-neutral-950/60 border border-white/5 hover:border-white/15 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className={`w-2 h-2 rounded-full ${isCoinbaseConnected ? "bg-emerald-500 animate-pulse" : "bg-zinc-600 animate-pulse"}`} />
-                <div>
-                  <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">Coinbase Custodial Segment</h4>
-                  <span className="text-[10px] font-mono text-zinc-500 mt-0.5 uppercase block">
-                    {isCoinbaseConnected ? "Institutional Vault Link" : "Awaiting Vault API"}
-                  </span>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className={`text-sm font-mono font-bold block ${isCoinbaseConnected ? "text-white" : "text-zinc-650"}`}>
-                  {isCoinbaseConnected ? "Not yet wired" : "$0.00"}
-                </span>
-                <span className={`text-[9px] font-mono uppercase block ${isCoinbaseConnected ? "text-emerald-500" : "text-zinc-500"}`}>
-                  {isCoinbaseConnected ? "Active Sync" : "Not Linked"}
                 </span>
               </div>
             </div>
@@ -1176,41 +1063,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
           </div>
       </div>
 
-      {/* Low bento health card log */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="metric-card rounded p-5 flex items-center space-x-4 border-white/10">
-          <div className="p-3 bg-white/5 rounded">
-            <HardDrive className="w-4 h-4 text-white/60" />
-          </div>
-          <div>
-            <div className="text-[9px] font-mono text-white/40 tracking-widest uppercase">DATABASE STORAGE</div>
-            <div className="text-sm font-medium text-white font-serif italic">SM Blockchain Clusters</div>
-            <div className="text-[9px] mt-0.5 font-mono text-emerald-500">STATUS: REPLICATED (100%)</div>
-          </div>
-        </div>
-
-        <div className="metric-card rounded p-5 flex items-center space-x-4 border-white/10">
-          <div className="p-3 bg-white/5 rounded">
-            <Cpu className="w-4 h-4 text-white/60" />
-          </div>
-          <div>
-            <div className="text-[9px] font-mono text-white/40 tracking-widest uppercase">AGI PROCESSING ENGINE</div>
-            <div className="text-sm font-medium text-white font-serif italic">Dual-Core Architecture</div>
-            <div className="text-[9px] mt-0.5 font-mono text-white/50">INTELLIGENCE LAYER: OPTIMAL</div>
-          </div>
-        </div>
-
-        <div className="metric-card rounded p-5 flex items-center space-x-4 border-white/10">
-          <div className="p-3 bg-white/5 rounded">
-            <BrainCircuit className="w-4 h-4 text-white/60" />
-          </div>
-          <div>
-            <div className="text-[9px] font-mono text-white/40 tracking-widest uppercase">NEURAL LINK LATENCY</div>
-            <div className="text-sm font-medium text-white font-serif italic">Subatomic Integrations</div>
-            <div className="text-[9px] mt-0.5 font-mono text-white/50">STRETCH CORRELATION: 0.9997</div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

@@ -9,48 +9,19 @@ import apiClient from '../../api/apiClient';
 import ContactVerifier, { VerifiedEntry } from './ContactVerifier';
 import { 
   User, 
-  CreditCard, 
   Shield,
   Link2,
   Landmark, 
-  Calendar, 
-  DollarSign, 
   ExternalLink, 
-  Cpu, 
-  Coins, 
-  RefreshCw, 
-  CheckCircle2,
-  TrendingUp,
-  AlertTriangle,
-  Flame,
-  Gauge,
-  Play,
-  Pause,
-  ArrowRight,
-  Info,
-  HelpCircle,
-  Activity,
-  Award
+  CheckCircle2
 } from 'lucide-react';
 
 interface UserProfileEditorProps {
 }
 
-interface BillingLog {
-  id: string;
-  time: string;
-  action: string;
-  impact: string;
-  type: 'burn' | 'mint' | 'system';
-}
-
 export default function UserProfileEditor() {
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<'profile' | 'billing' | 'kyc' | 'brokers' | 'tax'>('profile');
-  // Node Allocation & Credits is an admin surface (plan pricing, license
-  // grants). Regular users never see the tab; admins do. (Effects live
-  // below, after kycStatus is declared.)
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [activeTab, setActiveTab] = useState<'profile' | 'kyc' | 'brokers' | 'tax'>('profile');
   const [hasRealConnection, setHasRealConnection] = useState<boolean>(false);
   // Broker connections beyond Deriv (TradingView / MT5 bridge / affiliate
   // venues) are reserved for the two highest subscription tiers --
@@ -157,40 +128,10 @@ export default function UserProfileEditor() {
     return parseInt(localStorage.getItem("xm_profile_leverage") || "20");
   });
 
-  // Pricing & Licensing Node Tier -- this is a cosmetic gamification
-  // display only (fake credits ledger, fake pilot simulator below); it
-  // has no connection to the real subscribed tier or any paywall.
-  // Deliberately stored under its own key (not "xm_node_tier") so a
-  // click here can never be confused with -- or leak into -- a real
-  // access gate. Connections.tsx reads the actual tier from
-  // GET /subscriptions/me instead of trusting anything client-side.
-  const [nodeTier, setNodeTier] = useState<'standard' | 'obsidian' | 'sovereign'>(() => {
-    return (localStorage.getItem("xm_node_tier_display") as any) || "obsidian";
-  });
-
   // KYC Status Sync
   const [kycStatus, setKycStatus] = useState<string>(() => {
     return localStorage.getItem("xm_kyc_status") || "unsubmitted";
   });
-
-  // Admin probe for the Node Allocation tab (see isAdmin above).
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res: any = await apiClient.get('/api/v1/admin/whoami');
-        if (!cancelled && res?.data?.data?.admin) setIsAdmin(true);
-      } catch (_) {
-        /* stay non-admin */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  useEffect(() => {
-    if (!isAdmin && activeTab === 'billing') setActiveTab('profile');
-  }, [isAdmin, activeTab]);
 
   // Tier gate for the broker-connections block (sovereign/autonomous or
   // admin). Both probes are console-clean when signed out: whoami is
@@ -271,20 +212,6 @@ export default function UserProfileEditor() {
     };
   }, [kycStatus]);
 
-  // Billing & Usage Credits state
-  const [credits, setCredits] = useState<number>(() => {
-    const saved = localStorage.getItem("xm_usage_credits");
-    return saved ? parseFloat(saved) : 842.15;
-  });
-
-  // Credit Gas Burner Pilot simulator state
-  const [isPilotRunning, setIsPilotRunning] = useState<boolean>(false);
-  const [liveLogQueue, setLiveLogQueue] = useState<BillingLog[]>([
-    { id: 'TX-4819', time: '09:15:32 AM', action: 'Backtested AGI Empathy Stance EUR/USD', impact: '-0.30 PRIV', type: 'burn' },
-    { id: 'TX-4818', time: '09:02:14 AM', action: 'Sovereign Clearing Portals Synchronized', impact: '0.00 PRIV', type: 'system' },
-    { id: 'TX-3918', time: '08:44:02 AM', action: 'Obsidian Node License Allocation Allocated', impact: '+500.00 PRIV', type: 'mint' }
-  ]);
-
   // Sync state modifications
   useEffect(() => {
     localStorage.setItem("xm_user_profile", JSON.stringify(profile));
@@ -295,10 +222,6 @@ export default function UserProfileEditor() {
   useEffect(() => {
     localStorage.setItem("xm_profile_leverage", leverage.toString());
   }, [leverage]);
-
-  useEffect(() => {
-    localStorage.setItem("xm_node_tier_display", nodeTier);
-  }, [nodeTier]);
 
   // ── Server-side persistence ─────────────────────────────────────────
   // The account row on the server is the source of truth; localStorage
@@ -362,7 +285,6 @@ export default function UserProfileEditor() {
             riskAppetite: d.risk_appetite ?? prev.riskAppetite,
           }));
           if (d.leverage != null) setLeverage(d.leverage);
-          if (d.node_tier) setNodeTier(d.node_tier as any);
         }
         // Name/email always come from the account when present, even on
         // the very first visit (LoginGate prefills them from the login).
@@ -396,62 +318,26 @@ export default function UserProfileEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Leverage slider / tier are changed outside the form, so persist them
+  // Leverage slider is changed outside the form, so persist it
   // (debounced) once we've loaded the server copy -- never before, or a
   // default value could overwrite what's stored on the account.
   useEffect(() => {
     if (!serverHydrated) return;
     const t = window.setTimeout(() => {
-      apiClient.updateMyProfile({ leverage, node_tier: nodeTier }).catch(() => {});
+      apiClient.updateMyProfile({ leverage }).catch(() => {});
     }, 800);
     return () => window.clearTimeout(t);
-  }, [leverage, nodeTier, serverHydrated]);
+  }, [leverage, serverHydrated]);
 
   // Real-time synchronization
   useEffect(() => {
     const handleStatusSync = () => {
       const liveStatus = localStorage.getItem("xm_kyc_status") || "unsubmitted";
       setKycStatus(liveStatus);
-      const savedCreds = localStorage.getItem("xm_usage_credits");
-      if (savedCreds && !isPilotRunning) {
-        setCredits(parseFloat(savedCreds));
-      }
     };
     const interval = setInterval(handleStatusSync, 900);
     return () => clearInterval(interval);
-  }, [isPilotRunning]);
-
-  // Real-time gas credits burner simulator loops
-  useEffect(() => {
-    if (!isPilotRunning) return;
-
-    const interval = setInterval(() => {
-      setCredits(prev => {
-        const nextCreds = Math.max(0, parseFloat((prev - 0.04).toFixed(2)));
-        localStorage.setItem("xm_usage_credits", nextCreds.toString());
-        return nextCreds;
-      });
-
-      // Append live operation log in real-time
-      const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const actions = [
-        "Sweeping EUR/USD order book price anomalies",
-        "ZKP block proof verified on SANS ledger",
-        "Sovereign news feed polarity adjusted",
-        "Arbitrage margin clearance updated at HMRC gate",
-        "Sub-millisecond futures lot rebalancing executed"
-      ];
-      const randomAction = actions[Math.floor(Math.random() * actions.length)];
-      const logId = `TX-${Math.floor(1000 + Math.random() * 9000)}`;
-      
-      setLiveLogQueue(prev => [
-        { id: logId, time: timestamp, action: randomAction, impact: '-0.04 PRIV', type: 'burn' },
-        ...prev.slice(0, 7)
-      ]);
-    }, 1200);
-
-    return () => clearInterval(interval);
-  }, [isPilotRunning]);
+  }, []);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -474,7 +360,6 @@ export default function UserProfileEditor() {
         trading_goal: profile.tradingGoal,
         risk_appetite: profile.riskAppetite,
         leverage,
-        node_tier: nodeTier,
         // Only sent when the account has no email yet (e.g. Twitter login).
         ...(!emailLocked && profile.email ? { email: profile.email } : {}),
       });
@@ -493,100 +378,6 @@ export default function UserProfileEditor() {
     }
   };
 
-  const handleSponsorBoost = (amount: number) => {
-    const added = amount === 100 ? 100 : amount === 250 ? 250 : 600;
-    const finalCreds = parseFloat((credits + added).toFixed(2));
-    setCredits(finalCreds);
-    localStorage.setItem("xm_usage_credits", finalCreds.toString());
-
-    const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    setLiveLogQueue(prev => [
-      { id: `MINT-${Math.floor(100 + Math.random() * 900)}`, time: timestamp, action: `Sponsored Node Allocation via SEC Desk (+${added} PRIV)`, impact: `+${added}.00 PRIV`, type: 'mint' },
-      ...prev
-    ]);
-  };
-
-  const handleRefreshCredits = () => {
-    const newCreds = parseFloat((credits + 25.00).toFixed(2));
-    setCredits(newCreds);
-    localStorage.setItem("xm_usage_credits", newCreds.toString());
-  };
-
-  // S&P Grade Metrics Calculations based on user preference
-  const getSPGrading = () => {
-    switch (profile.riskAppetite) {
-      case 'Conservative':
-        return {
-          grade: 'AAA / Sovereign Stable',
-          desc: 'High-Capital Protection Shield. Margin buffers defense priority.',
-          maxDrawdown: '1.2% Historical Outflow Range',
-          varPercent: '0.8%',
-          sharpRatio: '3.42 Optimal',
-          kellyFraction: '0.12x (Fractional)',
-          riskMultiplier: 0.5,
-          color: 'text-emerald-400 border-emerald-900 bg-emerald-950/20'
-        };
-      case 'Moderate':
-        return {
-          grade: 'A- / Optimal Sharp Balance',
-          desc: 'Balanced Systematic Arbitrage. Mid-term swing execution.',
-          maxDrawdown: '4.5% Historical Outflow Range',
-          varPercent: '3.2%',
-          sharpRatio: '2.84 Robust',
-          kellyFraction: '0.45x (Half-Kelly)',
-          riskMultiplier: 1.0,
-          color: 'text-sky-400 border-sky-900 bg-sky-950/20'
-        };
-      case 'Aggressive':
-        return {
-          grade: 'BB+ / Speculative Opportunity',
-          desc: 'High-Yield Futures allocations. Sub-millisecond sweeps enabled.',
-          maxDrawdown: '16.4% Historical Outflow Range',
-          varPercent: '9.4%',
-          sharpRatio: '1.92 Volatile',
-          kellyFraction: '1.00x (Full-Kelly)',
-          riskMultiplier: 2.0,
-          color: 'text-[#e11d48] border-rose-900 bg-rose-950/20'
-        };
-      case 'Very aggressive':
-        return {
-          grade: 'CCC+ / High-Frequency Leverage',
-          desc: 'Maximum leverage, flash collateral limits, high-slippage tolerances.',
-          maxDrawdown: '38.5% Macro draw limits',
-          varPercent: '24.1%',
-          sharpRatio: '1.15 High-Beta',
-          kellyFraction: '1.80x (Super-Kelly)',
-          riskMultiplier: 4.5,
-          color: 'text-amber-500 border-amber-900 bg-amber-950/20'
-        };
-      default:
-        return {
-          grade: 'A- / Optimal Balanced',
-          desc: 'Standard default allocation strategy.',
-          maxDrawdown: '4.5%',
-          varPercent: '3.2%',
-          sharpRatio: '2.84',
-          kellyFraction: '0.45x',
-          riskMultiplier: 1.0,
-          color: 'text-white border-zinc-800 bg-zinc-900/40'
-        };
-    }
-  };
-
-  const spState = getSPGrading();
-
-  // Dynamic values depending on selected leverage + risk
-  const calculatedVar = parseFloat(spState.varPercent) * (leverage / 10);
-  const calculatedMarginThreshold = Math.max(1, (100 / leverage) * 1.5).toFixed(2);
-  const liquidationSpreadPercent = Math.max(0.01, (100 / leverage) * 0.85).toFixed(3);
-
-  // Invoices history representation
-  const invoices = [
-    { id: 'INV-4820-2026', date: '2026-05-15', tier: 'PRIV Obsidian Node License', creditsAdded: '+500 PRIV', amount: '$150.00', status: 'Paid' },
-    { id: 'INV-3918-2026', date: '2026-04-15', tier: 'PRIV Obsidian Node License', creditsAdded: '+500 PRIV', amount: '$150.00', status: 'Paid' },
-    { id: 'INV-2081-2026', date: '2026-03-15', tier: 'PRIV Standard Allocation', creditsAdded: '+250 PRIV', amount: '$75.00', status: 'Paid' }
-  ];
-
   return (
     <div className="space-y-6">
       
@@ -595,7 +386,6 @@ export default function UserProfileEditor() {
         {[
           { id: 'profile', label: 'Sovereign Profile', icon: User },
           { id: 'brokers', label: 'Broker Connections', icon: Link2 },
-          ...(isAdmin ? [{ id: 'billing', label: 'Node Allocation & Credits', icon: CreditCard }] : []),
           { id: 'kyc', label: 'Identity Registry KYC', icon: Shield },
           { id: 'tax', label: 'Tax Intelligence', icon: Landmark }
         ].map(t => {
@@ -860,358 +650,32 @@ export default function UserProfileEditor() {
             </form>
           </div>
 
-          {/* Sovereign Capital Risk Index Visualizer Panel */}
-          <div className="bg-zinc-905 p-5 border border-zinc-800/80 rounded-xl space-y-4.5 flex flex-col h-full bg-zinc-950/40">
-            <div className="border-b border-zinc-900 pb-3 flex items-center justify-between">
-              <h3 className="text-xs font-mono uppercase tracking-widest font-extrabold text-zinc-400 flex items-center gap-1.5">
-                <Award className="w-4 h-4 text-rose-500" /> Sovereign Grading
-              </h3>
-              <span className="text-[8px] font-mono px-2 py-0.5 rounded border border-zinc-800 bg-zinc-950 text-zinc-500">
-                STRESS LABS
-              </span>
-            </div>
-
-            {/* Simulated Live Grade Card */}
-            <div className={`p-4 border rounded-xl space-y-2 ${spState.color} transition-all duration-300`}>
-              <div className="flex items-center justify-between">
-                <span className="text-[9px] font-mono uppercase tracking-wider text-zinc-400">Portfolio Rating Index</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-white/5 border border-white/10 uppercase tracking-widest">
-                  LIVE STATUS
-                </span>
-              </div>
-              <p className="text-xl font-mono font-extrabold tracking-tight italic text-white flex items-center">
-                {spState.grade}
-              </p>
-              <p className="text-[11px] font-sans text-zinc-300 leading-relaxed font-light">
-                {spState.desc}
-              </p>
-            </div>
-
-            {/* Technical VaR & Multiplier Ratios */}
+          {/* Risk settings summary — echoes only what you actually saved;
+              no invented grades, VaR, Kelly or stress numbers. */}
+          <div className="p-5 border border-zinc-800/80 rounded-xl bg-zinc-950/40">
+            <h3 className="text-xs font-mono uppercase tracking-widest font-extrabold text-zinc-400 border-b border-zinc-900 pb-2 mb-3">
+              Your Risk Settings
+            </h3>
             <div className="space-y-3 font-mono text-xs">
               <div className="flex justify-between items-center py-2 border-b border-zinc-900">
-                <span className="text-zinc-500 font-bold text-[10px] uppercase">Base Value-at-Risk (99% VaR)</span>
-                <span className="text-white font-bold">{spState.varPercent} Daily Balance</span>
+                <span className="text-zinc-500 font-bold text-[10px] uppercase">Risk Appetite</span>
+                <span className="text-white font-bold">{profile.riskAppetite || "—"}</span>
               </div>
-              
               <div className="flex justify-between items-center py-2 border-b border-zinc-900">
-                <span className="text-zinc-500 font-bold text-[10px] uppercase">Adjusted VaR (Leveraged)</span>
-                <span className="text-white font-bold pl-2 text-right">
-                  <span className="text-rose-500 font-extrabold">{calculatedVar.toFixed(2)}%</span> Account Cap
-                </span>
+                <span className="text-zinc-500 font-bold text-[10px] uppercase">Leverage</span>
+                <span className="text-white font-bold">{leverage}x</span>
               </div>
-
-              <div className="flex justify-between items-center py-2 border-b border-zinc-900">
-                <span className="text-zinc-500 font-bold text-[10px] uppercase">Kelly Criterion Size Fraction</span>
-                <span className="text-zinc-300 font-extrabold text-right">{spState.kellyFraction}</span>
-              </div>
-
-              <div className="flex justify-between items-center py-2 border-b border-zinc-900">
-                <span className="text-zinc-500 font-bold text-[10px] uppercase">Liquidation Slippage Guard</span>
-                <span className="text-zinc-300 font-extrabold text-right">{liquidationSpreadPercent}% distance</span>
-              </div>
-
-              <div className="flex justify-between items-center py-2">
-                <span className="text-zinc-500 font-bold text-[10px] uppercase">Max Margin Threshold Clearance</span>
-                <span className="text-[#10b981] font-extrabold text-right">{calculatedMarginThreshold}% Equity</span>
-              </div>
+              <p className="text-[11px] text-zinc-500 leading-relaxed pt-1">
+                These values shape how the autotrader sizes positions on your
+                connected account. They are saved to your profile — nothing on
+                this panel is simulated or projected.
+              </p>
             </div>
-
-            {/* Horizontal Gauge Bar */}
-            <div className="pt-2 space-y-1.5">
-              <div className="flex justify-between text-[9px] font-mono text-zinc-500 uppercase font-black">
-                <span>Safe Safeguard</span>
-                <span className="text-rose-500 font-bold uppercase">Critical Bounds reached</span>
-              </div>
-              <div className="h-2 bg-zinc-950 rounded-full overflow-hidden border border-zinc-900 p-[1px]">
-                <div 
-                  className={`h-full rounded-full transition-all duration-300 ${
-                    leverage < 50 
-                      ? 'bg-emerald-500' 
-                      : leverage < 150 
-                        ? 'bg-sky-500' 
-                        : leverage < 300 
-                          ? 'bg-yellow-500' 
-                          : 'bg-rose-500 animate-pulse'
-                  }`}
-                  style={{ width: `${Math.min(100, (leverage / 500) * 100)}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Immersive Stress Event Projection Matrix */}
-            <div className="mt-2.5 p-3.5 bg-black/50 border border-zinc-800 rounded-lg space-y-3 font-mono">
-              <span className="text-[10px] font-bold text-rose-500 uppercase tracking-widest block border-b border-zinc-900 pb-1.5">
-                Stress Assessment Model
-              </span>
-              
-              <div className="space-y-2 text-[10px] text-zinc-400">
-                <div className="flex justify-between border-b border-zinc-900 pb-1">
-                  <span>Black Swan (Flash Depeg):</span> 
-                  <strong className={leverage > 100 ? "text-rose-500 font-bold" : "text-emerald-400"}>
-                    {leverage > 100 ? "Force Liquidation Alert" : "Mitigated via Reserves"}
-                  </strong>
-                </div>
-                
-                <div className="flex justify-between border-b border-zinc-900 pb-1">
-                  <span>HFT Liquidity Freeze:</span> 
-                  <strong className="text-zinc-300">
-                    Slippage: {((leverage * 0.005) + 0.1).toFixed(2)} bps
-                  </strong>
-                </div>
-
-                <div className="flex justify-between font-medium">
-                  <span>Interest Rate Shock (50bps):</span>
-                  <strong className={profile.riskAppetite === 'Conservative' ? 'text-emerald-400' : 'text-yellow-400'}>
-                    {profile.riskAppetite === 'Conservative' ? 'Income Neutral' : 'Delta Shift Imbalance'}
-                  </strong>
-                </div>
-              </div>
-            </div>
-
           </div>
 
         </div>
       </div>
     )}
-
-      {activeTab === 'billing' && (
-        <div className="space-y-6">
-          
-          {/* Top Token Telemetry Panels */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            
-            <div className="p-4 bg-zinc-900/30 border border-zinc-850 rounded-xl flex items-center justify-between relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-[1px] h-full bg-gradient-to-b from-[#e11d48]/10 to-transparent" />
-              <div>
-                <span className="text-[10px] font-mono text-zinc-500 uppercase font-extrabold tracking-wide block">Usage Credits Ledger</span>
-                <p className="text-3xl font-mono text-white font-bold mt-1 tracking-tight">{credits.toFixed(2)} PRIV</p>
-                <div className="flex items-center gap-1.5 mt-1 font-mono text-[9px] text-[#10b981]">
-                  <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>1 PRIV = 1 Autonomous Run</span>
-                </div>
-              </div>
-              <button 
-                onClick={handleRefreshCredits}
-                className="p-2 border border-zinc-850 hover:border-zinc-700 bg-zinc-950 text-zinc-400 hover:text-white rounded-lg transition"
-                title="Synchronize direct balance"
-              >
-                <RefreshCw className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-4 bg-zinc-900/30 border border-zinc-850 rounded-xl flex items-center justify-between font-mono">
-              <div>
-                <span className="text-[10px] text-zinc-500 uppercase font-extrabold tracking-wide">License Level</span>
-                <p className="text-base font-serif italic text-rose-400 font-bold mt-1">
-                  {nodeTier === 'standard' ? 'SANS Standard Allocation' : nodeTier === 'obsidian' ? 'SANS Obsidian Elite' : 'Sovereign Institutional'}
-                </p>
-                <span className="text-[9px] text-zinc-400 uppercase font-medium mt-0.5 block">
-                  LAG LIMIT: <strong className="text-white">{nodeTier === 'standard' ? '0.003s' : nodeTier === 'obsidian' ? '0.0008s' : '0.0003s'}</strong>
-                </span>
-              </div>
-              <Cpu className="w-8 h-8 text-rose-500/10" />
-            </div>
-
-            <div className="p-4 bg-zinc-900/30 border border-zinc-850 rounded-xl flex items-center justify-between font-mono">
-              <div>
-                <span className="text-[10px] text-zinc-500 uppercase font-extrabold tracking-wide">Live Pilot Node</span>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className={`px-2 py-0.5 text-[8px] rounded border uppercase font-extrabold font-mono tracking-widest ${
-                    isPilotRunning 
-                      ? 'bg-emerald-950/40 text-emerald-400 border-emerald-900/50 animate-pulse' 
-                      : 'bg-zinc-950 text-zinc-500 border-zinc-900'
-                  }`}>
-                    {isPilotRunning ? 'Active Execution' : 'Standby Mode'}
-                  </span>
-                </div>
-                <p className="text-[9px] text-zinc-500 mt-1.5 uppercase">Node 04 Server: Europe-West-2</p>
-              </div>
-              <Coins className="w-8 h-8 text-rose-500/10" />
-            </div>
-
-          </div>
-
-          {/* Interactive Multi-Node Licensing & Sponsor Topups Section */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-
-            {/* License Switcher Card */}
-            <div className="xl:col-span-1 bg-zinc-950/40 p-5 border border-zinc-850 rounded-xl space-y-4">
-              <h3 className="text-xs font-mono uppercase tracking-widest font-extrabold text-white border-b border-zinc-900 pb-2 flex items-center gap-1.5">
-                <Landmark className="w-4 h-4 text-rose-500" /> SANS Node Licenses
-              </h3>
-              <p className="text-[11px] font-sans text-zinc-400 leading-relaxed font-light">
-                Upgrade your allocated execution queue inside the SANS network matrix to reduce front-end execution delays.
-              </p>
-
-              <div className="space-y-3.5 pt-1">
-                {[
-                  { id: 'standard', name: 'Standard Allocation', cost: '$75/mo', limit: '250 PRIV Credits', speed: '0.003s Delay', border: 'border-zinc-900' },
-                  { id: 'obsidian', name: 'SANS Obsidian Elite', cost: '$150/mo', limit: '500 PRIV Credits', speed: '0.0008s Priority queue', border: 'border-rose-900/40' },
-                  { id: 'sovereign', name: 'Institutional Cluster', cost: '$300/mo', limit: '1200 PRIV Credits', speed: '0.0003s Subatomic sweeps', border: 'border-amber-900/40' }
-                ].map(item => (
-                  <div
-                    key={item.id}
-                    onClick={() => {
-                      setNodeTier(item.id as any);
-                      if (item.id === 'standard') handleRefreshCredits();
-                    }}
-                    className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                      nodeTier === item.id 
-                        ? 'bg-rose-950/15 border-rose-500/40 shadow-[0_0_8px_rgba(225,29,72,0.15)]' 
-                        : 'bg-zinc-900/40 border-zinc-900 hover:bg-zinc-900 hover:border-zinc-800'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono font-bold text-white uppercase">{item.name}</span>
-                      <span className="text-xs font-mono font-bold text-rose-400">{item.cost}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500 mt-1.5 font-medium">
-                      <span>{item.limit}</span>
-                      <span className="text-[#10b981]">{item.speed}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Live Pilot Gas Burner & Sponsor Module */}
-            <div className="xl:col-span-2 bg-zinc-950/40 p-5 border border-zinc-850 rounded-xl space-y-4">
-              
-              <div className="border-b border-zinc-900 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <h3 className="text-xs font-mono uppercase tracking-widest font-extrabold text-white flex items-center gap-1.5">
-                  <Activity className="w-4 h-4 text-[#e11d48]" /> Interactive Node Gas Burner
-                </h3>
-                
-                {/* Burner Toggle Control */}
-                <button
-                  onClick={() => setIsPilotRunning(!isPilotRunning)}
-                  className={`px-3 py-1 text-[10px] font-mono font-bold uppercase border rounded-lg flex items-center gap-1.5 cursor-pointer transition ${
-                    isPilotRunning 
-                      ? 'bg-rose-950 text-rose-400 border-rose-800 hover:bg-rose-900' 
-                      : 'bg-[#10b981]/10 text-emerald-400 border-emerald-900 hover:bg-[#10b981]/20'
-                  }`}
-                  id="btn-pilot-simulation"
-                >
-                  {isPilotRunning ? (
-                    <>
-                      <Pause className="w-3 h-3 text-rose-500 animate-spin" />
-                      <span>PAUSE PILOT RUNS</span>
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-3 h-3 text-emerald-400" />
-                      <span>ACTIVATE PILOT EXECUTION</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
-                {/* Left Mini Module: Token Booster Sponsor */}
-                <div className="space-y-3 bg-black/40 p-4 rounded-lg border border-zinc-900">
-                  <span className="text-[10px] font-bold text-[#e11d48] uppercase tracking-wider block font-mono">
-                    Node Token Sponsorship Portal
-                  </span>
-                  <p className="text-[11px] font-sans text-zinc-400 leading-snug font-light">
-                    Select a block allocation value to instantly sponsor Node 04 operational costs and mint credits.
-                  </p>
-                  
-                  <div className="grid grid-cols-3 gap-2 pt-1">
-                    {[
-                      { amount: 100, label: '+100 PRIV' },
-                      { amount: 250, label: '+250 PRIV' },
-                      { amount: 600, label: '+600 PRIV' }
-                    ].map((btn, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handleSponsorBoost(btn.amount)}
-                        className="p-2 bg-zinc-900 hover:bg-[#e11d48]/10 hover:text-rose-400 hover:border-rose-500/30 border border-zinc-800 text-[10px] font-mono font-black rounded-md text-zinc-300 transition uppercase cursor-pointer"
-                        id={`btn-sponsor-${btn.amount}`}
-                      >
-                        {btn.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="border-t border-zinc-900/60 pt-2 flex justify-between font-mono text-[9px] text-zinc-500 uppercase">
-                    <span>MINT RATE: STABLE</span>
-                    <span>SLIPPAGE ZERO GATED</span>
-                  </div>
-                </div>
-
-                {/* Right: Live Credit Operation Streams logs */}
-                <div className="space-y-2 flex flex-col justify-between">
-                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block font-mono">
-                    Node Operation Telemetry
-                  </span>
-                  
-                  <div className="flex-1 max-h-[110px] overflow-y-auto space-y-1.5 scrollbar-hide pr-1">
-                    {liveLogQueue.slice(0, 4).map((log, lIdx) => (
-                      <div 
-                        key={log.id} 
-                        className="flex items-center justify-between text-[10px] font-mono p-1 bg-zinc-950/60 border border-zinc-900/30 rounded"
-                      >
-                        <div className="truncate pr-4 text-zinc-400 flex items-center gap-1">
-                          <span className="text-zinc-650 font-black">{log.id}</span>
-                          <span className="truncate">{log.action}</span>
-                        </div>
-                        <span className={`font-black flex-shrink-0 ${log.type === 'burn' ? 'text-rose-500' : log.type === 'mint' ? 'text-emerald-400' : 'text-zinc-500'}`}>
-                          {log.impact}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-              </div>
-
-            </div>
-
-          </div>
-
-          {/* SANS Ledger Accounts List / Past Billing Invoices */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-mono uppercase tracking-widest font-extrabold text-white flex items-center justify-between">
-              <span>Sovereign Ledger Billing Entries</span>
-              <span className="text-[9px] font-extralight text-zinc-500 capitalize font-sans">Hash #948294</span>
-            </h3>
-            
-            <div className="overflow-x-auto border border-zinc-900 rounded-xl bg-zinc-950/20">
-              <table className="w-full text-left font-mono text-xs">
-                <thead>
-                  <tr className="bg-zinc-950 border-b border-zinc-900 text-zinc-500 font-semibold text-[10px] uppercase tracking-wider">
-                    <th className="p-3">Reference Hash</th>
-                    <th className="p-3">Dossier Date</th>
-                    <th className="p-3">Reference / Plan</th>
-                    <th className="p-3">Sovereign Allocation</th>
-                    <th className="p-3 text-right">Amount</th>
-                    <th className="p-3 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoices.map((inv) => (
-                    <tr key={inv.id} className="border-b border-zinc-900/50 hover:bg-zinc-900/20 transition">
-                      <td className="p-3 text-zinc-400 font-bold">{inv.id}</td>
-                      <td className="p-3 text-zinc-500">{inv.date}</td>
-                      <td className="p-3 text-zinc-200">{inv.tier}</td>
-                      <td className="p-3 text-emerald-400 font-bold">{inv.creditsAdded}</td>
-                      <td className="p-3 text-right text-zinc-300">{inv.amount}</td>
-                      <td className="p-3 text-right">
-                        <span className="p-1 px-2.5 bg-emerald-950/35 text-emerald-400 border border-emerald-900/30 rounded text-[10px] font-bold uppercase">
-                          {inv.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-        </div>
-      )}
 
       {activeTab === 'brokers' && (
         <div className="space-y-4">

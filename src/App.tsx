@@ -106,9 +106,11 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
   const [device, setDevice] = useState(initialDevice);
   const [isSidebarMinimized, setSidebarMinimized] = useState(false);
   const [demoMode, setDemoMode] = useState<boolean>(() => {
-    // Load demo mode from localStorage or default to true
+    // Load demo mode from localStorage; default to LIVE (false).
+    // It used to default to true, which flipped every fresh browser into
+    // demo mode (and the fabricated-content surfaces that came with it).
     const saved = localStorage.getItem("demoMode");
-    return saved !== null ? JSON.parse(saved) : true;
+    return saved !== null ? JSON.parse(saved) : false;
   });
 
   const { hasRealDeriv, loading: brokerConnLoading } = useBrokerConnections();
@@ -263,7 +265,7 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
                   <Route path="/dashboard" element={<Dashboard demoMode={demoMode} />} />
                   <Route path="/dashboard/terminal" element={<TradingTerminal />} />
                   <Route path="/dashboard/agi-core" element={<AGICore demoMode={demoMode} />} />
-                  <Route path="/dashboard/multi-agent" element={<MultiAgent demoMode={demoMode} />} />
+                  <Route path="/dashboard/multi-agent" element={<MultiAgent />} />
                   {/* Data Ingest moved under SANS Network Link as an
                       admin-only tab; old bookmarks follow. */}
                   <Route path="/dashboard/data-ingestion" element={<Navigate to="/dashboard/connections" replace />} />
@@ -275,7 +277,7 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
                   {/* Tax Intelligence moved to Identity & Profile, next to
                       Identity Registry KYC; old bookmarks follow. */}
                   <Route path="/dashboard/tax" element={<Navigate to="/dashboard/profile?tab=tax" replace />} />
-                  <Route path="/dashboard/news" element={<News demoMode={demoMode} />} />
+                  <Route path="/dashboard/news" element={<News />} />
                   <Route path="/dashboard/signals" element={<MySignals />} />
                   {/* Diagnostics Log merged into History & Audit -- old
                       bookmarked URL redirects there. */}
@@ -290,9 +292,10 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
                   {/* Client CRM is admin-only (sidebar hides it from
                       clients; this guard closes the direct-URL path). */}
                   <Route path="/dashboard/crm" element={<RequireAdmin><CrmPage /></RequireAdmin>} />
-                  {/* Marketing Studio: local poster/video compositor plus the
-                      Creatify cloud (REST + MCP). Admin-only -- it renders
-                      campaign assets and spends cloud credits. */}
+                  {/* Marketing Studio: in-house generation engine — local
+                      poster/video compositor, SAPI voice, Bedrock plates and
+                      app-AI script writing. Admin-only -- it renders campaign
+                      assets and spends AWS credits. */}
                   <Route path="/dashboard/marketing" element={<RequireAdmin><MarketingStudio /></RequireAdmin>} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </Routes>

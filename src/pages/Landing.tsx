@@ -124,19 +124,10 @@ interface LiveSignal {
   }>;
 }
 
-const STATIC_SIGNAL: LiveSignal = {
-  id: "static-sample",
-  symbol: "R_100",
-  display_name: "VOLATILITY 100 INDEX",
-  direction: "BUY",
-  entry: 8452.1,
-  take_profit_1: 8461.3,
-  take_profit_2: 8470.5,
-  stop_loss: 8443.0,
-  atr: 6.1,
-  timeframe: "1H",
-  slot_start_utc: "",
-};
+// (Removed STATIC_SIGNAL: a hardcoded R_100 BUY ticket at 8452.1 that
+// served as a fabricated "sample signal" whenever the live feed and the
+// <5min cache both failed. The ticket now stays empty with an honest
+// placeholder instead of showing invented entry/TP/SL numbers.)
 
 interface Toast {
   id: string;
@@ -204,8 +195,8 @@ function useLiveSignal() {
             }
           }
         } catch (_) {}
-        setSignal(STATIC_SIGNAL);
-        setLive(false);
+        // No live signal and no fresh cache -- stay null; Landing renders
+        // an honest "no live signal" placeholder.
       }
     })();
     return () => {
@@ -226,7 +217,7 @@ function useLiveSignal() {
   }, [signal]);
 
   const stale = !!signal?.stale;
-  return { signal: signal || STATIC_SIGNAL, live, stale, sentLocal };
+  return { signal, live, stale, sentLocal };
 }
 
 function useSignalToasts(signal: LiveSignal | null, live: boolean) {
@@ -234,7 +225,7 @@ function useSignalToasts(signal: LiveSignal | null, live: boolean) {
   const firedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!signal || !live || !signal.app_id || signal.id === "static-sample") return;
+    if (!signal || !live || !signal.app_id) return;
     const key = `priv_toast_fired_${signal.id}`;
     try {
       (JSON.parse(localStorage.getItem(key) || "[]") as string[]).forEach((k) => firedRef.current.add(k));
@@ -669,13 +660,15 @@ export default function Landing() {
     });
   const signIn = () => loginWithRedirect({ appState: { returnTo: "/dashboard" } });
 
-  const isBuy = signal.direction === "BUY";
-  const rows: Array<[string, number, string?]> = [
-    ["Entry", signal.entry, ""],
-    ["Take Profit 1", signal.take_profit_1, "tp"],
-    ["Take Profit 2", signal.take_profit_2, "tp"],
-    ["Stop Loss", signal.stop_loss, "sl"],
-  ];
+  const isBuy = signal?.direction === "BUY";
+  const rows: Array<[string, number, string?]> = signal
+    ? [
+        ["Entry", signal.entry, ""],
+        ["Take Profit 1", signal.take_profit_1, "tp"],
+        ["Take Profit 2", signal.take_profit_2, "tp"],
+        ["Stop Loss", signal.stop_loss, "sl"],
+      ]
+    : [];
 
   return (
     <div className="min-h-screen bg-black text-white neural-grid matrix-bg">
@@ -749,16 +742,25 @@ export default function Landing() {
             transition={{ duration: 0.5, delay: 0.15 }}
             className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-5 shadow-2xl"
           >
-            <SignalCarousel
-              signal={signal}
-              live={live}
-              stale={stale}
-              sentLocal={sentLocal}
-              isBuy={isBuy}
-              rows={rows}
-              history={history}
-              appId={signal.app_id || ""}
-            />
+            {signal ? (
+              <SignalCarousel
+                signal={signal}
+                live={live}
+                stale={stale}
+                sentLocal={sentLocal}
+                isBuy={isBuy}
+                rows={rows}
+                history={history}
+                appId={signal.app_id || ""}
+              />
+            ) : (
+              <div className="py-10 text-center">
+                <div className="text-[10px] font-mono tracking-widest text-rose-200/70 mb-3">LIVE SIGNAL</div>
+                <p className="text-sm text-white/50">
+                  No live signal right now. Signals appear here the moment a setup forms.
+                </p>
+              </div>
+            )}
           </motion.div>
         </div>
 
