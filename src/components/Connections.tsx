@@ -320,6 +320,7 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
                 <label className="block text-[10px] font-mono text-zinc-500 uppercase tracking-wider mb-1">Encrypted Client-Side API Key</label>
                 <input
                   type="password"
+                  autoComplete="off"
                   value={connectedAi ? "••••••••••••••••••••••••" : apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   placeholder="Enter secure API key locally..."
@@ -394,7 +395,8 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
               <div>
                 <label className="block text-[10px] font-mono text-zinc-500 uppercase tracking-wider mb-1">Authorization Bearer Header</label>
                 <input 
-                  type="password" 
+                  type="password"
+                  autoComplete="off"
                   value="sans_merchant_ecc_token_sh_256"
                   className="w-full bg-neutral-900 border border-white/10 rounded p-2.5 text-xs text-white placeholder-zinc-650 focus:outline-none focus:border-white/30 font-mono"
                   readOnly
@@ -913,6 +915,7 @@ ORDER BY trade_date DESC LIMIT 5;`);
                 <label className="text-[9.5px] uppercase font-mono text-zinc-500 block">Sovereign Connection URI</label>
                 <input
                   type="password"
+                  autoComplete="off"
                   value={mongoUri}
                   onChange={(e) => setMongoUri(e.target.value)}
                   className="w-full bg-black border border-white/10 rounded px-2 py-1 flex items-center font-mono text-[9.5px] text-zinc-400 focus:outline-none"

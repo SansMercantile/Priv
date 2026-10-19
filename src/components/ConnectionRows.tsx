@@ -99,6 +99,7 @@ export function TaxPortalRow({ tax }: { tax: TaxPortal }) {
           />
           <input
             type="password"
+            autoComplete="off"
             placeholder="Secret Passkey"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -215,6 +216,7 @@ export function ExchangeRow({ ex }: { ex: ExchangeInfo }) {
           />
           <input
             type="password"
+            autoComplete="off"
             placeholder="API Secret Token"
             value={apiSecret}
             onChange={(e) => setApiSecret(e.target.value)}
