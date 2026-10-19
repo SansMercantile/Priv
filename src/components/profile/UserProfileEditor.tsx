@@ -28,6 +28,11 @@ export default function UserProfileEditor() {
   // sovereign + autonomous -- plus admins. Server-derived tier only
   // (GET /subscriptions/me -> tier), never the cosmetic node-tier picker.
   const [brokerTierOk, setBrokerTierOk] = useState(false);
+  // Identity Registry KYC is the source of truth for legal names. The
+  // First/Last Legal Name inputs are read-only and mirror the KYC record
+  // (null = record not loaded yet). Edit surface: Profile -> Identity
+  // Verification (KYC form); a submitted KYC only changes via amendment.
+  const [kycNames, setKycNames] = useState<{ first: string; last: string } | null>(null);
   const [signalBrokers, setSignalBrokers] = useState<any[]>([]);
   
   useEffect(() => {
@@ -238,9 +243,10 @@ export default function UserProfileEditor() {
     let hydrated = false;
     const loadIdentity = async () => {
       try {
-        const [meRes, verRes]: any[] = await Promise.all([
+        const [meRes, verRes, kycRes]: any[] = await Promise.all([
           apiClient.getMyProfile(),
           apiClient.getVerifiedContacts().catch(() => null),
+          apiClient.getKycRecord().catch(() => null),
         ]);
         const d = meRes?.data?.data ?? meRes?.data;
         if (cancelled || !d) return;
@@ -296,6 +302,25 @@ export default function UserProfileEditor() {
             email: d.email ?? prev.email,
           }));
         }
+        // Identity Registry KYC owns the legal names: overlay whatever the
+        // KYC record holds, and strip email-shaped junk some profiles carry
+        // (an account email previously landed in First Legal Name).
+        const kd: any = kycRes ?? {};
+        const kycPersonal: any = kd.personal ?? kd?.data?.personal ?? {};
+        const kycFirst = String(kycPersonal.legal_first_name || "").trim();
+        const kycLast = String(kycPersonal.legal_last_name || "").trim();
+        setProfile((prev: any) => {
+          const isEmail = (v: any) => /\S+@\S+/.test(String(v || ""));
+          let firstName = isEmail(prev.firstName) ? "" : prev.firstName;
+          let lastName = isEmail(prev.lastName) ? "" : prev.lastName;
+          if (kycFirst) firstName = kycFirst;
+          if (kycLast) lastName = kycLast;
+          if (firstName === prev.firstName && lastName === prev.lastName) return prev;
+          return { ...prev, firstName, lastName };
+        });
+        if (kycRes !== null && kycRes !== undefined) {
+          setKycNames({ first: kycFirst, last: kycLast });
+        }
         setServerHydrated(true);
         hydrated = true;
       } catch (_) {
@@ -317,6 +342,36 @@ export default function UserProfileEditor() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Legal names mirror Identity Registry KYC live: re-read the record
+  // whenever we come back from the Identity Verification tab (draft KYC
+  // edits land there first), so the locked fields never go stale.
+  useEffect(() => {
+    if (activeTab !== "profile" || !serverHydrated) return;
+    let dead = false;
+    apiClient
+      .getKycRecord()
+      .then((kd: any) => {
+        if (dead || !kd) return;
+        const p = kd.personal ?? {};
+        const first = String(p.legal_first_name || "").trim();
+        const last = String(p.legal_last_name || "").trim();
+        setKycNames({ first, last });
+        setProfile((prev: any) => {
+          const nf = first || prev.firstName;
+          const nl = last || prev.lastName;
+          if (nf === prev.firstName && nl === prev.lastName) return prev;
+          return { ...prev, firstName: nf, lastName: nl };
+        });
+      })
+      .catch(() => {
+        /* keep whatever we already mirrored */
+      });
+    return () => {
+      dead = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, serverHydrated]);
 
   // Leverage slider is changed outside the form, so persist it
   // (debounced) once we've loaded the server copy -- never before, or a
@@ -491,9 +546,18 @@ export default function UserProfileEditor() {
                     type="text" 
                     value={profile.firstName} 
                     id="profile-firstName"
-                    onChange={e => setProfile({...profile, firstName: e.target.value})}
-                    className="w-full p-2.5 bg-zinc-950/80 text-white rounded border border-zinc-800 font-mono text-xs focus:outline-none focus:border-rose-500 transition"
+                    readOnly
+                    tabIndex={-1}
+                    aria-readonly="true"
+                    className="w-full p-2.5 bg-zinc-900/60 text-zinc-300 rounded border border-zinc-800 font-mono text-xs opacity-70 cursor-not-allowed"
                   />
+                  <p className="mt-1 text-[9px] font-mono text-zinc-500">
+                    {kycNames && (kycNames.first || kycNames.last)
+                      ? "From Identity Registry KYC — source of truth. Changes via Identity Verification."
+                      : kycNames
+                        ? "Not set in Identity Registry KYC yet — add it under Identity Verification."
+                        : "Loading from Identity Registry KYC…"}
+                  </p>
                 </div>
 
                 <div>
@@ -502,9 +566,14 @@ export default function UserProfileEditor() {
                     type="text" 
                     value={profile.lastName} 
                     id="profile-lastName"
-                    onChange={e => setProfile({...profile, lastName: e.target.value})}
-                    className="w-full p-2.5 bg-zinc-950/80 text-white rounded border border-zinc-800 font-mono text-xs focus:outline-none focus:border-rose-500 transition"
+                    readOnly
+                    tabIndex={-1}
+                    aria-readonly="true"
+                    className="w-full p-2.5 bg-zinc-900/60 text-zinc-300 rounded border border-zinc-800 font-mono text-xs opacity-70 cursor-not-allowed"
                   />
+                  <p className="mt-1 text-[9px] font-mono text-zinc-500">
+                    Mirrors Identity Registry KYC — never edited here.
+                  </p>
                 </div>
 
                 <div>

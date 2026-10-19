@@ -138,6 +138,9 @@ export default function LoginGate({ children }: LoginGateProps) {
       }
       // Prefill from the social profile (given/family name, email, picture)
       // only into an empty shell -- never overwrite existing entries.
+      // Email-shaped values are NEVER names: some Google profiles carry
+      // the account email in name fields, which used to land in
+      // First/Last Legal Name on the profile.
       try {
         const raw = localStorage.getItem("xm_user_profile");
         const profile = raw ? JSON.parse(raw) : {};
@@ -146,6 +149,7 @@ export default function LoginGate({ children }: LoginGateProps) {
         const full = (user?.name || "").trim();
         const email = (user?.email || "").trim();
         const picture = (user?.picture || "").trim();
+        const isName = (v: string) => !!v && !v.includes("@");
         let changed = false;
         const put = (k: string, v: string) => {
           if (v && !profile[k]) {
@@ -153,9 +157,9 @@ export default function LoginGate({ children }: LoginGateProps) {
             changed = true;
           }
         };
-        put("firstName", given);
-        put("lastName", family);
-        if (!profile.firstName && !profile.lastName && full) {
+        put("firstName", isName(given) ? given : "");
+        put("lastName", isName(family) ? family : "");
+        if (!profile.firstName && !profile.lastName && isName(full)) {
           const parts = full.split(/\s+/);
           profile.firstName = parts[0];
           if (parts.length > 1) profile.lastName = parts.slice(1).join(" ");
