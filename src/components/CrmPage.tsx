@@ -107,6 +107,25 @@ interface Auth0User {
   last_login?: string | null;
 }
 
+// GET /api/v1/admin/client-accounts row: a client's trading account
+// (Deriv token store, MT5 bridge, MetaApi, or a manual IB record) joined
+// with the client's name/email and their referrer (IB).
+interface ClientAcctRow {
+  user_id: string;
+  broker_id?: string;
+  login?: string;
+  server?: string;
+  source?: string;
+  currency?: string;
+  account_type?: string;
+  status?: string; // deriv | pending | approved | rejected
+  client_name?: string | null;
+  client_email?: string | null;
+  ib_user_id?: string | null;
+  ib_name?: string | null;
+  ib_email?: string | null;
+}
+
 // Backend timestamps are naive UTC -- assume Z when no zone present.
 const parseUtc = (iso: string) =>
   new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`);
@@ -207,6 +226,22 @@ export default function CrmPage() {
     { userId: string; email: string; password: string; created: boolean } | null
   >(null);
   const [auPwCopied, setAuPwCopied] = useState(false);
+
+  // Client trading accounts: IB books + the approve/reject queue for
+  // non-Deriv (MT5 bridge / MetaApi) accounts. Lazy-loaded on open.
+  const [acctOpen, setAcctOpen] = useState(false);
+  const [accts, setAccts] = useState<ClientAcctRow[] | null>(null);
+  const [acctCounts, setAcctCounts] = useState<Record<string, number>>({});
+  const [acctLoading, setAcctLoading] = useState(false);
+  const [acctBusy, setAcctBusy] = useState<string | null>(null);
+  const [acctMsg, setAcctMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [acctAdd, setAcctAdd] = useState(false);
+  const [acctForm, setAcctForm] = useState({
+    user_id: "",
+    login: "",
+    server: "",
+    approve: true,
+  });
 
   const loadAll = async (quiet = false) => {
     if (!quiet) setRefreshing(true);
@@ -491,6 +526,97 @@ export default function CrmPage() {
       () => `Verification email sent to ${u.email || u.user_id}.`
     );
 
+  const loadAccts = async () => {
+    setAcctLoading(true);
+    setAcctMsg(null);
+    try {
+      const res: any = await apiClient.get("/api/v1/admin/client-accounts");
+      const body = res?.data ?? res;
+      setAccts(Array.isArray(body?.accounts) ? body.accounts : []);
+      setAcctCounts(body?.counts ?? {});
+    } catch (e: any) {
+      const d = e?.response?.data?.detail;
+      setAccts([]);
+      setAcctMsg({
+        ok: false,
+        text: typeof d === "string" ? d : "Could not load trading accounts.",
+      });
+    } finally {
+      setAcctLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (acctOpen && accts === null) loadAccts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [acctOpen, accts]);
+
+  const decideAcct = async (row: ClientAcctRow, action: "approve" | "reject") => {
+    const key = `${row.user_id}:${row.login || row.broker_id || ""}`;
+    setAcctBusy(key);
+    try {
+      await apiClient.post("/api/v1/admin/client-accounts/decide", {
+        user_id: row.user_id,
+        action,
+        broker_id: row.broker_id,
+        login: row.login,
+        server: row.server,
+        source: row.source,
+        currency: row.currency,
+        account_type: row.account_type,
+      });
+      setAcctMsg({
+        ok: true,
+        text: `${row.login || "Account"} ${
+          action === "approve" ? "approved for trading" : "rejected"
+        }.`,
+      });
+      await loadAccts();
+    } catch (e: any) {
+      const d = e?.response?.data?.detail;
+      setAcctMsg({
+        ok: false,
+        text: typeof d === "string" ? d : e?.message || "Action failed.",
+      });
+    } finally {
+      setAcctBusy(null);
+    }
+  };
+
+  const addAcct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const login = acctForm.login.trim();
+    const server = acctForm.server.trim();
+    if (!acctForm.user_id || !login || !server || acctBusy) return;
+    setAcctBusy("add");
+    try {
+      await apiClient.post("/api/v1/admin/client-accounts/add", {
+        user_id: acctForm.user_id,
+        login,
+        server,
+        source: "ib",
+        approve: acctForm.approve,
+      });
+      setAcctMsg({
+        ok: true,
+        text: `Account ${login} added${
+          acctForm.approve ? " and approved" : " (pending)"
+        }.`,
+      });
+      setAcctForm({ user_id: "", login: "", server: "", approve: true });
+      setAcctAdd(false);
+      await loadAccts();
+    } catch (e: any) {
+      const d = e?.response?.data?.detail;
+      setAcctMsg({
+        ok: false,
+        text: typeof d === "string" ? d : e?.message || "Could not add account.",
+      });
+    } finally {
+      setAcctBusy(null);
+    }
+  };
+
   const inputCls =
     "w-full bg-neutral-950 border border-white/10 rounded px-2.5 py-2 text-xs font-mono text-white placeholder-stone-600 focus:outline-none focus:border-white/30";
   const selectCls =
@@ -566,6 +692,242 @@ export default function CrmPage() {
             <div className="text-[10px] font-mono text-zinc-500 mt-1">{c.sub}</div>
           </div>
         ))}
+      </div>
+
+      {/* Client trading accounts: IB books + non-Deriv approval queue.
+          Collapsed by default; loads on first open. */}
+      <div className="border border-white/10 rounded-xl bg-black/30">
+        <button
+          onClick={() => setAcctOpen((o) => !o)}
+          className="w-full flex items-center justify-between gap-3 p-4 text-left hover:bg-white/[0.03] cursor-pointer"
+        >
+          <span className="text-xs font-mono uppercase tracking-wider text-zinc-400 font-bold">
+            Client trading accounts
+          </span>
+          <span className="flex items-center gap-2 text-[10px] font-mono text-zinc-500">
+            {(acctCounts.pending ?? 0) > 0 && (
+              <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">
+                {acctCounts.pending} awaiting approval
+              </span>
+            )}
+            {accts !== null && <span>{accts.length} accounts</span>}
+            <span className={`transition-transform ${acctOpen ? "rotate-180" : ""}`}>
+              ▾
+            </span>
+          </span>
+        </button>
+        {acctOpen && (
+          <div className="border-t border-white/5 p-4 space-y-3">
+            <p className="text-[10px] font-mono text-zinc-500 leading-relaxed">
+              Every linked client trading account: Deriv (auto-linked, no approval),
+              plus MT5 bridge / MetaApi / manually added IB accounts. A non-Deriv
+              account only auto-executes after you approve it here.
+            </p>
+
+            {acctMsg && (
+              <div
+                className={`p-2.5 rounded-lg border text-xs font-mono ${
+                  acctMsg.ok
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                    : "border-rose-500/30 bg-rose-500/10 text-rose-300"
+                }`}
+              >
+                {acctMsg.text}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={loadAccts}
+                disabled={acctLoading}
+                className={btnGhost}
+              >
+                {acctLoading ? "LOADING…" : "REFRESH"}
+              </button>
+              <button
+                onClick={() => setAcctAdd((a) => !a)}
+                className={btnPrimary}
+              >
+                {acctAdd ? "Cancel add" : "Add IB account"}
+              </button>
+            </div>
+
+            {acctAdd && (
+              <form
+                onSubmit={addAcct}
+                className="border border-white/10 rounded-lg p-3 space-y-2 bg-black/40"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <select
+                    value={acctForm.user_id}
+                    onChange={(e) =>
+                      setAcctForm((f) => ({ ...f, user_id: e.target.value }))
+                    }
+                    className={selectCls}
+                    required
+                  >
+                    <option value="">Client…</option>
+                    {rows.map((r) => (
+                      <option key={r.user_id} value={r.user_id}>
+                        {r.name || r.email || r.user_id}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={acctForm.login}
+                    onChange={(e) =>
+                      setAcctForm((f) => ({ ...f, login: e.target.value }))
+                    }
+                    placeholder="MT5 login (account number)"
+                    className={inputCls}
+                    required
+                  />
+                  <input
+                    type="text"
+                    value={acctForm.server}
+                    onChange={(e) =>
+                      setAcctForm((f) => ({ ...f, server: e.target.value }))
+                    }
+                    placeholder="Server (e.g. FTMO-Live)"
+                    className={inputCls}
+                    required
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <label className="flex items-center gap-2 text-[11px] font-mono text-zinc-400 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={acctForm.approve}
+                      onChange={(e) =>
+                        setAcctForm((f) => ({ ...f, approve: e.target.checked }))
+                      }
+                      className="accent-emerald-500"
+                    />
+                    Approve for auto-execution now
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={acctBusy === "add"}
+                    className={btnPrimary}
+                  >
+                    {acctBusy === "add" ? "ADDING…" : "Add account"}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            <div className="border border-white/10 rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-white/5 text-zinc-500 uppercase text-[9px] font-mono">
+                      <th className="py-2 px-3">Client</th>
+                      <th className="py-2 px-3">Account</th>
+                      <th className="py-2 px-3">Source</th>
+                      <th className="py-2 px-3">IB</th>
+                      <th className="py-2 px-3">Status</th>
+                      <th className="py-2 px-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {acctLoading && accts === null && (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-xs font-mono text-zinc-500">
+                          LOADING ACCOUNTS…
+                        </td>
+                      </tr>
+                    )}
+                    {accts !== null && accts.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-xs font-mono text-zinc-500">
+                          No client trading accounts yet.
+                        </td>
+                      </tr>
+                    )}
+                    {(accts ?? []).map((row) => {
+                      const key = `${row.user_id}:${row.login || row.broker_id || ""}`;
+                      const st = (row.status || "pending").toLowerCase();
+                      const busy = acctBusy === key;
+                      return (
+                        <tr key={key} className="border-t border-white/5">
+                          <td className="py-2 px-3">
+                            <div className="text-xs font-mono text-white">
+                              {row.client_name || row.client_email || row.user_id}
+                            </div>
+                            <div className="text-[9px] text-zinc-500 truncate max-w-[200px]" title={row.user_id}>
+                              {row.client_email || row.user_id}
+                            </div>
+                          </td>
+                          <td className="py-2 px-3">
+                            <div className="text-xs font-mono text-white">
+                              {row.login || "—"}
+                              {row.server ? ` · ${row.server}` : ""}
+                            </div>
+                            <div className="text-[9px] text-zinc-500">
+                              {row.account_type || "live"}
+                              {row.currency ? ` · ${row.currency}` : ""}
+                            </div>
+                          </td>
+                          <td className="py-2 px-3 text-[10px] font-mono uppercase text-zinc-400">
+                            {row.source || "—"}
+                          </td>
+                          <td className="py-2 px-3 text-[10px] font-mono text-zinc-400">
+                            {row.ib_name || row.ib_email ||
+                              (row.ib_user_id
+                                ? `${row.ib_user_id.split("|")[0]} · ${row.ib_user_id.split("|").pop()?.slice(-6)}`
+                                : "—")}
+                          </td>
+                          <td className="py-2 px-3">
+                            <span
+                              className={`text-[9px] uppercase px-1.5 py-0.5 rounded ${
+                                st === "deriv" || st === "approved"
+                                  ? "bg-emerald-500/10 text-emerald-400"
+                                  : st === "rejected"
+                                    ? "bg-rose-500/10 text-rose-400"
+                                    : "bg-amber-500/10 text-amber-400"
+                              }`}
+                            >
+                              {st === "deriv" ? "deriv · auto" : st}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            {st === "deriv" ? (
+                              <span className="text-[10px] font-mono text-zinc-600">
+                                no approval needed
+                              </span>
+                            ) : (
+                              <div className="flex justify-end gap-1.5">
+                                {st !== "approved" && (
+                                  <button
+                                    onClick={() => decideAcct(row, "approve")}
+                                    disabled={busy}
+                                    className="px-2 py-1 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono font-bold hover:bg-emerald-500/25 disabled:opacity-40 cursor-pointer"
+                                  >
+                                    APPROVE
+                                  </button>
+                                )}
+                                {st !== "rejected" && (
+                                  <button
+                                    onClick={() => decideAcct(row, "reject")}
+                                    disabled={busy}
+                                    className="px-2 py-1 rounded bg-rose-500/15 border border-rose-500/30 text-rose-300 text-[10px] font-mono font-bold hover:bg-rose-500/25 disabled:opacity-40 cursor-pointer"
+                                  >
+                                    {st === "approved" ? "REVOKE" : "REJECT"}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Search + filters (ptah PipelineBoard pattern) */}

@@ -68,6 +68,7 @@ interface DerivAccountRow {
   platform?: string;
   adapter_live?: boolean;
   is_default?: boolean;
+  category?: string; // "trading" | "wallet" — wallet rows never trade
 }
 
 interface WorkingOrder {
@@ -512,7 +513,11 @@ function TradingTerminalInner() {
   // Current-mode accounts and the final target list. Selection is
   // pruned to the active mode every render; an empty selection falls
   // back to the mode's active account (never an empty target list).
-  const modeAccounts = derivAccounts.filter((a) => a.account_type === activeMode);
+  // Wallet-category accounts (Deriv money accounts) are listed on the
+  // connection card but are never order targets.
+  const modeAccounts = derivAccounts.filter(
+    (a) => a.account_type === activeMode && (a.category ?? "trading") === "trading"
+  );
   const effectiveTargets: string[] =
     selectedAccounts.filter((id) => modeAccounts.some((a) => a.broker_id === id)).length > 0
       ? selectedAccounts.filter((id) => modeAccounts.some((a) => a.broker_id === id))

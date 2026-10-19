@@ -22,7 +22,8 @@ import {
   Coins,
   User,
   Radio,
-  Contact
+  Contact,
+  Palette
 } from "lucide-react";
 import logo from "../assets/images/logo_1779280505672.png";
 
@@ -267,6 +268,7 @@ export default function Sidebar({
   }
   if (showCompliance) {
     items.push({ name: "Compliance Desk", icon: ShieldCheck, path: "/dashboard/admin/kyc" });
+    items.push({ name: "Marketing Studio", icon: Palette, path: "/dashboard/marketing" });
   }
 
   // Mobile Top Bar
@@ -527,9 +529,12 @@ function DerivAccountSwitcher({
     );
   }
 
-  const demoAccts = accounts.filter((a: any) => a.account_type === "demo");
-  const liveAccts = accounts.filter((a: any) => a.account_type !== "demo");
-  const active = (demoMode ? demoAccts[0] : liveAccts[0]) || accounts[0];
+  // Wallet-category accounts (Deriv money accounts) hold balance but are
+  // not tradeable targets -- keep them out of the switcher.
+  const tradeable = accounts.filter((a: any) => (a.category ?? "trading") === "trading");
+  const demoAccts = tradeable.filter((a: any) => a.account_type === "demo");
+  const liveAccts = tradeable.filter((a: any) => a.account_type !== "demo");
+  const active = (demoMode ? demoAccts[0] : liveAccts[0]) || tradeable[0] || accounts[0];
   const activeIsDemo = active?.account_type === "demo";
 
   const switchTo = (loginid: string, type: string) => {

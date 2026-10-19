@@ -11,6 +11,26 @@ interface DerivAccount {
   broker_id: string;
   adapter_live: boolean;
   is_default: boolean;
+  category?: string; // "trading" | "wallet" (wallet = Deriv money account)
+}
+
+// Survives the post-connect reload: connect responses stash every account
+// Deriv reported (trading + wallet + virtual) here so the card can show a
+// "found N accounts" notice after the page comes back.
+const CONNECT_RESULT_KEY = "priv_deriv_connect_result";
+
+export function stashDerivConnectResult(d: any) {
+  try {
+    const found = Array.isArray(d?.accounts_found) ? d.accounts_found : [];
+    if (found.length) {
+      localStorage.setItem(
+        CONNECT_RESULT_KEY,
+        JSON.stringify({ at: Date.now(), accounts: found })
+      );
+    }
+  } catch {
+    /* localStorage unavailable */
+  }
 }
 
 // One shared Deriv connect surface used by the dashboard locked screen,
@@ -32,6 +52,28 @@ export default function DerivConnectCard() {
       const m = sessionStorage.getItem("priv_deriv_error");
       sessionStorage.removeItem("priv_deriv_error");
       return m;
+    } catch (_) {
+      return null;
+    }
+  });
+  // "Found N accounts" notice from the last successful connect (stashed
+  // before the reload by this card or LoginGate's PKCE return leg).
+  const [foundNotice, setFoundNotice] = useState<
+    { at: number; accounts: any[] } | null
+  >(() => {
+    try {
+      const raw = localStorage.getItem(CONNECT_RESULT_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      localStorage.removeItem(CONNECT_RESULT_KEY);
+      if (
+        !parsed?.at ||
+        Date.now() - parsed.at > 10 * 60 * 1000 ||
+        !Array.isArray(parsed.accounts) ||
+        !parsed.accounts.length
+      )
+        return null;
+      return parsed;
     } catch (_) {
       return null;
     }
@@ -101,7 +143,13 @@ export default function DerivConnectCard() {
         user_id: getAppUserId(),
       });
       const d = res?.data?.data ?? res?.data ?? {};
-      setDone(`Linked ${d.loginid || "Deriv account"} (${d.account_type || "live"}). Reloading…`);
+      stashDerivConnectResult(d);
+      const n = Array.isArray(d.accounts_found) ? d.accounts_found.length : 0;
+      setDone(
+        `Linked ${d.loginid || "Deriv account"} (${d.account_type || "live"})` +
+          (n > 1 ? ` — found ${n} Deriv accounts` : "") +
+          ". Reloading…"
+      );
       setToken("");
       window.setTimeout(() => window.location.reload(), 1200);
     } catch (err: any) {
@@ -130,6 +178,39 @@ export default function DerivConnectCard() {
         </span>
       </div>
 
+      {foundNotice && (
+        <div
+          data-testid="deriv-found-notice"
+          className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-xs font-mono space-y-2"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <span className="text-emerald-300">
+              ✓ Found {foundNotice.accounts.length} Deriv account
+              {foundNotice.accounts.length === 1 ? "" : "s"} — connected:
+            </span>
+            <button
+              onClick={() => setFoundNotice(null)}
+              className="text-[10px] text-zinc-400 underline hover:text-zinc-200 whitespace-nowrap"
+            >
+              dismiss
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {foundNotice.accounts.map((a: any) => (
+              <span
+                key={a.loginid}
+                className="px-1.5 py-0.5 rounded bg-black/50 border border-white/10 text-[10px] text-white"
+              >
+                {a.loginid}
+                {a.currency ? ` · ${a.currency}` : ""} ·{" "}
+                {a.is_demo ? "demo" : "live"}
+                {a.category === "wallet" ? " · wallet" : ""}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {accounts.length > 0 && (
         <div className="space-y-1.5">
           {accounts.map((a) => (
@@ -148,12 +229,30 @@ export default function DerivConnectCard() {
                 >
                   {a.account_type}
                 </span>{" "}
+                {a.category === "wallet" && (
+                  <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">
+                    wallet
+                  </span>
+                )}{" "}
                 {a.currency && <span className="text-zinc-500">{a.currency}</span>}
               </div>
-              {/* Both accounts stay connected; demo/live is chosen with
-                  the sidebar toggle, not per-account defaults. */}
-              <span className="text-[10px] whitespace-nowrap text-emerald-400">
-                ● connected
+              {/* demo/live is chosen with the sidebar toggle, not per-account
+                  defaults. Wallet accounts hold balance but are never trade
+                  targets; status reflects real adapter liveness. */}
+              <span
+                className={`text-[10px] whitespace-nowrap ${
+                  a.category === "wallet"
+                    ? "text-amber-400"
+                    : a.adapter_live
+                      ? "text-emerald-400"
+                      : "text-zinc-500"
+                }`}
+              >
+                {a.category === "wallet"
+                  ? "● balance only"
+                  : a.adapter_live
+                    ? "● connected"
+                    : "○ reconnecting"}
               </span>
             </div>
           ))}
@@ -176,7 +275,9 @@ export default function DerivConnectCard() {
           onClick={connectOAuth}
           className="px-5 py-2.5 bg-white text-black font-mono font-bold text-xs rounded-lg hover:bg-white/90 transition"
         >
-          {accounts.length > 0 ? "Connect another Deriv account" : "Connect Deriv account"}
+          {accounts.length > 0
+            ? "Connect another Deriv account"
+            : "Find & connect Deriv accounts"}
         </button>
       </div>
 

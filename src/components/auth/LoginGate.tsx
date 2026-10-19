@@ -10,7 +10,7 @@ import {
   consumeValidatedCallback,
   DerivOAuthError,
 } from "../../lib/derivAuth/oauth";
-import DerivConnectCard from "../DerivConnectCard";
+import DerivConnectCard, { stashDerivConnectResult } from "../DerivConnectCard";
 import apiClient from "../../api/apiClient";
 
 interface LoginGateProps {
@@ -316,12 +316,18 @@ export default function LoginGate({ children }: LoginGateProps) {
         // allow-list for our origin -- a browser-side POST dies with a
         // network error after the user already consented).
         const { code, codeVerifier } = consumeValidatedCallback();
-        await apiClient.post("/api/v1/auth/deriv/connect-code", {
-          code,
-          code_verifier: codeVerifier,
-          user_id: getAppUserId(),
-        });
+        const res: any = await apiClient.post(
+          "/api/v1/auth/deriv/connect-code",
+          {
+            code,
+            code_verifier: codeVerifier,
+            user_id: getAppUserId(),
+          }
+        );
         if (cancelled) return;
+        // Stash every account Deriv reported so the connect card can show
+        // a "found N accounts" notice after the reload below.
+        stashDerivConnectResult(res?.data?.data ?? res?.data ?? {});
         ping("posted");
         markDerivDone();
         window.location.reload();
