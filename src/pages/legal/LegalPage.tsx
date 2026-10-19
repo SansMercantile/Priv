@@ -21,6 +21,15 @@ export default function LegalPage({
 }) {
   useEffect(() => {
     document.title = `${title} — Priv | Sans Mercantile`;
+    // The SPA serves one index.html everywhere, so the static canonical (/)
+    // must be overridden here or Google consolidates this page into "/".
+    let canonical = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement("link");
+      canonical.rel = "canonical";
+      document.head.appendChild(canonical);
+    }
+    canonical.href = `https://priv.sansmercantile.com${window.location.pathname}`;
   }, [title]);
 
   return (

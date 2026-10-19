@@ -635,7 +635,39 @@ export default function Landing() {
   const { toasts, dismiss } = useSignalToasts(live ? signal : null, live);
 
   useEffect(() => {
-    document.title = "Priv — Intelligent Trading. Limitless Potential.™";
+    document.title = "Priv Core — AI Trading Platform South Africa | Start Free";
+    const updateMeta = (name: string, content: string, attr: "name" | "property" = "name") => {
+      let el = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${name}"]`);
+      if (!el) {
+        el = document.createElement("meta");
+        el.setAttribute(attr, name);
+        document.head.appendChild(el);
+      }
+      el.setAttribute("content", content);
+    };
+    updateMeta(
+      "description",
+      "Autonomous trading desk with strategy backtesting, 24/7 market watch and full custody control. AI trading terminal for South Africa — start free, no card required."
+    );
+    updateMeta(
+      "robots",
+      "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+    );
+    updateMeta("og:title", "Priv Core — AI Trading Platform South Africa", "property");
+    updateMeta(
+      "og:description",
+      "Autonomous trading desk with strategy backtesting, 24/7 market watch and full custody control. Start free — no card required.",
+      "property"
+    );
+    updateMeta("og:url", "https://priv.sansmercantile.com/", "property");
+    // Restore the root canonical when returning here from a subroute.
+    let canonical = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement("link");
+      canonical.rel = "canonical";
+      document.head.appendChild(canonical);
+    }
+    canonical.href = "https://priv.sansmercantile.com/";
     // Referral capture: a share link lands here as ?ref=CODE. Stash it
     // so the post-login bind (LoginGate) can credit the referrer on
     // first sign-in. Survives the Auth0 redirect round-trip.

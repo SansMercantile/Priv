@@ -159,6 +159,9 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
     updateMetaTag('meta[name="description"]', 'name', 'description', 'Next-generation AI-driven execution engine featuring AGI & AI cores, multi-agent systems, and advanced market analysis capabilities.');
     updateMetaTag('meta[property="og:title"]', 'property', 'og:title', 'Sans Mercantile™ PRIV Core - AI-Driven Execution Engine');
     updateMetaTag('meta[property="og:description"]', 'property', 'og:description', 'Revolutionary dual-core AGI system with emotional intelligence and deep market analysis capabilities.');
+    // The dashboard is gated app surface — never let it be indexed even if
+    // robots.txt rules are bypassed.
+    updateMetaTag('meta[name="robots"]', 'name', 'robots', 'noindex, nofollow, noarchive');
   }, [demoMode]);
 
   const handleToggleSidebar = () => {

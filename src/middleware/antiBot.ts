@@ -30,6 +30,15 @@ const BOT_UA_SUBSTRINGS: string[] = [
   "google-extended", "meta-externalagent", "omgili", "dataprovider",
 ];
 
+// Search engines and social preview fetchers must reach the marketing pages
+// or the site can never rank. Checked before the block list below; API routes
+// stay exempt from bot filtering entirely (see antiBotMiddleware).
+const SEARCH_ENGINE_ALLOWLIST: string[] = [
+  "googlebot", "google-inspectiontool", "storebot-google", "bingbot",
+  "slurp", "duckduckbot", "yandexbot", "baiduspider", "applebot",
+  "twitterbot", "linkedinbot", "facebookexternalhit", "whatsapp",
+];
+
 // ── 2. Headless browser fingerprint check ────────────────────────────────────
 function hasHeadlessBrowserFingerprint(req: Request): boolean {
   const ua = req.headers["user-agent"] || "";
@@ -93,11 +102,12 @@ export function antiBotMiddleware(req: Request, res: Response, next: NextFunctio
   }
   const ua = req.headers["user-agent"] || "";
   const uaLower = ua.toLowerCase();
-  if (!ua || BOT_UA_SUBSTRINGS.some((s) => uaLower.includes(s))) {
+  const isSearchEngine = SEARCH_ENGINE_ALLOWLIST.some((s) => uaLower.includes(s));
+  if (!isSearchEngine && (!ua || BOT_UA_SUBSTRINGS.some((s) => uaLower.includes(s)))) {
     res.status(403).set("X-Blocked-Reason", "bot-ua").end();
     return;
   }
-  if (hasHeadlessBrowserFingerprint(req)) {
+  if (!isSearchEngine && hasHeadlessBrowserFingerprint(req)) {
     res.status(403).set("X-Blocked-Reason", "headless-fingerprint").end();
     return;
   }
@@ -110,7 +120,9 @@ export function securityHeadersMiddleware(_req: Request, res: Response, next: Ne
   res.set("X-Content-Type-Options", "nosniff");
   res.set("Referrer-Policy", "no-referrer");
   res.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
-  res.set("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet, noimageindex");
+  // NOTE: no X-Robots-Tag here — a global noindex header would deindex the
+  // public marketing pages. Gated dashboard surface is excluded via
+  // robots.txt (/dashboard) and a per-route meta robots noindex in App.tsx.
   res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
   res.set("Pragma", "no-cache");
   res.set(
