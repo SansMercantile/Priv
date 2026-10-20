@@ -24,6 +24,7 @@
 | Growth agent on AWS | **done** | `pr-growth-agent` + `pr-growth-agent-schedule` `rate(12 hours)` ENABLED |
 | Owned pages live | **done** | 18 files at `public/growth/` in `SansMercantile/Nexus` → `www.sansmercantile.com/growth/…` |
 | Growth skill | **done** | `~/.agents/skills/priv-growth-agent/` — workflow, module map, AWS reference |
+| Marketing Studio | **done** | `/dashboard/marketing` in the webapp — in-house engine: local compositor + SAPI voice + Bedrock plates + app AI scripts, `08-MARKETING-STUDIO.md` |
 
 ---
 
@@ -36,6 +37,8 @@
 5. **`04-COPY-BANK.md`** — headlines, tier copy, captions, subject lines — the words the assets are built from.
 6. **`05-ASSET-AND-PRODUCTION-GUIDE.md`** — folder map, how to re-render, QA gates, and the AWS reactivation record.
 7. **`06-ZEELY-GROWTH-PLAYBOOK.md`** — the zeely.ai teardown, the `build/growth/` module map, and the deployed `pr-growth-agent` runtime.
+8. **`07-PRODUCT-FACT-SHEET.md`** — the product facts every channel copy is checked against.
+9. **`08-MARKETING-STUDIO.md`** — the in-app studio: API reference, the in-house engine (scripts / voice / plates), local-renderer notes.
 
 ---
 

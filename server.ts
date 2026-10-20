@@ -2230,6 +2230,41 @@ Output a valid JSON matching this schema exactly:
 
 import { spawn, execSync } from "child_process";
 
+// ── Marketing Studio ────────────────────────────────────────────────────────
+// In-house marketing engine: local poster/video compositor
+// (marketing/build/studio.py), local SAPI voice, Amazon Bedrock plates, and
+// script writing via this server's own AI provider. No competitor APIs.
+import { marketingRouter, setEngineAI } from "./server/marketing/routes.js";
+import { ASSETS_DIR } from "./server/marketing/local.js";
+app.use(
+  "/marketing-assets",
+  express.static(ASSETS_DIR, { maxAge: "1h", fallthrough: true, index: false })
+);
+app.use("/api/marketing", marketingRouter);
+
+// Marketing Studio engine: the script writer reuses whichever AI provider
+// this server already has wired (Bedrock or Gemini via getAIClient) so the
+// studio never needs its own credentials. Lazy — getAIClient() resolves on
+// first call, after env and ADC are in place.
+setEngineAI(async (prompt) => {
+  const ai = getAIClient();
+  if (!ai) {
+    throw new Error(
+      "No AI provider configured. Set GEMINI_API_KEY or AWS Bedrock credentials."
+    );
+  }
+  const response = await ai.models.generateContent({
+    model: getDefaultModel(),
+    contents: prompt,
+  });
+  const text =
+    response?.text ||
+    response?.candidates?.[0]?.content?.parts?.[0]?.text ||
+    "";
+  if (!text.trim()) throw new Error("AI provider returned empty script");
+  return text;
+}, getActiveProviderName());
+
 // Proxy `/api/v1/*`, `/api/brokers/*`, `/healthz`, `/readyz`, `/users` requests to the Python FastAPI backend on port 8000
 app.all(["/api/v1/*", "/api/brokers/*", "/healthz", "/readyz", "/users"], async (req, res) => {
   const upstreamOrigin = "http://127.0.0.1:8000";

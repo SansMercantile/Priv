@@ -13,6 +13,8 @@ toolchain that renders them.
 | [`04-COPY-BANK.md`](04-COPY-BANK.md) | every headline, tier line, caption and subject line |
 | [`05-ASSET-AND-PRODUCTION-GUIDE.md`](05-ASSET-AND-PRODUCTION-GUIDE.md) | folder map, commands, QA gates, pipeline notes |
 | [`06-ZEELY-GROWTH-PLAYBOOK.md`](06-ZEELY-GROWTH-PLAYBOOK.md) | the zeely.ai strategy teardown, module map and AWS runtime |
+| [`07-PRODUCT-FACT-SHEET.md`](07-PRODUCT-FACT-SHEET.md) | the product facts every channel copy is checked against |
+| [`08-MARKETING-STUDIO.md`](08-MARKETING-STUDIO.md) | the in-app Marketing Studio at `/dashboard/marketing` — in-house engine (local compositor, SAPI voice, Bedrock plates, app AI scripts) |
 
 ## Assets at a glance
 
