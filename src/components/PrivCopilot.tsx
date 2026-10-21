@@ -4,7 +4,7 @@ import {
   Camera, CameraOff,
 } from "lucide-react";
 import chatAvatar from "../assets/images/chat_avatar_1779278082106.png";
-import { getAuthToken } from "../lib/authToken";
+import { getAuthToken, getIdToken } from "../lib/authToken";
 import { forSpeech, pickBestVoice, rankVoices } from "../lib/speech";
 
 interface HarmonicPoint {
@@ -549,11 +549,16 @@ export const PrivCopilot: React.FC = () => {
       const emotionNotePromise = cameraEnabled ? runEmotionCheckIn(promptToSend) : Promise.resolve(undefined);
 
       const token = await getAuthToken();
-      const res = await fetch("/api/v1/support/", {
+      // NO trailing slash: vercel.json's /api/:path* rewrite doesn't match
+      // "/api/v1/support/", so the request hit the SPA fallback (GET -> index.html,
+      // POST -> empty 405) and res.json() threw "Unexpected end of JSON input".
+      const idToken = await getIdToken().catch(() => null);
+      const res = await fetch("/api/v1/support", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(idToken ? { "X-Auth0-Id-Token": idToken } : {}),
         },
         body: JSON.stringify({ message: promptToSend, history }),
       });
