@@ -22,3 +22,27 @@ export async function getAuthToken(): Promise<string | null> {
     return null;
   }
 }
+
+// The OIDC id_token (JWT) from Auth0. Unlike the access token (minted for
+// the API audience and rejected by Auth0's /userinfo), the id_token carries
+// verified `email` / `email_verified` claims the backend can verify locally
+// against the tenant JWKS (aud = client_id). The backend uses it to resolve
+// the caller's real email for admin gating (whoami / require_admin) --
+// without it every admin surface hid, because /userinfo failed on the
+// custom-audience access token.
+type IdTokenGetter = () => Promise<string | null>;
+
+let idTokenGetter: IdTokenGetter | null = null;
+
+export function setIdTokenGetter(fn: IdTokenGetter | null): void {
+  idTokenGetter = fn;
+}
+
+export async function getIdToken(): Promise<string | null> {
+  if (!idTokenGetter) return null;
+  try {
+    return await idTokenGetter();
+  } catch {
+    return null;
+  }
+}

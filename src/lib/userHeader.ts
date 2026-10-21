@@ -4,7 +4,7 @@
 // records were claimed away at login -- and callers fell back to the
 // shared desk (a LIVE account) in every mode, including demo.
 import { getAppUserId } from "./appUserId";
-import { getAuthToken } from "./authToken";
+import { getAuthToken, getIdToken } from "./authToken";
 
 export async function userHeader(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {};
@@ -16,6 +16,14 @@ export async function userHeader(): Promise<Record<string, string>> {
   try {
     const token = await getAuthToken();
     if (token) headers["Authorization"] = `Bearer ${token}`;
+  } catch (_) {
+    /* ignore */
+  }
+  try {
+    // OIDC id_token -- lets the backend resolve the caller's verified email
+    // locally (Auth0 /userinfo rejects the custom-audience access token).
+    const idToken = await getIdToken();
+    if (idToken) headers["X-Auth0-Id-Token"] = idToken;
   } catch (_) {
     /* ignore */
   }

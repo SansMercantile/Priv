@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 import { getAppUserId } from "../../lib/appUserId";
-import { setAuthTokenGetter, getAuthToken } from "../../lib/authToken";
+import { setAuthTokenGetter, setIdTokenGetter, getAuthToken } from "../../lib/authToken";
 import {
   isDerivCallback,
   derivReturnEmpty,
@@ -70,7 +70,7 @@ function useBrokerOAuthCallbackHandler(onDone: (result: { broker: string; succes
 }
 
 export default function LoginGate({ children }: LoginGateProps) {
-  const { isAuthenticated, isLoading, error, user, getAccessTokenSilently, loginWithRedirect } = useAuth0();
+  const { isAuthenticated, isLoading, error, user, getAccessTokenSilently, getIdTokenClaims, loginWithRedirect } = useAuth0();
   const [derivConnected, setDerivConnected] = useState(false);
   const [derivChecked, setDerivChecked] = useState(false);
   // True once the user chooses "continue anyway" on an Auth0 error screen
@@ -98,11 +98,20 @@ export default function LoginGate({ children }: LoginGateProps) {
   useEffect(() => {
     if (!isAuthenticated) {
       setAuthTokenGetter(null);
+      setIdTokenGetter(null);
       lastIdentityRef.current = null;
       setSessionExpired(false);
       return;
     }
     setAuthTokenGetter(() => getAccessTokenSilently());
+    // id_token for backend email resolution (admin gating): Auth0's
+    // /userinfo rejects the custom-audience access token above, but the
+    // id_token (aud = client_id) carries verified email claims the backend
+    // verifies locally against the tenant JWKS.
+    setIdTokenGetter(async () => {
+      const claims = await getIdTokenClaims();
+      return (claims as { __raw?: string } | undefined)?.__raw ?? null;
+    });
     // The connections hook may already have fetched before this getter
     // existed (anonymous uuid -> []). Tell every useBrokerConnections
     // instance to re-fetch now that Bearer tokens are available.
