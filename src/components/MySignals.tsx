@@ -324,6 +324,24 @@ export default function MySignals() {
       if (s.id) p.set("trade_id", String(s.id));
       navigate(`/dashboard/terminal?${p.toString()}`);
     };
+    // Settled archive rows carry a signed pip result (server computes
+    // FX pips / synthetics point=1 pip). Wins emerald, losses rose —
+    // never the reverse (History.tsx STATUS_CLS convention).
+    const pips = s.result_pips === null || s.result_pips === undefined ? null : Number(s.result_pips);
+    const pipsCls = pips === null || Number.isNaN(pips) ? "text-zinc-500"
+      : pips >= 0 ? "text-emerald-400" : "text-rose-400";
+    const pipsTxt = pips === null || Number.isNaN(pips) ? null
+      : `${pips >= 0 ? "+" : ""}${pips.toLocaleString("en-US", { maximumFractionDigits: 1 })} pips`;
+    const statusCls =
+      status === "CLOSED_TP" || status === "TP_HIT"
+        ? "bg-emerald-500/10 text-emerald-400"
+        : status === "CLOSED_SL" || status === "SL_HIT"
+        ? "bg-rose-500/10 text-rose-400"
+        : status === "TP1_HIT"
+        ? "bg-amber-500/10 text-amber-400"
+        : status === "OPEN"
+        ? "bg-sky-500/10 text-sky-400"
+        : "bg-white/10 text-zinc-400";
     return (
       <div className={`flex items-center justify-between gap-2 p-2 rounded-lg border text-xs font-mono ${
         isNew ? "border-rose-500/40 bg-rose-500/5" : "border-white/10 bg-black/40"}`}>
@@ -332,15 +350,26 @@ export default function MySignals() {
           <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded ${s.direction === "BUY" ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
             {s.direction}
           </span>{" "}
-          {s.status && <span className="text-zinc-500 text-[10px]">{s.status}</span>}
+          {s.status && (
+            <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded ${statusCls}`}>{s.status}</span>
+          )}
+          {pipsTxt && (
+            <span className={`ml-1 text-[10px] font-bold ${pipsCls}`}>{pipsTxt}</span>
+          )}
           {isNew && (
             <span className="ml-1.5 text-[9px] uppercase px-1.5 py-0.5 rounded bg-[#e11d48]/20 text-rose-300">new</span>
           )}
         </div>
         <div className="text-right text-[10px] text-zinc-400 whitespace-nowrap">
           <div>IN {s.entry}</div>
-          <div className="text-emerald-400">TP {s.take_profit_1}</div>
-          <div className="text-rose-400">SL {s.stop_loss}</div>
+          {pipsTxt && s.exit_price != null ? (
+            <div className={pipsCls}>EXIT {s.exit_price}</div>
+          ) : (
+            <>
+              <div className="text-emerald-400">TP {s.take_profit_1}</div>
+              <div className="text-rose-400">SL {s.stop_loss}</div>
+            </>
+          )}
         </div>
         {canTrade && (
           <button

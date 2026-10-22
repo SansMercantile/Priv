@@ -12,6 +12,9 @@ export interface AgentStatus {
   tier?: string;
   strategy?: string | null;
   strategy_params?: Record<string, unknown>;
+  // What drives entries while armed: "strategy" (MAIN strategy), 
+  // "own_signals" (subscriber tickets) or "global_stream" (public 6h ticket).
+  signal_source?: string;
   cycles: number;
   placements: number;
   last_contract?: string | null;

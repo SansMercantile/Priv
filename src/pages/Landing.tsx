@@ -319,6 +319,14 @@ interface HistSignal {
   slot_start_utc?: string;
   created_at?: string;
   timeframe?: string;
+  // Server-side settlement (backend/signals/archive_settlement.py):
+  // status OPEN | TP1_HIT | CLOSED_TP | CLOSED_SL | EXPIRED; result_pips
+  // is signed, in FX pips or synthetics point=1 pip.
+  status?: string;
+  exit_price?: number | null;
+  result_pips?: number | null;
+  settled_at?: string | null;
+  outcome_note?: string | null;
 }
 
 function useSignalHistory() {
@@ -366,6 +374,19 @@ const STATUS_STYLES: Record<string, string> = {
   "…": "text-zinc-500 border-white/10 bg-white/5",
 };
 
+// Server settlement status -> the same display labels the client-side
+// candle walk produces, so both paths share STATUS_STYLES.
+function serverStatusToLabel(status: string | undefined): SignalStatus | null {
+  switch (String(status || "").toUpperCase()) {
+    case "OPEN": return "Hold";
+    case "TP1_HIT": return "TP1 Hit";
+    case "CLOSED_TP": return "TP2 Hit";
+    case "CLOSED_SL": return "SL Hit";
+    case "EXPIRED": return "Expired";
+    default: return null;
+  }
+}
+
 // First-touch outcome over 1h candles after the signal: TP2 > TP1 > SL by
 // touch order. Untouched + fresh slot => Hold; untouched + older => Expired.
 function computeOutcome(
@@ -408,6 +429,14 @@ function useSignalStatus(item: HistSignal | null, active: boolean, appId: string
       const d = new Date(item.slot_start_utc || item.created_at || "");
       if (!isNaN(d.getTime())) setSentLocal(d.toLocaleString());
     } catch (_) {}
+    // Server-settled rows skip the client candle walk entirely: the
+    // backend already stored the authoritative outcome (and pips).
+    const settled = serverStatusToLabel(item.status);
+    if (settled) {
+      setStatus(settled);
+      setAlt(null);
+      return;
+    }
     let ws: WebSocket | null = null;
     let closed = false;
     try {
@@ -461,7 +490,7 @@ function useSignalStatus(item: HistSignal | null, active: boolean, appId: string
         ws?.close();
       } catch (_) {}
     };
-  }, [item?.id, active]);
+  }, [item?.id, item?.status, active]);
 
   return { status, alt, sentLocal };
 }
@@ -469,12 +498,23 @@ function useSignalStatus(item: HistSignal | null, active: boolean, appId: string
 function HistorySlide({ item, active, appId }: { item: HistSignal; active: boolean; appId: string }) {
   const { status, alt, sentLocal } = useSignalStatus(item, active, appId);
   const isBuy = item.direction === "BUY";
-  const rows: Array<[string, number]> = [
-    ["Entry", item.entry],
-    ["Take Profit 1", item.take_profit_1],
-    ["Take Profit 2", item.take_profit_2],
-    ["Stop Loss", item.stop_loss],
-  ];
+  // Settled rows show the realized outcome (exit + signed pips) instead
+  // of the planned TP/SL ladder — the ticket already played out.
+  const pips = item.result_pips === null || item.result_pips === undefined
+    ? null : Number(item.result_pips);
+  const settledRow = pips !== null && !Number.isNaN(pips);
+  const pipsCls = settledRow && pips! < 0 ? "text-rose-300" : "text-emerald-300";
+  const rows: Array<[string, number]> = settledRow
+    ? [
+        ["Entry", item.entry],
+        ["Exit", Number(item.exit_price ?? 0)],
+      ]
+    : [
+        ["Entry", item.entry],
+        ["Take Profit 1", item.take_profit_1],
+        ["Take Profit 2", item.take_profit_2],
+        ["Stop Loss", item.stop_loss],
+      ];
   return (
     <div>
       <div className="flex items-start justify-between mb-1">
@@ -488,6 +528,11 @@ function HistorySlide({ item, active, appId }: { item: HistSignal; active: boole
       </div>
       <div className={`text-[11px] font-semibold mb-3 ${isBuy ? "text-emerald-300" : "text-rose-300"}`}>
         {item.direction} · {item.timeframe || "1H"}
+        {settledRow && (
+          <span className={`ml-2 font-mono font-bold ${pipsCls}`}>
+            {pips! >= 0 ? "+" : ""}{pips!.toLocaleString(undefined, { maximumFractionDigits: 1 })} pips
+          </span>
+        )}
       </div>
       <div className="space-y-2 text-[14px]">
         {rows.map(([k, v]) => (

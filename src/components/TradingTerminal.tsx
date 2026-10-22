@@ -231,6 +231,9 @@ function TradingTerminalInner() {
   // evaluated the single symbol on Dispatch.
   const autotrader = useAutotrader(userHeader);
   const [scanAllMarkets, setScanAllMarkets] = useState(false);
+  // Entry driver for the server-side agent: MAIN strategy (default),
+  // the user's own issued signals, or the public global landing stream.
+  const [signalSource, setSignalSource] = useState<"strategy" | "own_signals" | "global_stream">("strategy");
   const [autoLogs, setAutoLogs] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem("priv_auto_logs") || "[]");
@@ -1670,15 +1673,50 @@ function TradingTerminalInner() {
                 </div>
               )}
 
-              <label className="flex items-center gap-2 text-[9px] font-mono text-zinc-400 uppercase tracking-wider select-none">
+              <div className="space-y-1">
+                <span className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">
+                  Follow
+                </span>
+                <div className="grid grid-cols-3 gap-1">
+                  {([
+                    ["strategy", "Strategy", "my MAIN strategy"],
+                    ["own_signals", "My signals", "subscriber tickets"],
+                    ["global_stream", "Global", "public 6h ticket"],
+                  ] as const).map(([value, label, hint]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      disabled={autotrader.status.armed}
+                      title={hint}
+                      onClick={() => setSignalSource(value)}
+                      className={`py-1.5 rounded border text-[9px] font-mono font-bold uppercase tracking-wider transition disabled:opacity-60 ${
+                        signalSource === value
+                          ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+                          : "bg-white/5 text-zinc-400 border-white/10 hover:bg-white/10"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[9px] text-zinc-600 font-mono leading-relaxed">
+                  {signalSource === "strategy"
+                    ? "Entries from the starred MAIN strategy (same fn the Strategy Tester backtests)."
+                    : signalSource === "own_signals"
+                    ? "Executes your open subscriber signal tickets once each; no SL at entry, AI-managed exits."
+                    : "Follows the public landing-page 6h ticket; no SL at entry, AI-managed exits."}
+                </p>
+              </div>
+
+              <label className={`flex items-center gap-2 text-[9px] font-mono text-zinc-400 uppercase tracking-wider select-none ${signalSource !== "strategy" ? "opacity-40" : ""}`}>
                 <input
                   type="checkbox"
                   checked={scanAllMarkets}
-                  disabled={autotrader.status.armed}
+                  disabled={autotrader.status.armed || signalSource !== "strategy"}
                   onChange={(e) => setScanAllMarkets(e.target.checked)}
                   className="accent-emerald-500"
                 />
-                Scan all markets (rotate the full Deriv universe instead of only {selectedSymbol})
+                Scan all markets (rotate the full Deriv universe instead of only {selectedSymbol}){signalSource !== "strategy" ? " — signal modes pick symbols from tickets" : ""}
               </label>
 
               <button
@@ -1695,7 +1733,8 @@ function TradingTerminalInner() {
                     broker_id: brokerId,
                     platform: activePlatform,
                     symbol: selectedSymbol,
-                    scan_all_markets: scanAllMarkets,
+                    scan_all_markets: signalSource === "strategy" && scanAllMarkets,
+                    signal_source: signalSource,
                     risk_appetite: profile.riskAppetite,
                     trading_goal: profile.tradingGoal,
                     user_identity: profile.userIdentity,
@@ -1704,9 +1743,13 @@ function TradingTerminalInner() {
                     ...(nodeTier === "free" ? { duration, duration_unit: "m" } : {}),
                   });
                   pushAutoLog(
-                    scanAllMarkets
-                      ? `Autonomous agent ARMED (platform=${activePlatform}) -- scanning all Deriv markets server-side. Stays live across tab close/logout; only Disable Agent stops it.`
-                      : `Autonomous agent ARMED on ${selectedSymbol} (platform=${activePlatform}) -- runs server-side, stays live across tab close/logout; only Disable Agent stops it.`
+                    signalSource === "strategy"
+                      ? scanAllMarkets
+                        ? `Autonomous agent ARMED (platform=${activePlatform}) -- MAIN strategy, scanning all Deriv markets server-side. Stays live across tab close/logout; only Disable Agent stops it.`
+                        : `Autonomous agent ARMED on ${selectedSymbol} (platform=${activePlatform}) -- MAIN strategy, runs server-side, stays live across tab close/logout; only Disable Agent stops it.`
+                      : signalSource === "own_signals"
+                      ? `Autonomous agent ARMED (platform=${activePlatform}) -- executing your open signal tickets, AI-managed exits (no SL at entry).`
+                      : `Autonomous agent ARMED (platform=${activePlatform}) -- following the global landing stream, AI-managed exits (no SL at entry).`
                   );
                 }}
                 className={`w-full py-2.5 rounded text-xs font-mono font-bold border disabled:opacity-50 disabled:cursor-not-allowed ${
@@ -1738,14 +1781,21 @@ function TradingTerminalInner() {
                     <span className="text-zinc-600 normal-case tracking-normal">
                       {" "}
                       &middot; {autotrader.status.cycles} cycles &middot; {autotrader.status.placements} placements
-                      {autotrader.status.scan_all_markets && autotrader.status.universe_size
+                      {autotrader.status.signal_source && autotrader.status.signal_source !== "strategy"
+                        ? ` \u00b7 ${
+                            autotrader.status.signal_source === "own_signals" ? "my signals" : "global stream"
+                          }`
+                        : ""}
+                      {autotrader.status.signal_source === "strategy" && autotrader.status.scan_all_markets && autotrader.status.universe_size
                         ? ` \u00b7 scanning ${autotrader.status.universe_size} markets`
                         : ""}
-                      {autotrader.status.strategy
+                      {autotrader.status.signal_source === "strategy" && autotrader.status.strategy
                         ? ` \u00b7 strategy ${autotrader.status.strategy}${
                             Object.keys(autotrader.status.strategy_params || {}).length ? " ~" : ""
                           }`
-                        : " \u00b7 multi-agent desk"}
+                        : autotrader.status.signal_source === "strategy"
+                        ? " \u00b7 multi-agent desk"
+                        : ""}
                     </span>
                   )}
                 </span>
