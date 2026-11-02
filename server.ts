@@ -108,8 +108,11 @@ const awsSecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || process.env.AWS_
 const awsSessionToken = process.env.AWS_SESSION_TOKEN;
 const explicitRegion = process.env.AWS_REGION || process.env.BEDROCK_REGION;
 const awsRegion = explicitRegion || parseBedrockRegion(process.env.BEDROCK_ENDPOINT);
-const bedrockModel = process.env.BEDROCK_MODEL || process.env.BEDROCK_MODEL_ID || "gpt-3.1-mini";
-const bedrockEndpoint = process.env.BEDROCK_ENDPOINT || (awsRegion ? `https://bedrock.${awsRegion}.amazonaws.com` : undefined);
+const bedrockModel = process.env.BEDROCK_MODEL || process.env.BEDROCK_MODEL_ID || "us.moonshotai.kimi-k3";
+const configuredBedrockEndpoint = process.env.BEDROCK_ENDPOINT;
+const bedrockEndpoint = configuredBedrockEndpoint
+  ? configuredBedrockEndpoint.replace(/^https:\/\/bedrock\.([^.]+)\.amazonaws\.com\/?$/, "https://bedrock-runtime.$1.amazonaws.com")
+  : (awsRegion ? `https://bedrock-runtime.${awsRegion}.amazonaws.com` : undefined);
 const bedrockConfigured = Boolean(bedrockEndpoint && bedrockModel && awsAccessKeyId && awsSecretAccessKey && awsRegion);
 
 function getActiveProviderName(): string {
@@ -168,11 +171,13 @@ async function bedrockGenerateContent(request: any) {
   }
 
   const prompt = buildPromptFromContents(request?.contents ?? request?.prompt ?? request);
-  const url = `${bedrockEndpoint}/model/${encodeURIComponent(bedrockModel)}/invoke`;
+  const url = `${bedrockEndpoint}/model/${encodeURIComponent(bedrockModel)}/converse`;
   const payload = JSON.stringify({
-    inputText: prompt,
-    maxTokensToSample: Number(process.env.BEDROCK_MAX_TOKENS ?? 512),
-    temperature: Number(process.env.BEDROCK_TEMPERATURE ?? 0.7),
+    messages: [{ role: "user", content: [{ text: prompt }] }],
+    inferenceConfig: {
+      maxTokens: Math.max(16, Number(process.env.BEDROCK_MAX_TOKENS ?? 512)),
+      temperature: Number(process.env.BEDROCK_TEMPERATURE ?? 0.7),
+    },
   });
 
   const { host, pathname } = new URL(url);
@@ -237,16 +242,9 @@ async function bedrockGenerateContent(request: any) {
     throw new Error(`Bedrock request failed: ${response.status} ${response.statusText} - ${JSON.stringify(data)}`);
   }
 
-  let text = "";
-  if (typeof data === "string") {
-    text = data;
-  } else if (data?.outputText && typeof data.outputText === "string") {
-    text = data.outputText;
-  } else if (data?.body) {
-    text = typeof data.body === "string" ? data.body : JSON.stringify(data.body);
-  } else {
-    text = JSON.stringify(data);
-  }
+  const text = (data?.output?.message?.content ?? [])
+    .map((block: any) => typeof block?.text === "string" ? block.text : "")
+    .join("");
 
   return {
     candidates: [

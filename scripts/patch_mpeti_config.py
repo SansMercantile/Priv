@@ -16,7 +16,7 @@ for line in lines:
     if 'AWS_BEDROCK_MODEL_ID:   Optional[str] = None' in line:
         line = line.replace(
             'AWS_BEDROCK_MODEL_ID:   Optional[str] = None',
-            'AWS_BEDROCK_MODEL_ID:   Optional[str] = "us.anthropic.claude-sonnet-5"',
+            'AWS_BEDROCK_MODEL_ID:   Optional[str] = "us.moonshotai.kimi-k3"',
         )
         found_bedrock_model = True
     if 'LLM_DEFAULT_PROVIDER: str = "vertex"' in line:
@@ -43,7 +43,7 @@ with open(p2, "r", encoding="utf-8") as f:
     content2 = f.read()
 
 old = '''self.model_id = config.get("model_id", "us.anthropic.claude-sonnet-4-6")'''
-new = '''self.model_id = config.get("model_id", "us.anthropic.claude-sonnet-5")'''
+new = '''self.model_id = config.get("model_id", "us.moonshotai.kimi-k3")'''
 if old not in content2:
     raise SystemExit("WRAPPER_PATCH_MARKER_NOT_FOUND")
 content2 = content2.replace(old, new, 1)
@@ -57,7 +57,7 @@ with open(p3, "r", encoding="utf-8") as f:
     content3 = f.read()
 
 old3 = 'assert settings.AWS_BEDROCK_MODEL_ID == "us.anthropic.claude-sonnet-4-6"'
-new3 = 'assert settings.AWS_BEDROCK_MODEL_ID == "us.anthropic.claude-sonnet-5"'
+new3 = 'assert settings.AWS_BEDROCK_MODEL_ID == "us.moonshotai.kimi-k3"'
 if old3 not in content3:
     raise SystemExit("TEST_PATCH_MARKER_NOT_FOUND")
 content3 = content3.replace(old3, new3, 1)
