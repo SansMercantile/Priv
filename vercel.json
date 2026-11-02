@@ -1,8 +1,22 @@
 {
   "version": 2,
-  "routes": [
-    { "src": "/api/(.*)", "dest": "http://100.56.153.154:8000/api/$1" },
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Referrer-Policy", "value": "no-referrer" },
+        { "key": "X-Permitted-Cross-Domain-Policies", "value": "none" },
+        { "key": "Permissions-Policy", "value": "accelerometer=(), camera=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(self), payment=(), usb=()" },
+        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
+        { "key": "Content-Security-Policy", "value": "frame-ancestors 'self'; base-uri 'self'; form-action 'self'" }
+      ]
+    }
+  ],
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "http://54.208.14.215:8000/api/:path*" },
+    { "source": "/marketing-assets/:path*", "destination": "http://54.208.14.215:8000/marketing-assets/:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

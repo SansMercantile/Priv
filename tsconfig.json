@@ -18,6 +18,12 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@deriv/core": [
+        "./packages/deriv-core/src/index.ts"
+      ],
+      "@deriv/core/*": [
+        "./packages/deriv-core/src/*"
       ]
     },
     "allowImportingTsExtensions": true,

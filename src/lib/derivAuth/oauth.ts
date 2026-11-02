@@ -17,8 +17,15 @@ import {
 } from "./storage";
 
 const DERIV_APP_ID = "340CMkSyVrWLSlXnzSaIP"; // PRIVCore - real OAuth-type app, registered redirect: https://priv.sansmercantile.com
+export const DERIV_REFERRAL_TOKEN = "RGQ4HDEG7JR4";
+export const DERIV_SIGNUP_URL = `https://t.deriv.link?t=${DERIV_REFERRAL_TOKEN}`;
 const AUTH_BASE = "https://auth.deriv.com/oauth2";
 const REDIRECT_URI = window.location.origin + "/"; // must exactly match Deriv's registered Redirect URL, trailing slash included
+// Set just before navigating to Deriv so the return leg can tell "came
+// back with nothing" (abandoned at Deriv, bounced to marketing, popup
+// closed) apart from "never left".
+const PENDING_KEY = "deriv_oauth_pending";
+const DONE_KEY = "deriv_oauth_done";
 
 export class DerivOAuthError extends Error {
   constructor(message: string) {
@@ -56,11 +63,17 @@ async function buildPkceParams(): Promise<URLSearchParams> {
     state: csrfToken,
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
+    t: DERIV_REFERRAL_TOKEN,
   });
 }
 
 export async function initiateDerivLogin(): Promise<void> {
   const params = await buildPkceParams();
+  try {
+    localStorage.setItem(PENDING_KEY, String(Date.now()));
+  } catch (_) {
+    /* ignore */
+  }
   window.location.href = `${AUTH_BASE}/auth?${params.toString()}`;
 }
 
@@ -70,7 +83,46 @@ export async function initiateDerivSignUp(): Promise<void> {
   window.location.href = `${AUTH_BASE}/auth?${params.toString()}`;
 }
 
+export function derivReturnEmpty(): boolean {
+  // True when a previous initiateDerivLogin never produced a callback.
+  // Ignored when another tab already completed the flow after this flag
+  // was set (its done-marker is newer). Clears state either way.
+  try {
+    const pending = localStorage.getItem(PENDING_KEY);
+    if (!pending) return false;
+    localStorage.removeItem(PENDING_KEY);
+    const done = Number(localStorage.getItem(DONE_KEY) || 0);
+    if (done > Number(pending)) return false;
+    const params = new URLSearchParams(window.location.search);
+    return !params.has("code");
+  } catch (_) {
+    return false;
+  }
+}
+
+export function markDerivDone(): void {
+  try {
+    localStorage.setItem(DONE_KEY, String(Date.now()));
+  } catch (_) {
+    /* ignore */
+  }
+}
+
+export function clearDerivPending(): void {
+  try {
+    localStorage.removeItem(PENDING_KEY);
+  } catch (_) {
+    /* ignore */
+  }
+}
+
 export function isDerivCallback(): boolean {
+  // Deriv's registered redirect is the bare origin, so a genuine Deriv
+  // return always lands on "/". Auth0 uses /callback with the same
+  // ?code&state shape -- never treat that as Deriv (it produced bogus
+  // "session expired" errors on every Auth0 login).
+  if (typeof window === "undefined") return false;
+  if (window.location.pathname !== "/") return false;
   const params = new URLSearchParams(window.location.search);
   return params.has("code") && params.has("state");
 }
@@ -95,22 +147,24 @@ function cleanupUrl(): void {
 }
 
 function validateCallback(params: CallbackParams): string {
+  // The only success gate: our locally-stored CSRF token must match the
+  // state Deriv returned. All other params are interpreted AFTER this check.
+  const storedToken = getCSRFToken();
+  if (!storedToken || !params.state || storedToken !== params.state) {
+    clearAllDerivAuthData();
+    cleanupUrl();
+    const reason = !storedToken
+      ? "Login session expired -- please try connecting again"
+      : !params.state
+      ? "Missing state parameter - possible CSRF attack"
+      : "CSRF token mismatch - possible CSRF attack";
+    throw new DerivOAuthError(reason);
+  }
+  clearCSRFToken();
   if (params.error) {
     cleanupUrl();
     throw new DerivOAuthError(`${params.error}: ${params.error_description || ""}`);
   }
-  if (!params.state) {
-    clearAllDerivAuthData();
-    cleanupUrl();
-    throw new DerivOAuthError("Missing state parameter - possible CSRF attack");
-  }
-  const storedToken = getCSRFToken();
-  if (!storedToken || storedToken !== params.state) {
-    clearAllDerivAuthData();
-    cleanupUrl();
-    throw new DerivOAuthError("CSRF token mismatch - possible CSRF attack");
-  }
-  clearCSRFToken();
   if (!params.code) {
     throw new DerivOAuthError("Missing authorization code");
   }
@@ -152,11 +206,32 @@ async function exchangeCodeForTokens(code: string, codeVerifier: string): Promis
   return authInfo;
 }
 
+/**
+ * Validate the Deriv return and hand back the single-use code + PKCE
+ * verifier WITHOUT exchanging them in the browser. The exchange must
+ * happen server-side (POST /api/v1/auth/deriv/connect-code): Deriv's
+ * token endpoint has no CORS allow-list for our origin, so a browser
+ * POST dies with a network error after the user already consented.
+ * Cleans the URL afterward regardless of success or failure.
+ */
+export function consumeValidatedCallback(): { code: string; codeVerifier: string } {
+  const params = parseCallbackParams();
+  const code = validateCallback(params);
+  const codeVerifier = getCodeVerifier();
+  if (!codeVerifier) {
+    clearAllDerivAuthData();
+    cleanupUrl();
+    throw new DerivOAuthError("Login session expired -- please try connecting again");
+  }
+  clearCodeVerifier();
+  cleanupUrl();
+  return { code, codeVerifier };
+}
+
 /** Full callback handling: validate -> exchange code -> return auth info.
  * Call this when isDerivCallback() is true. Cleans the URL afterward
  * regardless of success or failure. */
-export async function handleDerivCallback(): Promise<DerivAuthInfo> {
-  const params = parseCallbackParams();
+export async function handleDerivCallback(): Promise<DerivAuthInfo> {  const params = parseCallbackParams();
   const code = validateCallback(params);
 
   const codeVerifier = getCodeVerifier();

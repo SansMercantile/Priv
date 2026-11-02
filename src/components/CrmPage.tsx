@@ -1,0 +1,1901 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { Users, RefreshCw, Search, X, Plus, AlertTriangle, CheckCircle2, Copy } from "lucide-react";
+import apiClient from "../api/apiClient";
+
+// Admin Client CRM -- ported from the ptah-realty CRM design (KPI strip,
+// search/filter bar, master-detail table, tabbed detail modal) and fed
+// exclusively by the existing admin endpoints:
+//   GET    /api/v1/admin/clients               (subscription rows)
+//   GET    /api/v1/admin/clients/{id}          (invoices + billing history)
+//   POST   /api/v1/admin/clients               (manual onboard)
+//   POST   /api/v1/admin/clients/{id}/plan     (plan override)
+//   POST   /api/v1/admin/clients/{id}/fix      (stuck-account fixes)
+//   DELETE /api/v1/admin/clients/{id}
+//   GET    /api/v1/admin/trading/overview      (identity/trading/license merge)
+//   PUT    /api/v1/admin/licenses/{id}         (node license)
+//   GET    /api/v1/payment/plans               (plan catalogue)
+// Route is wrapped in RequireAdmin (App.tsx); sidebar hides it from clients.
+
+interface ClientSub {
+  user_id: string;
+  name?: string | null;
+  email?: string | null;
+  subscription_id?: string | null;
+  plan_id?: string | null;
+  plan_name?: string | null;
+  status?: string | null;
+  payment_provider?: string | null;
+  current_period_end?: string | null;
+  created_at?: string | null;
+  signed_up_at?: string | null;
+}
+
+interface OverviewAccount {
+  adapter_id: string;
+  account_id: string;
+  balance?: number | null;
+  currency?: string | null;
+  open_count?: number;
+  open_stake_total?: number;
+  open_positions?: Array<{
+    order_id?: string;
+    symbol?: string;
+    contract_type?: string;
+    stake?: number;
+    payout?: number;
+  }>;
+}
+
+interface LicenseInfo {
+  tier?: string;
+  enabled?: boolean;
+  effective_tier?: string;
+  expires_at?: string | null;
+  expired?: boolean;
+  updated_by?: string | null;
+}
+
+interface OverviewUser {
+  user_id: string;
+  name?: string | null;
+  email?: string | null;
+  kyc_status?: string | null;
+  plan?: string | null;
+  subscription_status?: string | null;
+  license?: LicenseInfo;
+  accounts?: OverviewAccount[];
+  signals_30d?: number;
+  signals_open?: number;
+  sources?: string[];
+  signed_up_at?: string | null;
+}
+
+interface PlanOpt {
+  plan_id: string;
+  name: string;
+  price?: number;
+  currency?: string;
+}
+
+interface MergedRow extends ClientSub {
+  name?: string | null;
+  email?: string | null;
+  kyc?: string | null;
+  license?: LicenseInfo;
+  accounts?: OverviewAccount[];
+  signals_30d?: number;
+  signals_open?: number;
+  sources?: string[];
+}
+
+interface ClientDetail {
+  subscription?: Record<string, any> | null;
+  invoices?: Array<Record<string, any>>;
+  billing_history?: Array<Record<string, any>>;
+}
+
+// GET /api/v1/admin/auth0/users row
+interface Auth0User {
+  user_id: string;
+  email?: string | null;
+  email_verified?: boolean;
+  username?: string | null;
+  identities: Array<{ provider?: string | null; connection?: string | null }>;
+  has_password: boolean;
+  logins_count?: number;
+  created_at?: string | null;
+  last_login?: string | null;
+}
+
+// GET /api/v1/admin/client-accounts row: a client's trading account
+// (Deriv token store, MT5 bridge, MetaApi, or a manual IB record) joined
+// with the client's name/email and their referrer (IB).
+interface ClientAcctRow {
+  user_id: string;
+  broker_id?: string;
+  login?: string;
+  server?: string;
+  source?: string;
+  currency?: string;
+  account_type?: string;
+  status?: string; // deriv | pending | approved | rejected
+  client_name?: string | null;
+  client_email?: string | null;
+  ib_user_id?: string | null;
+  ib_name?: string | null;
+  ib_email?: string | null;
+}
+
+// Backend timestamps are naive UTC -- assume Z when no zone present.
+const parseUtc = (iso: string) =>
+  new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`);
+const fmtDate = (iso?: string | null) => {
+  if (!iso) return "—";
+  const t = parseUtc(iso);
+  return Number.isNaN(t.getTime()) ? "—" : t.toLocaleDateString();
+};
+const fmtDateTime = (iso?: string | null) => {
+  if (!iso) return "—";
+  const t = parseUtc(iso);
+  return Number.isNaN(t.getTime()) ? "—" : t.toLocaleString();
+};
+const fmtNum = (v?: number | null, d = 2) =>
+  v === undefined || v === null || Number.isNaN(Number(v)) ? "—" : Number(v).toFixed(d);
+
+const statusBadge = (s?: string | null) => {
+  const v = (s || "").toLowerCase();
+  if (v === "active" || v === "paid" || v === "succeeded" || v === "open")
+    return "border-emerald-500/40 bg-emerald-500/10 text-emerald-300";
+  if (v === "cancelled" || v === "canceled" || v === "failed" || v === "void")
+    return "border-rose-500/40 bg-rose-500/10 text-rose-300";
+  if (v === "past_due" || v === "overdue" || v === "uncollectible")
+    return "border-amber-500/40 bg-amber-500/10 text-amber-300";
+  if (v === "pending" || v === "trialing" || v === "draft")
+    return "border-sky-500/40 bg-sky-500/10 text-sky-300";
+  return "border-white/15 bg-white/5 text-zinc-400";
+};
+
+const planBadge = (p?: string | null) => {
+  if (!p) return "border-white/10 bg-white/5 text-zinc-500";
+  const v = p.toLowerCase();
+  if (v === "free") return "border-white/15 bg-white/5 text-zinc-400";
+  if (v === "autonomous" || v === "sovereign") return "border-amber-500/40 bg-amber-500/10 text-amber-300";
+  return "border-violet-500/40 bg-violet-500/10 text-violet-300";
+};
+
+const FIX_ACTIONS = [
+  { id: "reactivate", label: "Reactivate (reset status, clear cancel)" },
+  { id: "clear_cancellation", label: "Clear cancellation flag" },
+  { id: "reset_status_active", label: "Reset status → active" },
+];
+
+const providerLabel = (p?: string | null) => {
+  const v = (p || "").toLowerCase();
+  if (v === "auth0") return "password";
+  if (v.startsWith("google")) return "google";
+  if (v.startsWith("apple")) return "apple";
+  if (v.startsWith("twitter") || v === "x") return "twitter";
+  if (v.startsWith("facebook")) return "facebook";
+  if (v.startsWith("github")) return "github";
+  if (v.startsWith("microsoft")) return "microsoft";
+  return v || "unknown";
+};
+
+export default function CrmPage() {
+  const [clients, setClients] = useState<ClientSub[]>([]);
+  const [overview, setOverview] = useState<OverviewUser[]>([]);
+  const [plans, setPlans] = useState<PlanOpt[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [search, setSearch] = useState("");
+  const [planFilter, setPlanFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const [modal, setModal] = useState<null | "detail" | "new">(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [tab, setTab] = useState<"overview" | "billing" | "actions">("overview");
+  const [detail, setDetail] = useState<ClientDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionMsg, setActionMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const [licTier, setLicTier] = useState("standard");
+  const [licEnabled, setLicEnabled] = useState(true);
+  // Grant window for the license form: default = leave the current
+  // expiry untouched so an enabled/tier-only save never wipes a window.
+  const [licDuration, setLicDuration] = useState("nochange");
+  const [setPlanName, setSetPlanName] = useState("");
+  const [setPlanReason, setSetPlanReason] = useState("");
+  const [fixAction, setFixAction] = useState("reactivate");
+  const [fixReason, setFixReason] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const [newUserId, setNewUserId] = useState("");
+  const [newPlan, setNewPlan] = useState("Free");
+
+  // Auth0 user-account directory (password logins / resets / verification)
+  const [auQuery, setAuQuery] = useState("");
+  const [auUsers, setAuUsers] = useState<Auth0User[] | null>(null);
+  const [auLoading, setAuLoading] = useState(false);
+  const [auError, setAuError] = useState<string | null>(null);
+  const [auBusy, setAuBusy] = useState<string | null>(null);
+  const [auMsg, setAuMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [auPw, setAuPw] = useState<
+    { userId: string; email: string; password: string; created: boolean } | null
+  >(null);
+  const [auPwCopied, setAuPwCopied] = useState(false);
+
+  // Client trading accounts: IB books + the approve/reject queue for
+  // non-Deriv (MT5 bridge / MetaApi) accounts. Lazy-loaded on open.
+  const [acctOpen, setAcctOpen] = useState(false);
+  const [accts, setAccts] = useState<ClientAcctRow[] | null>(null);
+  const [acctCounts, setAcctCounts] = useState<Record<string, number>>({});
+  const [acctLoading, setAcctLoading] = useState(false);
+  const [acctBusy, setAcctBusy] = useState<string | null>(null);
+  const [acctMsg, setAcctMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [acctAdd, setAcctAdd] = useState(false);
+  const [acctForm, setAcctForm] = useState({
+    user_id: "",
+    login: "",
+    server: "",
+    approve: true,
+  });
+
+  const loadAll = async (quiet = false) => {
+    if (!quiet) setRefreshing(true);
+    setLoadError(null);
+    const [cl, ov, pl] = await Promise.allSettled([
+      apiClient.get("/api/v1/admin/clients"),
+      apiClient.get("/api/v1/admin/trading/overview"),
+      apiClient.getPlans(),
+    ]);
+    if (cl.status === "fulfilled") {
+      setClients((cl.value?.data?.clients ?? []) as ClientSub[]);
+    }
+    if (ov.status === "fulfilled") {
+      setOverview((ov.value?.data?.users ?? []) as OverviewUser[]);
+    }
+    if (pl.status === "fulfilled") {
+      const body: any = pl.value?.data ?? pl.value;
+      setPlans(Array.isArray(body) ? body : body?.plans ?? []);
+    }
+    if (cl.status === "rejected" && ov.status === "rejected") {
+      setLoadError("Could not load admin client data.");
+    }
+    setLoading(false);
+    setRefreshing(false);
+  };
+
+  useEffect(() => {
+    loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setModal(null);
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
+
+  // Union of subscription rows and overview-only identities (KYC/broker
+  // users without a subscription record still show up as clients).
+  const rows: MergedRow[] = useMemo(() => {
+    const byId = new Map<string, MergedRow>();
+    for (const c of clients) byId.set(c.user_id, { ...c });
+    for (const u of overview) {
+      const r: MergedRow = byId.get(u.user_id) ?? { user_id: u.user_id };
+      // Server-persisted profile (clients endpoint) wins; overview fills gaps.
+      r.name = r.name ?? u.name ?? null;
+      r.email = r.email ?? u.email ?? null;
+      r.kyc = u.kyc_status ?? null;
+      if (!r.plan_name && u.plan) r.plan_name = u.plan;
+      if (!r.status && u.subscription_status) r.status = u.subscription_status;
+      r.license = u.license;
+      r.accounts = u.accounts;
+      r.signals_30d = u.signals_30d ?? 0;
+      r.signals_open = u.signals_open ?? 0;
+      r.sources = u.sources;
+      // Signed-up date for profile-only rows (no subscription carries
+      // created_at of its own) -- this is the waiting-list join date.
+      if (!r.created_at && u.signed_up_at) r.created_at = u.signed_up_at;
+      byId.set(u.user_id, r);
+    }
+    return Array.from(byId.values()).sort((a, b) =>
+      (a.name || a.user_id).localeCompare(b.name || b.user_id));
+  }, [clients, overview]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (planFilter !== "all") {
+        const pn = r.plan_name || "none";
+        if (pn !== planFilter) return false;
+      }
+      if (statusFilter !== "all") {
+        const st = (r.status || "none").toLowerCase();
+        if (st !== statusFilter) return false;
+      }
+      if (!q) return true;
+      return [r.user_id, r.name, r.email, r.plan_name]
+        .filter(Boolean)
+        .some((f) => String(f).toLowerCase().includes(q));
+    });
+  }, [rows, search, planFilter, statusFilter]);
+
+  const kpi = useMemo(() => {
+    const active = rows.filter((r) => (r.status || "").toLowerCase() === "active").length;
+    let accounts = 0;
+    let openPos = 0;
+    let stake = 0;
+    let signals30 = 0;
+    let signalsOpen = 0;
+    for (const r of rows) {
+      for (const a of r.accounts ?? []) {
+        accounts += 1;
+        openPos += a.open_count ?? 0;
+        stake += a.open_stake_total ?? 0;
+      }
+      signals30 += r.signals_30d ?? 0;
+      signalsOpen += r.signals_open ?? 0;
+    }
+    const planNames = new Set(rows.map((r) => r.plan_name).filter(Boolean) as string[]);
+    const paid = rows.filter((r) => r.plan_name && r.plan_name.toLowerCase() !== "free").length;
+    const waiting = rows.filter((r) => !r.plan_name).length;
+    const weekAgo = Date.now() - 7 * 86400000;
+    const signed7d = rows.filter((r) => {
+      const t = r.created_at ? Date.parse(r.created_at) : NaN;
+      return !Number.isNaN(t) && t >= weekAgo;
+    }).length;
+    return { total: rows.length, active, accounts, openPos, stake, signals30, signalsOpen,
+             planCount: planNames.size, paid, waiting, signed7d };
+  }, [rows]);
+
+  const planOptions = useMemo(() => {
+    const names = new Set<string>(plans.map((p) => p.name));
+    for (const r of rows) if (r.plan_name) names.add(r.plan_name);
+    names.add("Free");
+    return Array.from(names).sort();
+  }, [plans, rows]);
+
+  const selectedRow = useMemo(
+    () => rows.find((r) => r.user_id === selectedId) ?? null,
+    [rows, selectedId]);
+
+  const fetchDetail = async (id: string) => {
+    setDetailLoading(true);
+    setDetail(null);
+    try {
+      const res: any = await apiClient.get(`/api/v1/admin/clients/${encodeURIComponent(id)}`);
+      setDetail({
+        subscription: res?.data?.subscription ?? null,
+        invoices: res?.data?.invoices ?? [],
+        billing_history: res?.data?.billing_history ?? [],
+      });
+      setSetPlanName(res?.data?.subscription?.plan_id
+        ? plans.find((p) => p.plan_id === res?.data?.subscription?.plan_id)?.name ?? ""
+        : "");
+    } catch {
+      setDetail({ subscription: null, invoices: [], billing_history: [] });
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const openClient = (id: string) => {
+    setSelectedId(id);
+    setTab("overview");
+    setActionMsg(null);
+    setConfirmDelete(false);
+    setModal("detail");
+    fetchDetail(id);
+  };
+
+  useEffect(() => {
+    if (!selectedRow) return;
+    // Raw granted tier (not effective_tier): an expired window must not
+    // overwrite the record of what was actually granted on save.
+    setLicTier(selectedRow.license?.tier || "standard");
+    setLicEnabled(selectedRow.license?.enabled !== false);
+    setLicDuration("nochange");
+  }, [selectedRow]);
+
+  const runAction = async (fn: () => Promise<unknown>,
+                           okText: string | ((res: unknown) => string)) => {
+    if (!selectedId) return;
+    setActionBusy(true);
+    setActionMsg(null);
+    try {
+      const res = await fn();
+      setActionMsg({ ok: true, text: typeof okText === "function" ? okText(res) : okText });
+      await loadAll(true);
+      await fetchDetail(selectedId);
+    } catch (e: any) {
+      const detailMsg = e?.response?.data?.detail;
+      const text = typeof detailMsg === "string"
+        ? detailMsg
+        : detailMsg?.message || e?.message || "Action failed";
+      setActionMsg({ ok: false, text });
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const onCreateClient = async () => {
+    setActionBusy(true);
+    setActionMsg(null);
+    try {
+      await apiClient.post("/api/v1/admin/clients", {
+        user_id: newUserId.trim(),
+        plan_name: newPlan,
+      });
+      setModal(null);
+      setNewUserId("");
+      await loadAll(true);
+    } catch (e: any) {
+      const d = e?.response?.data?.detail;
+      setActionMsg({ ok: false, text: typeof d === "string" ? d : e?.message || "Create failed" });
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const searchAuth0 = async (q?: string) => {
+    const query = (q ?? auQuery).trim();
+    setAuLoading(true);
+    setAuError(null);
+    try {
+      const res: any = await apiClient.get(
+        `/api/v1/admin/auth0/users?query=${encodeURIComponent(query)}&limit=25`
+      );
+      setAuUsers((res?.data?.users ?? []) as Auth0User[]);
+    } catch (e: any) {
+      const d = e?.response?.data?.detail;
+      setAuError(typeof d === "string" ? d : e?.message || "Auth0 search failed.");
+      setAuUsers((prev) => prev ?? []);
+    } finally {
+      setAuLoading(false);
+    }
+  };
+
+  const runAuth0Action = async (
+    userId: string,
+    fn: () => Promise<any>,
+    okText: (data: any) => string
+  ) => {
+    setAuBusy(userId);
+    setAuMsg(null);
+    try {
+      const res = await fn();
+      const data = res?.data ?? res;
+      setAuMsg({ ok: true, text: okText(data) });
+    } catch (e: any) {
+      const d = e?.response?.data?.detail;
+      setAuMsg({
+        ok: false,
+        text: typeof d === "string" ? d : d?.message || e?.message || "Action failed",
+      });
+    } finally {
+      setAuBusy(null);
+    }
+  };
+
+  const auth0SetPassword = (u: Auth0User) =>
+    runAuth0Action(
+      u.user_id,
+      () =>
+        apiClient.post("/api/v1/admin/auth0/users/set-password", {
+          user_id: u.user_id,
+        }),
+      (data) => {
+        if (data?.password) {
+          setAuPw({
+            userId: u.user_id,
+            email: u.email || "",
+            password: data.password,
+            created: !!data.created_identity,
+          });
+          setAuPwCopied(false);
+        }
+        return data?.created_identity
+          ? "Password login created for this social-only account."
+          : "Temporary password set.";
+      }
+    ).then(() => searchAuth0());
+
+  const auth0SendReset = (u: Auth0User) =>
+    runAuth0Action(
+      u.user_id,
+      () =>
+        apiClient.post("/api/v1/admin/auth0/users/send-reset", {
+          user_id: u.user_id,
+        }),
+      () => `Password reset email sent to ${u.email || u.user_id}.`
+    );
+
+  const auth0SendVerification = (u: Auth0User) =>
+    runAuth0Action(
+      u.user_id,
+      () =>
+        apiClient.post("/api/v1/admin/auth0/users/send-verification", {
+          user_id: u.user_id,
+        }),
+      () => `Verification email sent to ${u.email || u.user_id}.`
+    );
+
+  const loadAccts = async () => {
+    setAcctLoading(true);
+    setAcctMsg(null);
+    try {
+      const res: any = await apiClient.get("/api/v1/admin/client-accounts");
+      const body = res?.data ?? res;
+      setAccts(Array.isArray(body?.accounts) ? body.accounts : []);
+      setAcctCounts(body?.counts ?? {});
+    } catch (e: any) {
+      const d = e?.response?.data?.detail;
+      setAccts([]);
+      setAcctMsg({
+        ok: false,
+        text: typeof d === "string" ? d : "Could not load trading accounts.",
+      });
+    } finally {
+      setAcctLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (acctOpen && accts === null) loadAccts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [acctOpen, accts]);
+
+  const decideAcct = async (row: ClientAcctRow, action: "approve" | "reject") => {
+    const key = `${row.user_id}:${row.login || row.broker_id || ""}`;
+    setAcctBusy(key);
+    try {
+      await apiClient.post("/api/v1/admin/client-accounts/decide", {
+        user_id: row.user_id,
+        action,
+        broker_id: row.broker_id,
+        login: row.login,
+        server: row.server,
+        source: row.source,
+        currency: row.currency,
+        account_type: row.account_type,
+      });
+      setAcctMsg({
+        ok: true,
+        text: `${row.login || "Account"} ${
+          action === "approve" ? "approved for trading" : "rejected"
+        }.`,
+      });
+      await loadAccts();
+    } catch (e: any) {
+      const d = e?.response?.data?.detail;
+      setAcctMsg({
+        ok: false,
+        text: typeof d === "string" ? d : e?.message || "Action failed.",
+      });
+    } finally {
+      setAcctBusy(null);
+    }
+  };
+
+  const addAcct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const login = acctForm.login.trim();
+    const server = acctForm.server.trim();
+    if (!acctForm.user_id || !login || !server || acctBusy) return;
+    setAcctBusy("add");
+    try {
+      await apiClient.post("/api/v1/admin/client-accounts/add", {
+        user_id: acctForm.user_id,
+        login,
+        server,
+        source: "ib",
+        approve: acctForm.approve,
+      });
+      setAcctMsg({
+        ok: true,
+        text: `Account ${login} added${
+          acctForm.approve ? " and approved" : " (pending)"
+        }.`,
+      });
+      setAcctForm({ user_id: "", login: "", server: "", approve: true });
+      setAcctAdd(false);
+      await loadAccts();
+    } catch (e: any) {
+      const d = e?.response?.data?.detail;
+      setAcctMsg({
+        ok: false,
+        text: typeof d === "string" ? d : e?.message || "Could not add account.",
+      });
+    } finally {
+      setAcctBusy(null);
+    }
+  };
+
+  const inputCls =
+    "w-full bg-neutral-950 border border-white/10 rounded px-2.5 py-2 text-xs font-mono text-white placeholder-stone-600 focus:outline-none focus:border-white/30";
+  const selectCls =
+    "bg-neutral-950 border border-white/10 rounded px-2.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-white/30 cursor-pointer";
+  const btnPrimary =
+    "px-3 py-1.5 rounded bg-white text-black border border-white text-xs font-mono font-bold hover:bg-neutral-200 transition disabled:opacity-40 cursor-pointer";
+  const btnGhost =
+    "px-3 py-1.5 rounded border border-white/15 bg-white/5 text-white text-xs font-mono font-bold hover:bg-white/10 transition disabled:opacity-40 cursor-pointer";
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-serif italic text-white font-normal flex items-center">
+            <Users className="w-7 h-7 mr-3 text-white/70" />
+            Client CRM
+          </h1>
+          <p className="text-white/40 text-xs mt-1 font-light">
+            Every client, plan, license and trading account in one place. Admin-only --
+            actions here are audited to the client's billing history.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => loadAll()}
+            disabled={refreshing}
+            className={btnGhost}
+            title="Refresh all data"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 inline mr-1.5 ${refreshing ? "animate-spin" : ""}`} />
+            REFRESH
+          </button>
+          <button
+            onClick={() => {
+              setActionMsg(null);
+              setNewUserId("");
+              setModal("new");
+            }}
+            className={btnPrimary}
+          >
+            <Plus className="w-3.5 h-3.5 inline mr-1.5" />
+            NEW CLIENT
+          </button>
+        </div>
+      </div>
+
+      {loadError && (
+        <div className="p-3 border border-rose-900/40 bg-rose-950/10 rounded-xl text-xs font-mono text-rose-300">
+          {loadError}
+        </div>
+      )}
+
+      {/* KPI strip (ptah TopStatsOverview pattern) */}
+      <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
+        {[
+          { label: "Waiting list", value: String(kpi.waiting),
+            sub: `${kpi.signed7d} signed up in 7d · no plan yet` },
+          { label: "Total clients", value: String(kpi.total),
+            sub: `${kpi.active} active subscriptions` },
+          { label: "Broker accounts", value: String(kpi.accounts),
+            sub: `${kpi.openPos} open positions · ${fmtNum(kpi.stake)} stake` },
+          { label: "Signals (30d)", value: String(kpi.signals30),
+            sub: `${kpi.signalsOpen} open now` },
+          { label: "Plans in use", value: String(kpi.planCount),
+            sub: `${kpi.paid} paid · ${kpi.total - kpi.paid} free/none` },
+        ].map((c) => (
+          <div key={c.label} className="border border-white/10 rounded-xl bg-black/30 p-4">
+            <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-bold">
+              {c.label}
+            </div>
+            <div className="text-2xl font-black text-white mt-1.5 tracking-tight">{c.value}</div>
+            <div className="text-[10px] font-mono text-zinc-500 mt-1">{c.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Client trading accounts: IB books + non-Deriv approval queue.
+          Collapsed by default; loads on first open. */}
+      <div className="border border-white/10 rounded-xl bg-black/30">
+        <button
+          onClick={() => setAcctOpen((o) => !o)}
+          className="w-full flex items-center justify-between gap-3 p-4 text-left hover:bg-white/[0.03] cursor-pointer"
+        >
+          <span className="text-xs font-mono uppercase tracking-wider text-zinc-400 font-bold">
+            Client trading accounts
+          </span>
+          <span className="flex items-center gap-2 text-[10px] font-mono text-zinc-500">
+            {(acctCounts.pending ?? 0) > 0 && (
+              <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">
+                {acctCounts.pending} awaiting approval
+              </span>
+            )}
+            {accts !== null && <span>{accts.length} accounts</span>}
+            <span className={`transition-transform ${acctOpen ? "rotate-180" : ""}`}>
+              ▾
+            </span>
+          </span>
+        </button>
+        {acctOpen && (
+          <div className="border-t border-white/5 p-4 space-y-3">
+            <p className="text-[10px] font-mono text-zinc-500 leading-relaxed">
+              Every linked client trading account: Deriv (auto-linked, no approval),
+              plus MT5 bridge / MetaApi / manually added IB accounts. A non-Deriv
+              account only auto-executes after you approve it here.
+            </p>
+
+            {acctMsg && (
+              <div
+                className={`p-2.5 rounded-lg border text-xs font-mono ${
+                  acctMsg.ok
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                    : "border-rose-500/30 bg-rose-500/10 text-rose-300"
+                }`}
+              >
+                {acctMsg.text}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={loadAccts}
+                disabled={acctLoading}
+                className={btnGhost}
+              >
+                {acctLoading ? "LOADING…" : "REFRESH"}
+              </button>
+              <button
+                onClick={() => setAcctAdd((a) => !a)}
+                className={btnPrimary}
+              >
+                {acctAdd ? "Cancel add" : "Add IB account"}
+              </button>
+            </div>
+
+            {acctAdd && (
+              <form
+                onSubmit={addAcct}
+                className="border border-white/10 rounded-lg p-3 space-y-2 bg-black/40"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <select
+                    value={acctForm.user_id}
+                    onChange={(e) =>
+                      setAcctForm((f) => ({ ...f, user_id: e.target.value }))
+                    }
+                    className={selectCls}
+                    required
+                  >
+                    <option value="">Client…</option>
+                    {rows.map((r) => (
+                      <option key={r.user_id} value={r.user_id}>
+                        {r.name || r.email || r.user_id}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={acctForm.login}
+                    onChange={(e) =>
+                      setAcctForm((f) => ({ ...f, login: e.target.value }))
+                    }
+                    placeholder="MT5 login (account number)"
+                    className={inputCls}
+                    required
+                  />
+                  <input
+                    type="text"
+                    value={acctForm.server}
+                    onChange={(e) =>
+                      setAcctForm((f) => ({ ...f, server: e.target.value }))
+                    }
+                    placeholder="Server (e.g. FTMO-Live)"
+                    className={inputCls}
+                    required
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <label className="flex items-center gap-2 text-[11px] font-mono text-zinc-400 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={acctForm.approve}
+                      onChange={(e) =>
+                        setAcctForm((f) => ({ ...f, approve: e.target.checked }))
+                      }
+                      className="accent-emerald-500"
+                    />
+                    Approve for auto-execution now
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={acctBusy === "add"}
+                    className={btnPrimary}
+                  >
+                    {acctBusy === "add" ? "ADDING…" : "Add account"}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            <div className="border border-white/10 rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-white/5 text-zinc-500 uppercase text-[9px] font-mono">
+                      <th className="py-2 px-3">Client</th>
+                      <th className="py-2 px-3">Account</th>
+                      <th className="py-2 px-3">Source</th>
+                      <th className="py-2 px-3">IB</th>
+                      <th className="py-2 px-3">Status</th>
+                      <th className="py-2 px-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {acctLoading && accts === null && (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-xs font-mono text-zinc-500">
+                          LOADING ACCOUNTS…
+                        </td>
+                      </tr>
+                    )}
+                    {accts !== null && accts.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-xs font-mono text-zinc-500">
+                          No client trading accounts yet.
+                        </td>
+                      </tr>
+                    )}
+                    {(accts ?? []).map((row) => {
+                      const key = `${row.user_id}:${row.login || row.broker_id || ""}`;
+                      const st = (row.status || "pending").toLowerCase();
+                      const busy = acctBusy === key;
+                      return (
+                        <tr key={key} className="border-t border-white/5">
+                          <td className="py-2 px-3">
+                            <div className="text-xs font-mono text-white">
+                              {row.client_name || row.client_email || row.user_id}
+                            </div>
+                            <div className="text-[9px] text-zinc-500 truncate max-w-[200px]" title={row.user_id}>
+                              {row.client_email || row.user_id}
+                            </div>
+                          </td>
+                          <td className="py-2 px-3">
+                            <div className="text-xs font-mono text-white">
+                              {row.login || "—"}
+                              {row.server ? ` · ${row.server}` : ""}
+                            </div>
+                            <div className="text-[9px] text-zinc-500">
+                              {row.account_type || "live"}
+                              {row.currency ? ` · ${row.currency}` : ""}
+                            </div>
+                          </td>
+                          <td className="py-2 px-3 text-[10px] font-mono uppercase text-zinc-400">
+                            {row.source || "—"}
+                          </td>
+                          <td className="py-2 px-3 text-[10px] font-mono text-zinc-400">
+                            {row.ib_name || row.ib_email ||
+                              (row.ib_user_id
+                                ? `${row.ib_user_id.split("|")[0]} · ${row.ib_user_id.split("|").pop()?.slice(-6)}`
+                                : "—")}
+                          </td>
+                          <td className="py-2 px-3">
+                            <span
+                              className={`text-[9px] uppercase px-1.5 py-0.5 rounded ${
+                                st === "deriv" || st === "approved"
+                                  ? "bg-emerald-500/10 text-emerald-400"
+                                  : st === "rejected"
+                                    ? "bg-rose-500/10 text-rose-400"
+                                    : "bg-amber-500/10 text-amber-400"
+                              }`}
+                            >
+                              {st === "deriv" ? "deriv · auto" : st}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            {st === "deriv" ? (
+                              <span className="text-[10px] font-mono text-zinc-600">
+                                no approval needed
+                              </span>
+                            ) : (
+                              <div className="flex justify-end gap-1.5">
+                                {st !== "approved" && (
+                                  <button
+                                    onClick={() => decideAcct(row, "approve")}
+                                    disabled={busy}
+                                    className="px-2 py-1 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono font-bold hover:bg-emerald-500/25 disabled:opacity-40 cursor-pointer"
+                                  >
+                                    APPROVE
+                                  </button>
+                                )}
+                                {st !== "rejected" && (
+                                  <button
+                                    onClick={() => decideAcct(row, "reject")}
+                                    disabled={busy}
+                                    className="px-2 py-1 rounded bg-rose-500/15 border border-rose-500/30 text-rose-300 text-[10px] font-mono font-bold hover:bg-rose-500/25 disabled:opacity-40 cursor-pointer"
+                                  >
+                                    {st === "approved" ? "REVOKE" : "REJECT"}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Search + filters (ptah PipelineBoard pattern) */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative max-w-sm flex-1 min-w-[220px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
+          <input
+            type="text"
+            placeholder="Search by name, email or user id..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className={`${inputCls} pl-9`}
+          />
+        </div>
+        <select
+          value={planFilter}
+          onChange={(e) => setPlanFilter(e.target.value)}
+          className={selectCls}
+          title="Filter by plan"
+        >
+          <option value="all">All plans</option>
+          {planOptions.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className={selectCls}
+          title="Filter by subscription status"
+        >
+          <option value="all">Any status</option>
+          <option value="active">active</option>
+          <option value="cancelled">cancelled</option>
+          <option value="past_due">past_due</option>
+          <option value="pending">pending</option>
+          <option value="none">no subscription</option>
+        </select>
+        <span className="text-[10px] font-mono px-2 py-1 rounded border border-white/10 bg-white/5 text-zinc-400">
+          {filtered.length}/{rows.length} clients
+        </span>
+      </div>
+
+      {/* Clients master table */}
+      <div className="border border-white/10 rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-white/5 text-zinc-500 uppercase text-[9px] font-mono">
+                <th className="py-2.5 px-3">Client</th>
+                <th className="py-2.5 px-3">Plan</th>
+                <th className="py-2.5 px-3">Status</th>
+                <th className="py-2.5 px-3">Provider</th>
+                <th className="py-2.5 px-3">Period end</th>
+                <th className="py-2.5 px-3">License</th>
+                <th className="py-2.5 px-3 text-right">Signals 30d</th>
+                <th className="py-2.5 px-3 text-right">Open pos</th>
+                <th className="py-2.5 px-3">Joined</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={9} className="py-10 text-center text-xs font-mono text-zinc-500">
+                    <RefreshCw className="w-4 h-4 inline animate-spin text-rose-500 mr-2" />
+                    LOADING CLIENTS...
+                  </td>
+                </tr>
+              )}
+              {!loading && filtered.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="py-10 text-center text-xs font-mono text-zinc-500">
+                    No clients match these filters.
+                  </td>
+                </tr>
+              )}
+              {!loading &&
+                filtered.map((r) => (
+                  <tr
+                    key={r.user_id}
+                    onClick={() => openClient(r.user_id)}
+                    className="border-t border-white/5 hover:bg-white/[0.04] cursor-pointer"
+                  >
+                    <td className="py-2.5 px-3">
+                      <div className="text-xs font-mono font-bold text-white">
+                        {r.name || r.email || (
+                          <span className="text-amber-400/80 font-normal italic">
+                            Name pending (syncs at next login)
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        className="text-[10px] text-zinc-500 truncate max-w-[260px]"
+                        title={r.user_id}
+                      >
+                        {r.name && r.email
+                          ? r.email
+                          : `${r.user_id.split("|")[0]} · ${r.user_id.split("|").pop()?.slice(-6)}`}
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span className={`text-[9px] font-mono uppercase px-2 py-0.5 rounded-full border ${planBadge(r.plan_name)}`}>
+                        {r.plan_name || "none"}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span className={`text-[9px] font-mono uppercase px-2 py-0.5 rounded-full border ${statusBadge(r.status)}`}>
+                        {r.status || "no sub"}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-[10px] font-mono text-zinc-400">
+                      {r.payment_provider || "—"}
+                    </td>
+                    <td className="py-2.5 px-3 text-[10px] font-mono text-zinc-400">
+                      {fmtDate(r.current_period_end)}
+                    </td>
+                    <td className="py-2.5 px-3 text-[10px] font-mono">
+                      <span
+                        className={r.license?.enabled === false || r.license?.expired ? "text-rose-400" : "text-zinc-400"}
+                        title={r.license?.expires_at ? `until ${fmtDate(r.license.expires_at)}` : undefined}
+                      >
+                        {r.license?.effective_tier || r.license?.tier || "standard"}
+                        {r.license?.expired && " (expired)"}
+                        {r.license?.enabled === false && " (off)"}
+                        {r.license?.expires_at && !r.license?.expired && ` · ${fmtDate(r.license.expires_at)}`}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-right text-[10px] font-mono text-zinc-400">
+                      {r.signals_30d ?? 0}
+                    </td>
+                    <td className="py-2.5 px-3 text-right text-[10px] font-mono text-zinc-400">
+                      {(r.accounts ?? []).reduce((n, a) => n + (a.open_count ?? 0), 0)}
+                    </td>
+                    <td className="py-2.5 px-3 text-[10px] font-mono text-zinc-500">
+                      {fmtDate(r.created_at)}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* User accounts (Auth0) -- password logins, reset + verification emails */}
+      <div className="border border-white/10 rounded-xl bg-black/30 p-4 space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-bold">
+              User accounts (Auth0)
+            </div>
+            <p className="text-[11px] text-zinc-500 font-mono mt-0.5 max-w-xl">
+              Search any sign-up by email, username or user id. Set a temporary
+              password (creates the password login on social-only accounts so
+              forgot-password can work), send the reset email, or resend
+              verification. Every action is audited to billing history.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative min-w-[220px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-500" />
+              <input
+                type="text"
+                placeholder="email / username / auth0|..."
+                value={auQuery}
+                onChange={(e) => setAuQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") searchAuth0();
+                }}
+                className={`${inputCls} pl-9`}
+              />
+            </div>
+            <button
+              onClick={() => searchAuth0()}
+              disabled={auLoading}
+              className={btnGhost}
+            >
+              {auLoading ? (
+                <RefreshCw className="w-3.5 h-3.5 inline animate-spin" />
+              ) : (
+                "SEARCH"
+              )}
+            </button>
+          </div>
+        </div>
+
+        {auMsg && (
+          <div
+            className={`p-2.5 rounded-lg border text-[11px] font-mono ${
+              auMsg.ok
+                ? "border-emerald-500/40 bg-emerald-950/20 text-emerald-300"
+                : "border-rose-500/40 bg-rose-950/20 text-rose-300"
+            }`}
+          >
+            {auMsg.ok ? (
+              <CheckCircle2 className="w-3.5 h-3.5 inline mr-1.5" />
+            ) : (
+              <AlertTriangle className="w-3.5 h-3.5 inline mr-1.5" />
+            )}
+            {auMsg.text}
+          </div>
+        )}
+
+        {auPw && (
+          <div className="p-3 rounded-lg border border-amber-500/40 bg-amber-950/20 space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="text-[11px] font-mono text-amber-200">
+                {auPw.created
+                  ? "Created the password login for this account. Hand this temporary password to the user -- they should change it right after signing in:"
+                  : "Temporary password for this account. Hand it over -- the user should reset it right after signing in:"}
+              </div>
+              <button
+                onClick={() => setAuPw(null)}
+                className="p-1 rounded hover:bg-white/10 transition cursor-pointer"
+                title="Dismiss"
+              >
+                <X className="w-3.5 h-3.5 text-zinc-400" />
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="px-2.5 py-1.5 rounded bg-black/60 border border-white/15 text-xs font-mono font-bold text-white select-all break-all">
+                {auPw.password}
+              </code>
+              <button
+                onClick={() => {
+                  navigator.clipboard
+                    .writeText(auPw.password)
+                    .then(() => {
+                      setAuPwCopied(true);
+                      setTimeout(() => setAuPwCopied(false), 1500);
+                    })
+                    .catch(() => undefined);
+                }}
+                className={btnGhost}
+              >
+                <Copy className="w-3.5 h-3.5 inline mr-1.5" />
+                {auPwCopied ? "COPIED" : "COPY"}
+              </button>
+              <span className="text-[10px] font-mono text-zinc-500">
+                {auPw.email || auPw.userId}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {auError && (
+          <div className="p-2.5 rounded-lg border border-rose-500/40 bg-rose-950/20 text-[11px] font-mono text-rose-300">
+            <AlertTriangle className="w-3.5 h-3.5 inline mr-1.5" />
+            {auError}
+          </div>
+        )}
+
+        {auUsers === null ? (
+          <p className="py-6 text-center text-[11px] font-mono text-zinc-600">
+            Not searched yet -- try an email address, username or auth0| user id.
+          </p>
+        ) : (
+          <div className="border border-white/10 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-white/5 text-zinc-500 uppercase text-[9px] font-mono">
+                    <th className="py-2 px-3">Account</th>
+                    <th className="py-2 px-3">Login methods</th>
+                    <th className="py-2 px-3">Verified</th>
+                    <th className="py-2 px-3 text-right">Logins</th>
+                    <th className="py-2 px-3">Joined</th>
+                    <th className="py-2 px-3">Last login</th>
+                    <th className="py-2 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auLoading && (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-xs font-mono text-zinc-500">
+                        <RefreshCw className="w-4 h-4 inline animate-spin text-rose-500 mr-2" />
+                        SEARCHING AUTH0...
+                      </td>
+                    </tr>
+                  )}
+                  {!auLoading && auUsers.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-xs font-mono text-zinc-500">
+                        No Auth0 users match this search.
+                      </td>
+                    </tr>
+                  )}
+                  {!auLoading &&
+                    auUsers.map((u) => {
+                      const busy = auBusy === u.user_id;
+                      return (
+                        <tr key={u.user_id} className="border-t border-white/5">
+                          <td className="py-2 px-3">
+                            <div className="text-xs font-mono font-bold text-white">
+                              {u.email || u.username || u.user_id}
+                            </div>
+                            <div
+                              className="text-[10px] text-zinc-500 truncate max-w-[220px]"
+                              title={u.user_id}
+                            >
+                              {u.user_id}
+                            </div>
+                          </td>
+                          <td className="py-2 px-3">
+                            <div className="flex flex-wrap gap-1">
+                              {u.identities.map((i) => (
+                                <span
+                                  key={`${i.provider}|${i.connection}`}
+                                  className={`text-[9px] font-mono uppercase px-1.5 py-0.5 rounded-full border ${
+                                    i.provider === "auth0"
+                                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                                      : "border-sky-500/40 bg-sky-500/10 text-sky-300"
+                                  }`}
+                                >
+                                  {providerLabel(i.provider)}
+                                </span>
+                              ))}
+                              {!u.has_password && (
+                                <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300">
+                                  no password
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-2 px-3 text-[10px] font-mono">
+                            {u.email_verified ? (
+                              <span className="text-emerald-400">yes</span>
+                            ) : (
+                              <span className="text-amber-400">no</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-right text-[10px] font-mono text-zinc-400">
+                            {u.logins_count ?? 0}
+                          </td>
+                          <td className="py-2 px-3 text-[10px] font-mono text-zinc-500">
+                            {fmtDate(u.created_at)}
+                          </td>
+                          <td className="py-2 px-3 text-[10px] font-mono text-zinc-500">
+                            {fmtDateTime(u.last_login)}
+                          </td>
+                          <td className="py-2 px-3">
+                            <div className="flex flex-wrap items-center justify-end gap-1.5">
+                              <button
+                                disabled={busy}
+                                onClick={() => auth0SetPassword(u)}
+                                className="px-2 py-1 rounded border border-amber-500/40 bg-amber-500/10 text-amber-300 text-[9px] font-mono font-bold uppercase hover:bg-amber-500/20 transition disabled:opacity-40 cursor-pointer"
+                                title={
+                                  u.has_password
+                                    ? "Set a new temporary password"
+                                    : "Social-only account: create the password login first"
+                                }
+                              >
+                                {busy ? "..." : u.has_password ? "SET TEMP PW" : "CREATE PW"}
+                              </button>
+                              <button
+                                disabled={busy || !u.has_password}
+                                onClick={() => auth0SendReset(u)}
+                                className="px-2 py-1 rounded border border-white/15 bg-white/5 text-white text-[9px] font-mono font-bold uppercase hover:bg-white/10 transition disabled:opacity-40 cursor-pointer"
+                                title={
+                                  u.has_password
+                                    ? "Email the forgot-password link"
+                                    : "No password login yet -- use CREATE PW first"
+                                }
+                              >
+                                {busy ? "..." : "RESET EMAIL"}
+                              </button>
+                              <button
+                                disabled={busy}
+                                onClick={() => auth0SendVerification(u)}
+                                className="px-2 py-1 rounded border border-white/15 bg-white/5 text-white text-[9px] font-mono font-bold uppercase hover:bg-white/10 transition disabled:opacity-40 cursor-pointer"
+                                title="Resend the email-verification link"
+                              >
+                                {busy ? "..." : "VERIFY EMAIL"}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Client detail modal (ptah LeadDetailModal pattern, simplified) */}
+      {modal === "detail" && selectedRow && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => setModal(null)}
+        >
+          <div
+            className="w-full max-w-4xl max-h-[90vh] flex flex-col border border-white/10 rounded-2xl bg-zinc-950 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-white/10 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-white/15 bg-white/5 text-zinc-400">
+                    {selectedRow.user_id}
+                  </span>
+                  <span className={`text-[9px] font-mono uppercase px-2 py-0.5 rounded-full border ${planBadge(selectedRow.plan_name)}`}>
+                    {selectedRow.plan_name || "no plan"}
+                  </span>
+                  <span className={`text-[9px] font-mono uppercase px-2 py-0.5 rounded-full border ${statusBadge(selectedRow.status)}`}>
+                    {selectedRow.status || "no sub"}
+                  </span>
+                  {selectedRow.kyc && (
+                    <span className="text-[9px] font-mono uppercase px-2 py-0.5 rounded-full border border-sky-500/40 bg-sky-500/10 text-sky-300">
+                      kyc: {selectedRow.kyc}
+                    </span>
+                  )}
+                </div>
+                <div className="text-white font-serif italic text-xl mt-1 truncate">
+                  {selectedRow.name || selectedRow.email || selectedRow.user_id}
+                </div>
+                {selectedRow.email && selectedRow.name && (
+                  <div className="text-[11px] text-zinc-500 font-mono">{selectedRow.email}</div>
+                )}
+              </div>
+              <button
+                onClick={() => setModal(null)}
+                className="p-1.5 rounded hover:bg-white/10 transition cursor-pointer"
+                title="Close (Esc)"
+              >
+                <X className="w-4 h-4 text-zinc-400" />
+              </button>
+            </div>
+
+            {/* Tab rail */}
+            <div className="px-5 pt-3 flex items-center gap-1.5 overflow-x-auto">
+              {(["overview", "billing", "actions"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={`px-3 py-1.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider transition cursor-pointer ${
+                    tab === t
+                      ? "bg-white text-black"
+                      : "bg-white/5 text-zinc-400 hover:bg-white/10 border border-white/10"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+              {detailLoading && (
+                <span className="text-[10px] font-mono text-zinc-500 animate-pulse">
+                  loading billing...
+                </span>
+              )}
+            </div>
+
+            {actionMsg && (
+              <div
+                className={`mx-5 mt-3 p-2.5 rounded-lg border text-[11px] font-mono ${
+                  actionMsg.ok
+                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                    : "border-rose-500/40 bg-rose-950/20 text-rose-300"
+                }`}
+              >
+                {actionMsg.ok ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 inline mr-1.5" />
+                ) : (
+                  <AlertTriangle className="w-3.5 h-3.5 inline mr-1.5" />
+                )}
+                {actionMsg.text}
+              </div>
+            )}
+
+            {/* Body */}
+            <div className="px-5 py-4 overflow-y-auto space-y-4">
+              {tab === "overview" && (
+                <>
+                  <div className="grid sm:grid-cols-3 gap-3">
+                    {[
+                      { k: "Name", v: selectedRow.name || "—" },
+                      { k: "Email", v: selectedRow.email || "—" },
+                      { k: "KYC status", v: selectedRow.kyc || "—" },
+                      { k: "Joined", v: fmtDate(selectedRow.created_at) },
+                      { k: "Signals 30d", v: String(selectedRow.signals_30d ?? 0) },
+                      { k: "Open signals", v: String(selectedRow.signals_open ?? 0) },
+                    ].map((f) => (
+                      <div key={f.k} className="border border-white/10 rounded-lg bg-black/30 p-3">
+                        <div className="text-[9px] font-mono uppercase tracking-wider text-zinc-500">
+                          {f.k}
+                        </div>
+                        <div className="text-xs font-mono text-white mt-1 break-all">{f.v}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {selectedRow.sources && selectedRow.sources.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[9px] font-mono uppercase text-zinc-500 mr-1">sources:</span>
+                      {selectedRow.sources.map((s) => (
+                        <span
+                          key={s}
+                          className="text-[9px] font-mono uppercase px-2 py-0.5 rounded-full border border-white/10 bg-white/5 text-zinc-400"
+                        >
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Node license (PUT /admin/licenses/{id}) */}
+                  <div className="border border-white/10 rounded-xl bg-black/30 p-4 space-y-3">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-bold">
+                      Node license
+                    </div>
+                    <div className="flex flex-wrap items-end gap-3">
+                      <label className="space-y-1">
+                        <span className="block text-[9px] font-mono uppercase text-zinc-500">Tier</span>
+                        <select
+                          value={licTier}
+                          onChange={(e) => setLicTier(e.target.value)}
+                          className={selectCls}
+                        >
+                          {["standard", "obsidian", "sovereign"].map((t) => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="space-y-1">
+                        <span className="block text-[9px] font-mono uppercase text-zinc-500">Grant window</span>
+                        <select
+                          value={licDuration}
+                          onChange={(e) => setLicDuration(e.target.value)}
+                          className={selectCls}
+                          title="Time-limited grant; the customer is emailed on save"
+                        >
+                          <option value="nochange">— no change —</option>
+                          <option value="1w">1 week</option>
+                          <option value="2w">2 weeks</option>
+                          <option value="1mo">1 month</option>
+                          <option value="6mo">6 months</option>
+                          <option value="12m">12 months</option>
+                          <option value="none">No expiry (permanent)</option>
+                        </select>
+                      </label>
+                      <label className="flex items-center gap-2 pb-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={licEnabled}
+                          onChange={(e) => setLicEnabled(e.target.checked)}
+                          className="accent-emerald-500 cursor-pointer"
+                        />
+                        <span className="text-[11px] font-mono text-zinc-300">enabled</span>
+                      </label>
+                      <button
+                        disabled={actionBusy}
+                        onClick={() =>
+                          runAction(
+                            async () => {
+                              const body: Record<string, unknown> = { tier: licTier, enabled: licEnabled };
+                              if (licDuration !== "nochange") body.duration = licDuration;
+                              const r: any = await apiClient.put(
+                                `/api/v1/admin/licenses/${encodeURIComponent(selectedId!)}`,
+                                body
+                              );
+                              return r?.data ?? r;
+                            },
+                            (res: any) => {
+                              const until = res?.expires_at
+                                ? ` until ${fmtDate(res.expires_at)}`
+                                : res?.tier && res.tier !== "standard" ? " (no expiry)" : "";
+                              const mail = res?.email_sent ? " · grant email sent" : "";
+                              const off = licEnabled ? "" : " · disabled";
+                              return `License → ${res?.tier ?? licTier}${until}${off}${mail}`;
+                            }
+                          )
+                        }
+                        className={btnPrimary}
+                      >
+                        SAVE LICENSE
+                      </button>
+                    </div>
+                    {selectedRow?.license?.expires_at && (
+                      <div className="text-[10px] font-mono text-zinc-500">
+                        Current window:{" "}
+                        {selectedRow.license.expired
+                          ? `expired ${fmtDate(selectedRow.license.expires_at)} — effective tier is standard`
+                          : `until ${fmtDate(selectedRow.license.expires_at)}`}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Broker accounts (live reads via trading/overview) */}
+                  <div className="space-y-2">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-bold">
+                      Broker accounts
+                    </div>
+                    {(selectedRow.accounts ?? []).length === 0 && (
+                      <p className="text-xs font-mono text-zinc-600">No connected broker accounts.</p>
+                    )}
+                    {(selectedRow.accounts ?? []).map((a) => (
+                      <div key={a.adapter_id} className="border border-white/10 rounded-lg bg-black/30 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-[11px] font-mono text-white">
+                            {a.account_id || a.adapter_id}
+                            <span className="text-zinc-600 ml-2 text-[9px]">{a.adapter_id}</span>
+                          </div>
+                          <div className="text-[11px] font-mono">
+                            <span className="text-emerald-400 font-bold">
+                              {a.balance != null ? `${fmtNum(a.balance)} ${a.currency || ""}` : "—"}
+                            </span>
+                            <span className="text-zinc-500 ml-3">
+                              {a.open_count ?? 0} open · stake {fmtNum(a.open_stake_total)}
+                            </span>
+                          </div>
+                        </div>
+                        {(a.open_positions ?? []).length > 0 && (
+                          <table className="w-full mt-2 text-left border-collapse">
+                            <thead>
+                              <tr className="text-zinc-600 uppercase text-[8.5px] font-mono">
+                                <th className="py-1 pr-3">Symbol</th>
+                                <th className="py-1 pr-3">Type</th>
+                                <th className="py-1 pr-3 text-right">Stake</th>
+                                <th className="py-1 text-right">Payout</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(a.open_positions ?? []).map((p, i) => (
+                                <tr key={p.order_id || i} className="border-t border-white/5">
+                                  <td className="py-1 pr-3 text-[10px] font-mono text-white">{p.symbol || "—"}</td>
+                                  <td className="py-1 pr-3 text-[10px] font-mono text-zinc-400">{p.contract_type || "—"}</td>
+                                  <td className="py-1 pr-3 text-right text-[10px] font-mono text-zinc-400">{fmtNum(p.stake)}</td>
+                                  <td className="py-1 text-right text-[10px] font-mono text-zinc-400">{fmtNum(p.payout)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {tab === "billing" && (
+                <>
+                  {!detail?.subscription ? (
+                    <p className="text-xs font-mono text-zinc-500">
+                      No subscription record for this client.
+                    </p>
+                  ) : (
+                    <div className="grid sm:grid-cols-3 gap-3">
+                      {[
+                        { k: "Plan", v: selectedRow.plan_name || detail.subscription.plan_id || "—" },
+                        { k: "Status", v: detail.subscription.status || "—" },
+                        { k: "Provider", v: detail.subscription.payment_provider || "—" },
+                        { k: "Period start", v: fmtDate(detail.subscription.current_period_start) },
+                        { k: "Period end", v: fmtDate(detail.subscription.current_period_end) },
+                        { k: "Cancel at period end",
+                          v: detail.subscription.cancel_at_period_end ? "yes" : "no" },
+                      ].map((f) => (
+                        <div key={f.k} className="border border-white/10 rounded-lg bg-black/30 p-3">
+                          <div className="text-[9px] font-mono uppercase tracking-wider text-zinc-500">
+                            {f.k}
+                          </div>
+                          <div className="text-xs font-mono text-white mt-1 break-all">{f.v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="border border-white/10 rounded-xl overflow-hidden">
+                    <div className="px-4 py-2.5 bg-white/5 text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-bold">
+                      Invoices ({detail?.invoices?.length ?? 0})
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-white/[0.03] text-zinc-600 uppercase text-[8.5px] font-mono">
+                            <th className="py-1.5 px-3">Invoice</th>
+                            <th className="py-1.5 px-3 text-right">Amount</th>
+                            <th className="py-1.5 px-3">Status</th>
+                            <th className="py-1.5 px-3">Due</th>
+                            <th className="py-1.5 px-3">Paid</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(detail?.invoices ?? []).map((inv) => (
+                            <tr key={inv.invoice_id} className="border-t border-white/5">
+                              <td className="py-1.5 px-3 text-[9.5px] font-mono text-zinc-500 truncate max-w-[140px]" title={inv.invoice_id}>
+                                {inv.invoice_id}
+                              </td>
+                              <td className="py-1.5 px-3 text-right text-[10px] font-mono text-white">
+                                {fmtNum(inv.amount)} {inv.currency || ""}
+                              </td>
+                              <td className="py-1.5 px-3">
+                                <span className={`text-[8.5px] font-mono uppercase px-1.5 py-0.5 rounded-full border ${statusBadge(inv.status)}`}>
+                                  {inv.status || "—"}
+                                </span>
+                              </td>
+                              <td className="py-1.5 px-3 text-[10px] font-mono text-zinc-400">{fmtDate(inv.due_date)}</td>
+                              <td className="py-1.5 px-3 text-[10px] font-mono text-zinc-400">{fmtDate(inv.paid_date)}</td>
+                            </tr>
+                          ))}
+                          {(detail?.invoices ?? []).length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="py-5 text-center text-[10px] font-mono text-zinc-600">
+                                No invoices yet.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="border border-white/10 rounded-xl overflow-hidden">
+                    <div className="px-4 py-2.5 bg-white/5 text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-bold">
+                      Billing history ({detail?.billing_history?.length ?? 0})
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-white/[0.03] text-zinc-600 uppercase text-[8.5px] font-mono">
+                            <th className="py-1.5 px-3">When</th>
+                            <th className="py-1.5 px-3">Action</th>
+                            <th className="py-1.5 px-3 text-right">Amount</th>
+                            <th className="py-1.5 px-3">Status</th>
+                            <th className="py-1.5 px-3">Details</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(detail?.billing_history ?? []).map((h) => (
+                            <tr key={h.history_id} className="border-t border-white/5">
+                              <td className="py-1.5 px-3 text-[9.5px] font-mono text-zinc-500 whitespace-nowrap">
+                                {fmtDateTime(h.created_at)}
+                              </td>
+                              <td className="py-1.5 px-3 text-[10px] font-mono font-bold text-white">{h.action}</td>
+                              <td className="py-1.5 px-3 text-right text-[10px] font-mono text-zinc-400">
+                                {h.amount != null ? `${fmtNum(h.amount)} ${h.currency || ""}` : "—"}
+                              </td>
+                              <td className="py-1.5 px-3">
+                                <span className={`text-[8.5px] font-mono uppercase px-1.5 py-0.5 rounded-full border ${statusBadge(h.status)}`}>
+                                  {h.status || "—"}
+                                </span>
+                              </td>
+                              <td
+                                className="py-1.5 px-3 text-[9.5px] font-mono text-zinc-600 truncate max-w-[220px]"
+                                title={h.details ? JSON.stringify(h.details) : ""}
+                              >
+                                {h.details ? JSON.stringify(h.details) : "—"}
+                              </td>
+                            </tr>
+                          ))}
+                          {(detail?.billing_history ?? []).length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="py-5 text-center text-[10px] font-mono text-zinc-600">
+                                No billing history yet.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {tab === "actions" && (
+                <div className="space-y-4">
+                  {/* Set plan */}
+                  <div className="border border-white/10 rounded-xl bg-black/30 p-4 space-y-3">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-bold">
+                      Set plan (upgrade / downgrade / comp)
+                    </div>
+                    <div className="flex flex-wrap items-end gap-3">
+                      <label className="space-y-1">
+                        <span className="block text-[9px] font-mono uppercase text-zinc-500">Plan</span>
+                        <select
+                          value={setPlanName}
+                          onChange={(e) => setSetPlanName(e.target.value)}
+                          className={selectCls}
+                        >
+                          <option value="">select plan...</option>
+                          {planOptions.map((p) => (
+                            <option key={p} value={p}>{p}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="space-y-1 flex-1 min-w-[200px]">
+                        <span className="block text-[9px] font-mono uppercase text-zinc-500">Reason (audited)</span>
+                        <input
+                          type="text"
+                          value={setPlanReason}
+                          onChange={(e) => setSetPlanReason(e.target.value)}
+                          placeholder="e.g. comp for outage"
+                          className={inputCls}
+                        />
+                      </label>
+                      <button
+                        disabled={actionBusy || !setPlanName}
+                        onClick={() =>
+                          runAction(
+                            () =>
+                              apiClient.post(
+                                `/api/v1/admin/clients/${encodeURIComponent(selectedId!)}/plan`,
+                                { plan_name: setPlanName, reason: setPlanReason || null }
+                              ),
+                            `Plan set to ${setPlanName}`
+                          ).then(() => setSetPlanReason(""))
+                        }
+                        className={btnPrimary}
+                      >
+                        APPLY PLAN
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Fix stuck account */}
+                  <div className="border border-white/10 rounded-xl bg-black/30 p-4 space-y-3">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-bold">
+                      Fix stuck account
+                    </div>
+                    <div className="flex flex-wrap items-end gap-3">
+                      <label className="space-y-1">
+                        <span className="block text-[9px] font-mono uppercase text-zinc-500">Action</span>
+                        <select
+                          value={fixAction}
+                          onChange={(e) => setFixAction(e.target.value)}
+                          className={selectCls}
+                        >
+                          {FIX_ACTIONS.map((a) => (
+                            <option key={a.id} value={a.id}>{a.label}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="space-y-1 flex-1 min-w-[200px]">
+                        <span className="block text-[9px] font-mono uppercase text-zinc-500">Reason (audited)</span>
+                        <input
+                          type="text"
+                          value={fixReason}
+                          onChange={(e) => setFixReason(e.target.value)}
+                          placeholder="e.g. support ticket #123"
+                          className={inputCls}
+                        />
+                      </label>
+                      <button
+                        disabled={actionBusy}
+                        onClick={() =>
+                          runAction(
+                            () =>
+                              apiClient.post(
+                                `/api/v1/admin/clients/${encodeURIComponent(selectedId!)}/fix`,
+                                { action: fixAction, reason: fixReason || null }
+                              ),
+                            `Fix applied: ${fixAction}`
+                          ).then(() => setFixReason(""))
+                        }
+                        className={btnGhost}
+                      >
+                        RUN FIX
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Danger zone */}
+                  <div className="border border-rose-900/40 rounded-xl bg-rose-950/10 p-4 space-y-3">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-rose-400 font-bold">
+                      Danger zone
+                    </div>
+                    <p className="text-[11px] text-zinc-400 font-mono">
+                      Deleting removes the subscription, invoices and billing history.
+                      The Auth0 identity is untouched and they can sign up again.
+                    </p>
+                    <button
+                      disabled={actionBusy}
+                      onClick={() => {
+                        if (!confirmDelete) {
+                          setConfirmDelete(true);
+                          return;
+                        }
+                        runAction(
+                          () => apiClient.delete(`/api/v1/admin/clients/${encodeURIComponent(selectedId!)}`),
+                          "Client record deleted"
+                        ).then((r) => {
+                          setConfirmDelete(false);
+                          return r;
+                        });
+                      }}
+                      className={`px-3 py-1.5 rounded text-xs font-mono font-bold border transition disabled:opacity-40 cursor-pointer ${
+                        confirmDelete
+                          ? "bg-rose-600 text-white border-rose-500"
+                          : "bg-transparent text-rose-400 border-rose-500/40 hover:bg-rose-950/30"
+                      }`}
+                    >
+                      {confirmDelete ? "CONFIRM DELETE (click again)" : "DELETE CLIENT"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New client modal */}
+      {modal === "new" && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => setModal(null)}
+        >
+          <div
+            className="w-full max-w-md border border-white/10 rounded-2xl bg-zinc-950 shadow-2xl p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-white font-serif italic text-xl">New client record</h2>
+              <button
+                onClick={() => setModal(null)}
+                className="p-1.5 rounded hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-4 h-4 text-zinc-400" />
+              </button>
+            </div>
+            <p className="text-[11px] text-zinc-500 font-mono">
+              Creates the Priv-side subscription record for an Auth0 identity (manual
+              onboard / comp). The user still signs up or logs in normally.
+            </p>
+            {actionMsg && !actionMsg.ok && (
+              <div className="p-2.5 rounded-lg border border-rose-500/40 bg-rose-950/20 text-[11px] font-mono text-rose-300">
+                <AlertTriangle className="w-3.5 h-3.5 inline mr-1.5" />
+                {actionMsg.text}
+              </div>
+            )}
+            <label className="space-y-1 block">
+              <span className="block text-[9px] font-mono uppercase text-zinc-500">
+                Auth0 user id
+              </span>
+              <input
+                type="text"
+                value={newUserId}
+                onChange={(e) => setNewUserId(e.target.value)}
+                placeholder="auth0|..."
+                className={inputCls}
+              />
+            </label>
+            <label className="space-y-1 block">
+              <span className="block text-[9px] font-mono uppercase text-zinc-500">Plan</span>
+              <select
+                value={newPlan}
+                onChange={(e) => setNewPlan(e.target.value)}
+                className={selectCls}
+              >
+                {planOptions.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </label>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setModal(null)} className={btnGhost}>
+                CANCEL
+              </button>
+              <button
+                onClick={onCreateClient}
+                disabled={actionBusy || !newUserId.trim()}
+                className={btnPrimary}
+              >
+                {actionBusy ? "CREATING..." : "CREATE CLIENT"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

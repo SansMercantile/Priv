@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   MessageSquare, X, Send, Mic, Volume2, VolumeX, Brain, RefreshCw, TrendingUp, TrendingDown, Calendar,
+  Camera, CameraOff,
 } from "lucide-react";
 import chatAvatar from "../assets/images/chat_avatar_1779278082106.png";
+import { getAuthToken, getIdToken } from "../lib/authToken";
+import { forSpeech, pickBestVoice, rankVoices } from "../lib/speech";
 
 interface HarmonicPoint {
   index: number;
@@ -30,17 +33,42 @@ interface EconomicEvent {
   impact?: string;
   currency?: string;
 }
+interface DoubleTriplePattern {
+  pattern_name: string;
+  direction?: "Bullish" | "Bearish" | string;
+  neckline_price?: number;
+  bar_index?: number;
+  time?: string | null;
+  confirmed?: boolean;
+  confirmation_time?: string | null;
+}
+interface BlackSwanEvent {
+  title?: string;
+  domain?: string;
+  seendate?: string;
+  url?: string;
+}
+interface PowerScore {
+  score?: number;
+  label?: string;
+  confidence?: string;
+  factors_used?: number;
+}
 interface SupportResponse {
   message: string;
   symbol?: string;
   technical_analysis?: {
     recommendation?: { recommendation: string; aggression: string } | null;
     harmonic_patterns?: HarmonicPattern[];
+    double_triple_patterns?: DoubleTriplePattern[];
+    bullish_bearish_power?: PowerScore;
+    fourier_forecast?: number[];
     fuzzy_signal_strength?: number;
   };
   fundamentals?: {
     economic_calendar_events?: EconomicEvent[];
     economic_calendar_link?: string;
+    black_swan_events?: BlackSwanEvent[];
   };
   trading_signal?: TradingSignal | null;
   position_advice?: Array<{ order_id: string; symbol: string; note: string }>;
@@ -50,6 +78,7 @@ interface ChatMessage {
   sender: "user" | "ai";
   text?: string;
   data?: SupportResponse;
+  emotionNote?: string;
 }
 
 // Real pattern/signal chart - plots the detected harmonic X-A-B-C-D points
@@ -121,6 +150,116 @@ const PatternSignalChart: React.FC<{ pattern?: HarmonicPattern; signal?: Trading
   );
 };
 
+// Real double/triple top-bottom patterns detected server-side (never
+// fabricated -- each entry only exists if analytics_engine actually
+// found it in the price series, with its real bar time and neckline).
+const DoubleTriplePatternsList: React.FC<{ patterns?: DoubleTriplePattern[] }> = ({ patterns }) => {
+  if (!patterns || patterns.length === 0) return null;
+  return (
+    <div className="p-2 bg-neutral-950 border border-white/5 rounded space-y-1.5">
+      <div className="text-[9px] text-zinc-500 font-mono uppercase mb-1">Double/Triple Top &amp; Bottom</div>
+      {patterns.slice(0, 3).map((p, i) => (
+        <div key={i} className="flex items-start gap-1.5 text-[9px] font-mono">
+          {p.direction === "Bullish" ? (
+            <TrendingUp className="w-3 h-3 text-emerald-400 mt-0.5 flex-shrink-0" />
+          ) : (
+            <TrendingDown className="w-3 h-3 text-red-400 mt-0.5 flex-shrink-0" />
+          )}
+          <div className="text-zinc-300">
+            <span className="text-white">{p.pattern_name}</span>
+            {p.time ? ` at ${p.time}` : p.bar_index != null ? ` at bar ${p.bar_index}` : ""}
+            {" "}
+            {p.neckline_price != null && (
+              <span className="text-zinc-500">(neckline {p.neckline_price})</span>
+            )}
+            {" "}
+            <span className={p.confirmed ? "text-emerald-400" : "text-amber-400"}>
+              {p.confirmed ? "confirmed" : "unconfirmed"}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const PowerScoreBar: React.FC<{ power?: PowerScore }> = ({ power }) => {
+  if (!power || power.score == null) return null;
+  const pct = Math.max(0, Math.min(100, power.score));
+  const color = pct >= 60 ? "bg-emerald-400" : pct <= 40 ? "bg-red-400" : "bg-amber-400";
+  return (
+    <div className="text-[9px] font-mono">
+      <div className="flex items-center justify-between text-zinc-400 mb-1">
+        <span>Bullish/Bearish Power</span>
+        <span className="text-white">{power.score}/100 ({power.label})</span>
+      </div>
+      <div className="w-full h-1.5 bg-neutral-800 rounded overflow-hidden">
+        <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+};
+
+// Fourier-based short-term price forecast (real FFT-extrapolated closes
+// from analytics_engine -- never a fabricated projection). Shown as a
+// small forward-looking line so it's clear whether the projected path
+// curls up or down from here, with the direction/magnitude called out.
+const FourierForecastChart: React.FC<{ forecast?: number[] }> = ({ forecast }) => {
+  if (!forecast || forecast.length < 2) return null;
+  const w = 300;
+  const h = 90;
+  const padding = 20;
+  const minV = Math.min(...forecast);
+  const maxV = Math.max(...forecast);
+  const range = maxV - minV || 1;
+  const getX = (i: number) => padding + (i / (forecast.length - 1)) * (w - 2 * padding);
+  const getY = (v: number) => h - padding - ((v - minV) / range) * (h - 2 * padding);
+  const first = forecast[0];
+  const last = forecast[forecast.length - 1];
+  const pctChange = first ? ((last - first) / Math.abs(first)) * 100 : 0;
+  const up = last >= first;
+
+  return (
+    <div className="p-2 bg-neutral-950 border border-white/5 rounded">
+      <div className="flex items-center justify-between text-[9px] text-zinc-500 font-mono uppercase mb-1">
+        <span>Fourier Forecast (next {forecast.length})</span>
+        <span className={up ? "text-emerald-400" : "text-red-400"}>
+          {up ? "+" : ""}
+          {pctChange.toFixed(2)}%
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-auto">
+        <polyline
+          points={forecast.map((v, i) => `${getX(i)},${getY(v)}`).join(" ")}
+          fill="none"
+          stroke={up ? "#34d399" : "#f87171"}
+          strokeWidth="1.5"
+        />
+        {forecast.map((v, i) => (
+          <circle key={i} cx={getX(i)} cy={getY(v)} r="1.5" fill={up ? "#34d399" : "#f87171"} />
+        ))}
+      </svg>
+      <div className="mt-1 text-[9px] font-mono text-zinc-500">
+        Extrapolated from recent price cycles -- not a guarantee.
+      </div>
+    </div>
+  );
+};
+
+const BlackSwanAlerts: React.FC<{ events?: BlackSwanEvent[] }> = ({ events }) => {
+  if (!events || events.length === 0) return null;
+  return (
+    <div className="p-2 bg-red-500/5 border border-red-500/20 rounded space-y-1">
+      <div className="text-[9px] text-red-400 font-mono uppercase">Black Swan / Geopolitical Risk</div>
+      {events.slice(0, 3).map((e, i) => (
+        <div key={i} className="text-[9px] font-mono text-zinc-300">
+          {e.title}{e.domain ? <span className="text-zinc-500"> — {e.domain}</span> : null}
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const SignalCard: React.FC<{ data: SupportResponse }> = ({ data }) => {
   const rec = data.technical_analysis?.recommendation;
   const pattern = data.technical_analysis?.harmonic_patterns?.slice(-1)[0];
@@ -139,7 +278,11 @@ const SignalCard: React.FC<{ data: SupportResponse }> = ({ data }) => {
           <span className="text-zinc-500">({rec.aggression})</span>
         </div>
       )}
+      <PowerScoreBar power={data.technical_analysis?.bullish_bearish_power} />
       <PatternSignalChart pattern={pattern} signal={data.trading_signal} />
+      <FourierForecastChart forecast={data.technical_analysis?.fourier_forecast} />
+      <DoubleTriplePatternsList patterns={data.technical_analysis?.double_triple_patterns} />
+      <BlackSwanAlerts events={data.fundamentals?.black_swan_events} />
       {events.length > 0 && (
         <div className="p-2 bg-neutral-950 border border-white/5 rounded">
           <div className="flex items-center gap-1.5 text-[9px] text-zinc-500 font-mono uppercase mb-1">
@@ -175,10 +318,23 @@ export const PrivCopilot: React.FC = () => {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [speechActive, setSpeechActive] = useState(true);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [voiceURI, setVoiceURI] = useState<string>(
+    () => localStorage.getItem("priv_voice_uri") || "",
+  );
   const [micActive, setMicActive] = useState(false);
+  // Opt-in camera check-in: off by default. The camera is never accessed
+  // until the user explicitly clicks the toggle, and the stream is fully
+  // stopped (all tracks released) the moment it's turned off or the
+  // widget closes -- no background access.
+  const [cameraEnabled, setCameraEnabled] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   const messageEndRef = useRef<HTMLDivElement | null>(null);
   const speechRecognizer = useRef<any>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -214,10 +370,160 @@ export const PrivCopilot: React.FC = () => {
     }
   };
 
+  // Voice list loads asynchronously in Chrome (empty on first getVoices()).
+  useEffect(() => {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    const load = () => setVoices(synth.getVoices() || []);
+    load();
+    synth.addEventListener?.("voiceschanged", load);
+    // Some engines never fire voiceschanged -- poll briefly as a fallback.
+    let tries = 0;
+    const poll = window.setInterval(() => {
+      const vs = synth.getVoices() || [];
+      if (vs.length > 0) {
+        setVoices(vs);
+        window.clearInterval(poll);
+      } else if (++tries > 20) {
+        window.clearInterval(poll);
+      }
+    }, 500);
+    return () => {
+      synth.removeEventListener?.("voiceschanged", load);
+      window.clearInterval(poll);
+      synth.cancel();
+    };
+  }, []);
+
+  const rankedVoices = rankVoices(voices);
+  const effectiveVoiceURI = voiceURI || rankedVoices[0]?.voiceURI || "";
+
+  const selectVoice = (uri: string) => {
+    setVoiceURI(uri);
+    localStorage.setItem("priv_voice_uri", uri);
+    // Preview so the choice is audible immediately.
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance("Hi, I'm Priv. This is how I'll sound.");
+    const v = voices.find((x) => x.voiceURI === uri);
+    if (v) {
+      u.voice = v;
+      u.lang = v.lang;
+    }
+    synth.speak(u);
+  };
+
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraEnabled(false);
+  };
+
+  const toggleCamera = async () => {
+    if (cameraEnabled) {
+      stopCamera();
+      return;
+    }
+    setCameraError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setCameraEnabled(true);
+    } catch (err: any) {
+      setCameraError("Couldn't access your camera. Check your browser's camera permission for this site.");
+    }
+  };
+
+  // Release the camera the moment the widget is closed, not just on unmount.
+  useEffect(() => {
+    if (!isOpen && cameraEnabled) stopCamera();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  useEffect(() => () => stopCamera(), []);
+
+  // Captures one frame as base64 JPEG, or null if the camera isn't on /
+  // ready. A single snapshot per message -- never a continuous stream to
+  // the backend.
+  const captureFrame = (): string | null => {
+    if (!cameraEnabled || !videoRef.current || !canvasRef.current) return null;
+    const video = videoRef.current;
+    if (!video.videoWidth || !video.videoHeight) return null;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+    return dataUrl.split(",")[1] || null;
+  };
+
+  const runEmotionCheckIn = async (context: string): Promise<string | undefined> => {
+    const frame = captureFrame();
+    if (!frame) return undefined;
+    try {
+      const token = await getAuthToken();
+      if (!token) return undefined; // camera check-ins require sign-in
+      const res = await fetch("/api/v1/support/emotion-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ imageBase64: frame, mimeType: "image/jpeg", context }),
+      });
+      if (res.status === 429) return undefined; // rate limited -- stay quiet, don't spam the chat
+      if (!res.ok) return undefined;
+      const data = await res.json();
+      if (data.in_cooldown) return undefined; // the chat response already covers this
+      if (data.usable_frame === false) return undefined;
+      return data.trading_note as string | undefined;
+    } catch {
+      return undefined; // check-in is a bonus, never blocks sending the message
+    }
+  };
+
   const speak = (text: string) => {
     if (!speechActive || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+    const clean = forSpeech(text);
+    if (!clean) return;
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(clean);
+    const v = pickBestVoice(voices, voiceURI);
+    if (v) {
+      u.voice = v;
+      u.lang = v.lang;
+    }
+    u.rate = 1;
+    u.pitch = 1;
+    // Chrome stalls synthesis after ~15s; nudge it to keep long replies flowing.
+    let tick = 0;
+    const stopTick = () => {
+      if (tick) {
+        window.clearInterval(tick);
+        tick = 0;
+      }
+    };
+    u.onend = stopTick;
+    u.onerror = stopTick;
+    synth.speak(u);
+    tick = window.setInterval(() => {
+      if (!synth.speaking) {
+        stopTick();
+        return;
+      }
+      try {
+        synth.pause();
+        synth.resume();
+      } catch {
+        stopTick();
+      }
+    }, 9000);
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -225,20 +531,44 @@ export const PrivCopilot: React.FC = () => {
     const promptToSend = input.trim();
     if (!promptToSend) return;
 
+    // Conversation memory: the support API is stateless per request, so
+    // the prior turns must travel with every message -- otherwise the
+    // model answers follow-ups as if the chat just started ("I don't see
+    // a previous message from you"). `messages` here is the rendered
+    // state, i.e. it excludes the message being sent right now.
+    const history = messages.slice(-12).map((m) => ({
+      sender: m.sender,
+      text: m.text,
+    }));
+
     setMessages((prev) => [...prev, { sender: "user", text: promptToSend }]);
     setInput("");
     setIsTyping(true);
 
     try {
-      const res = await fetch("/api/v1/support/", {
+      const emotionNotePromise = cameraEnabled ? runEmotionCheckIn(promptToSend) : Promise.resolve(undefined);
+
+      const token = await getAuthToken();
+      // NO trailing slash: vercel.json's /api/:path* rewrite doesn't match
+      // "/api/v1/support/", so the request hit the SPA fallback (GET -> index.html,
+      // POST -> empty 405) and res.json() threw "Unexpected end of JSON input".
+      const idToken = await getIdToken().catch(() => null);
+      const res = await fetch("/api/v1/support", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: promptToSend }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(idToken ? { "X-Auth0-Id-Token": idToken } : {}),
+        },
+        body: JSON.stringify({ message: promptToSend, history }),
       });
       const data: SupportResponse = await res.json();
+      const emotionNote = await emotionNotePromise;
       if (res.ok) {
-        setMessages((prev) => [...prev, { sender: "ai", text: data.message, data }]);
+        setMessages((prev) => [...prev, { sender: "ai", text: data.message, data, emotionNote }]);
         speak(data.message);
+      } else if (res.status === 429) {
+        setMessages((prev) => [...prev, { sender: "ai", text: (data as any).detail || "Slow down a little — please wait a moment before sending another message." }]);
       } else {
         const errText = (data as any).detail || "Priv's analysis engine is temporarily unavailable.";
         setMessages((prev) => [...prev, { sender: "ai", text: errText }]);
@@ -279,7 +609,21 @@ export const PrivCopilot: React.FC = () => {
                 </p>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
+              {speechActive && rankedVoices.length > 0 && (
+                <select
+                  value={effectiveVoiceURI}
+                  onChange={(e) => selectVoice(e.target.value)}
+                  title="Narrator voice"
+                  className="max-w-[130px] bg-white/5 border border-white/15 text-[10px] text-gray-300 rounded px-1 py-1.5 outline-none focus:border-white/30 cursor-pointer truncate"
+                >
+                  {rankedVoices.map((v) => (
+                    <option key={v.voiceURI} value={v.voiceURI} className="bg-neutral-900">
+                      {v.name}
+                    </option>
+                  ))}
+                </select>
+              )}
               <button
                 onClick={() => setSpeechActive(!speechActive)}
                 className={`p-1.5 rounded border transition ${speechActive ? "text-white border-white/25 bg-white/5" : "text-gray-500 border-white/5"}`}
@@ -306,6 +650,11 @@ export const PrivCopilot: React.FC = () => {
                   }`}
                 >
                   {msg.text && <p>{msg.text}</p>}
+                  {msg.emotionNote && (
+                    <p className="mt-2 text-[10px] text-white/50 italic border-t border-white/5 pt-2">
+                      {msg.emotionNote}
+                    </p>
+                  )}
                   {msg.data && <SignalCard data={msg.data} />}
                 </div>
               </div>
@@ -319,6 +668,25 @@ export const PrivCopilot: React.FC = () => {
             <div ref={messageEndRef} />
           </div>
 
+          {(cameraEnabled || cameraError) && (
+            <div className="px-3 pt-2 flex-shrink-0 flex items-center gap-2 border-t border-white/10 bg-neutral-950">
+              {cameraEnabled && (
+                <video
+                  ref={videoRef}
+                  muted
+                  playsInline
+                  className="w-12 h-9 rounded object-cover border border-white/15"
+                />
+              )}
+              <p className="text-[9px] text-white/40 leading-tight">
+                {cameraError
+                  ? cameraError
+                  : "Camera check-ins are on: each message includes a quick, private read of your expression to help flag stress before a trade. Reads are logged to your own history only (view/delete anytime)."}
+              </p>
+            </div>
+          )}
+          <canvas ref={canvasRef} className="hidden" />
+
           <form onSubmit={handleSendMessage} className="p-3 border-t border-white/10 bg-neutral-950 flex-shrink-0 flex items-center space-x-2">
             <button
               type="button"
@@ -328,6 +696,16 @@ export const PrivCopilot: React.FC = () => {
               }`}
             >
               <Mic className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={toggleCamera}
+              title={cameraEnabled ? "Turn off camera check-ins" : "Turn on camera check-ins (opt-in emotional read before trades)"}
+              className={`p-2.5 rounded border transition flex-shrink-0 ${
+                cameraEnabled ? "text-white border-white/20 bg-white/10" : "text-gray-500 border-white/5 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              {cameraEnabled ? <Camera className="w-4 h-4" /> : <CameraOff className="w-4 h-4" />}
             </button>
             <input
               type="text"

@@ -1,14 +1,12 @@
-# PRIV - All automated access strictly prohibited
-# Unauthorized crawling, scraping, or replication is forbidden
+# Priv Core — search engines welcome; AI training crawlers and scrapers blocked.
 
 User-agent: *
-Disallow: /
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
 
 # AI training crawlers
 User-agent: GPTBot
-Disallow: /
-
-User-agent: ChatGPT-User
 Disallow: /
 
 User-agent: Google-Extended
@@ -38,31 +36,6 @@ Disallow: /
 User-agent: Bytespider
 Disallow: /
 
-# Search engine crawlers
-User-agent: bingbot
-Disallow: /
-
-User-agent: Googlebot
-Disallow: /
-
-User-agent: Googlebot-Image
-Disallow: /
-
-User-agent: Slurp
-Disallow: /
-
-User-agent: DuckDuckBot
-Disallow: /
-
-User-agent: Baiduspider
-Disallow: /
-
-User-agent: YandexBot
-Disallow: /
-
-User-agent: Applebot
-Disallow: /
-
 # SEO / data scraper bots
 User-agent: SemrushBot
 Disallow: /
@@ -88,3 +61,5 @@ Disallow: /
 
 User-agent: Wayback
 Disallow: /
+
+Sitemap: https://priv.sansmercantile.com/sitemap.xml

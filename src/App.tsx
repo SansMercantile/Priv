@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { Loader2 } from "lucide-react";
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 import { Toaster } from "./components/ui/toaster";
 import Sidebar from "./components/Sidebar";
@@ -8,42 +9,113 @@ import Dashboard from "./components/dashboard/RealTimeDashboard";
 import TradingTerminal from "./components/TradingTerminal";
 import AGICore from "./components/AgiCore";
 import MultiAgent from "./components/MultiAgent";
-import DataIngestion from "./components/DataIngestion";
 import Security from "./components/Security";
 import Automation from "./components/Automation";
-import Tax from "./components/Tax";
 import News from "./components/News";
-import Analytics from "./components/Analytics";
+import MySignals from "./components/MySignals";
 import History from "./components/History";
-import Connections from "./components/Connections";
+import ConnectionsSection from "./components/ConnectionsSection";
+import Billing from "./components/Billing";
+import Celebrations from "./components/Celebrations";
 import ProfilePage from "./components/profile/ProfilePage";
 import KycAdminReviewPage from "./components/profile/KycAdminReviewPage";
+import CrmPage from "./components/CrmPage";
+import MarketingStudio from "./components/MarketingStudio";
 import UnifiedAssistant from "./ui/UnifiedAssistant";
 import GuidedWalkthrough from "./components/GuidedWalkthrough";
 import LoginGate from "./components/auth/LoginGate";
+import Landing from "./pages/Landing";
+import LegalTerms from "./pages/legal/Terms";
+import LegalPolicy from "./pages/legal/Policy";
+import LegalCookie from "./pages/legal/Cookie";
+import LegalEula from "./pages/legal/Eula";
+import LegalLiability from "./pages/legal/Liability";
+import LegalDataDeletion from "./pages/legal/DataDeletion";
+import apiClient from "./api/apiClient";
+import { probeAdmin } from "./api/adminProbe";
 import { useBrokerConnections } from "./lib/useBrokerConnections";
-import { initiateDerivLogin } from "./lib/derivAuth";
+import { isDerivCallback } from "./lib/derivAuth/oauth";
 import { initDatadog } from "./lib/datadog";
 
 interface AppProps {
   initialDevice?: string;
 }
 
-function App({ initialDevice = "desktop" }: AppProps) {
+// Admin-only surface (Security Check): resolves GET /admin/whoami and
+// bounces non-admins to the dashboard. Hidden until proven admin -- the
+// page (and the sidebar entry) never appears for clients.
+function RequireAdmin({ children }: { children: React.ReactNode }) {
+  const [state, setState] = useState<"loading" | "ok" | "deny">("loading");
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const admin = await probeAdmin();
+      if (!cancelled) setState(admin ? "ok" : "deny");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  if (state === "loading") {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
+      </div>
+    );
+  }
+  return state === "ok" ? <>{children}</> : <Navigate to="/dashboard" replace />;
+}
+
+// Paid-tier surface (Strategies): requires a real subscription whose
+// server-derived tier is not free (admins always pass). Free users are
+// sent to Billing -- the sidebar hides the entry the same way.
+function RequirePaying({ children }: { children: React.ReactNode }) {
+  const [state, setState] = useState<"loading" | "ok" | "deny">("loading");
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      let admin = false;
+      let paying = false;
+      admin = await probeAdmin();
+      try {
+        const body: any = await apiClient.getMySubscription();
+        const sub = body?.subscription ?? (body && typeof body === "object" ? body : null);
+        paying = !!sub?.tier && sub.tier !== "free";
+      } catch (_) {
+        /* no subscription */
+      }
+      if (!cancelled) setState(admin || paying ? "ok" : "deny");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  if (state === "loading") {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
+      </div>
+    );
+  }
+  return state === "ok" ? <>{children}</> : <Navigate to="/dashboard/billing" replace />;
+}
+
+function GatedApp({ initialDevice = "desktop" }: AppProps) {
   const location = useLocation();
   const [isWalkthroughActive, setWalkthroughActive] = useState(false);
   const [device, setDevice] = useState(initialDevice);
   const [isSidebarMinimized, setSidebarMinimized] = useState(false);
   const [demoMode, setDemoMode] = useState<boolean>(() => {
-    // Load demo mode from localStorage or default to true
+    // Load demo mode from localStorage; default to LIVE (false).
+    // It used to default to true, which flipped every fresh browser into
+    // demo mode (and the fabricated-content surfaces that came with it).
     const saved = localStorage.getItem("demoMode");
-    return saved !== null ? JSON.parse(saved) : true;
+    return saved !== null ? JSON.parse(saved) : false;
   });
 
   const { hasRealDeriv, loading: brokerConnLoading } = useBrokerConnections();
 
   useEffect(() => {
-    initDatadog();
     const hasSeenWalkthrough = localStorage.getItem("hasSeenWalkthrough");
     if (!hasSeenWalkthrough) {
       setWalkthroughActive(true);
@@ -87,6 +159,9 @@ function App({ initialDevice = "desktop" }: AppProps) {
     updateMetaTag('meta[name="description"]', 'name', 'description', 'Next-generation AI-driven execution engine featuring AGI & AI cores, multi-agent systems, and advanced market analysis capabilities.');
     updateMetaTag('meta[property="og:title"]', 'property', 'og:title', 'Sans Mercantile™ PRIV Core - AI-Driven Execution Engine');
     updateMetaTag('meta[property="og:description"]', 'property', 'og:description', 'Revolutionary dual-core AGI system with emotional intelligence and deep market analysis capabilities.');
+    // The dashboard is gated app surface — never let it be indexed even if
+    // robots.txt rules are bypassed.
+    updateMetaTag('meta[name="robots"]', 'name', 'robots', 'noindex, nofollow, noarchive');
   }, [demoMode]);
 
   const handleToggleSidebar = () => {
@@ -95,14 +170,10 @@ function App({ initialDevice = "desktop" }: AppProps) {
 
   const handleToggleDemoMode = async () => {
     setDevice(prev => prev); // keep state intact
-    // Only demo -> real is gated. If no real Deriv account is connected,
-    // send them straight into the real client-side Deriv OAuth flow
-    // (create or link) rather than flipping into a real-mode view with
-    // nothing behind it.
-    if (demoMode && !hasRealDeriv) {
-      await initiateDerivLogin();
-      return;
-    }
+    // The sidebar toggle flips demo <-> live directly, always. Both
+    // modes show real Deriv data (demo account vs live account); when
+    // the target mode has no linked account the locked screen's connect
+    // card handles onboarding. No forced login at toggle time.
     setDemoMode(!demoMode);
   };
 
@@ -182,34 +253,106 @@ function App({ initialDevice = "desktop" }: AppProps) {
                 transition={{ duration: 0.3 }}
                 className="p-4 sm:p-6"
               >
+                {/* Dashboard routes only mount under /dashboard/*. Rendering
+                    a descendant <Routes> at the bare "/" (Deriv's registered
+                    redirect) trips React Router's "parent route has no
+                    trailing /*" warning and can never match anything -- the
+                    return leg needs LoginGate, not these routes. Any other
+                    non-/dashboard deep link (e.g. old /terminal bookmarks)
+                    redirects home instead of rendering an empty shell. */}
+                {!location.pathname.startsWith("/dashboard") && location.pathname !== "/" && (
+                  <Navigate to="/dashboard" replace />
+                )}
+                {location.pathname.startsWith("/dashboard") && (
                 <Routes>
-                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<Dashboard demoMode={demoMode} />} />
                   <Route path="/dashboard/terminal" element={<TradingTerminal />} />
                   <Route path="/dashboard/agi-core" element={<AGICore demoMode={demoMode} />} />
-                  <Route path="/dashboard/multi-agent" element={<MultiAgent demoMode={demoMode} />} />
-                  <Route path="/dashboard/data-ingestion" element={<DataIngestion demoMode={demoMode} />} />
-                  <Route path="/dashboard/security" element={<Security demoMode={demoMode} />} />
-                  <Route path="/dashboard/automation" element={<Automation demoMode={demoMode} />} />
-                  <Route path="/dashboard/tax" element={<Tax demoMode={demoMode} />} />
-                  <Route path="/dashboard/news" element={<News demoMode={demoMode} />} />
-                  <Route path="/dashboard/analytics" element={<Analytics demoMode={demoMode} />} />
+                  <Route path="/dashboard/multi-agent" element={<MultiAgent />} />
+                  {/* Data Ingest moved under SANS Network Link as an
+                      admin-only tab; old bookmarks follow. */}
+                  <Route path="/dashboard/data-ingestion" element={<Navigate to="/dashboard/connections" replace />} />
+                  {/* Security Check is admin-only (sidebar hides it from
+                      clients; this guard closes the direct-URL path). */}
+                  <Route path="/dashboard/security" element={<RequireAdmin><Security demoMode={demoMode} /></RequireAdmin>} />
+                  {/* Strategies: paying tiers only. */}
+                  <Route path="/dashboard/automation" element={<RequirePaying><Automation demoMode={demoMode} /></RequirePaying>} />
+                  {/* Tax Intelligence moved to Identity & Profile, next to
+                      Identity Registry KYC; old bookmarks follow. */}
+                  <Route path="/dashboard/tax" element={<Navigate to="/dashboard/profile?tab=tax" replace />} />
+                  <Route path="/dashboard/news" element={<News />} />
+                  <Route path="/dashboard/signals" element={<MySignals />} />
+                  {/* Diagnostics Log merged into History & Audit -- old
+                      bookmarked URL redirects there. */}
+                  <Route path="/dashboard/analytics" element={<Navigate to="/dashboard/history" replace />} />
                   <Route path="/dashboard/history" element={<History demoMode={demoMode} />} />
-                  <Route path="/dashboard/connections" element={<Connections demoMode={demoMode} />} />
+                  <Route path="/dashboard/connections" element={<ConnectionsSection demoMode={demoMode} />} />
+                  <Route path="/dashboard/billing" element={<Billing demoMode={demoMode} />} />
                   <Route path="/dashboard/profile" element={<ProfilePage demoMode={demoMode} />} />
-                  <Route path="/dashboard/admin/kyc" element={<KycAdminReviewPage />} />
+                  {/* KYC review is admin-only (same rule as Security/CRM;
+                      the direct-URL path used to be unguarded). */}
+                  <Route path="/dashboard/admin/kyc" element={<RequireAdmin><KycAdminReviewPage /></RequireAdmin>} />
+                  {/* Client CRM is admin-only (sidebar hides it from
+                      clients; this guard closes the direct-URL path). */}
+                  <Route path="/dashboard/crm" element={<RequireAdmin><CrmPage /></RequireAdmin>} />
+                  {/* Marketing Studio: in-house generation engine — local
+                      poster/video compositor, SAPI voice, Bedrock plates and
+                      app-AI script writing. Admin-only -- it renders campaign
+                      assets and spends AWS credits. */}
+                  <Route path="/dashboard/marketing" element={<RequireAdmin><MarketingStudio /></RequireAdmin>} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </Routes>
+                )}
               </motion.div>
             </AnimatePresence>
           </main>
         </div>
         
         <UnifiedAssistant isVisible={true} />
+        <Celebrations />
         <Toaster />
         <VercelAnalytics />
       </div>
     </LoginGate>
+  );
+}
+
+function App({ initialDevice = "desktop" }: AppProps) {
+  useEffect(() => {
+    initDatadog();
+  }, []);
+
+  return (
+    <Routes>
+      {/* Public marketing page for visitors before login -- EXCEPT when
+          Deriv's PKCE return lands here (its registered Redirect URL is
+          the bare origin "/", same as this route). React Router picks the
+          exact "/" match over the "/*" catch-all below, so without this
+          guard every Deriv return rendered Landing instead of GatedApp --
+          LoginGate (which owns the code exchange + /connect-token POST +
+          callback-ping telemetry) never mounted at all, silently
+          swallowing 100% of Deriv connect attempts. isDerivCallback()
+          checks for ?code&state (Deriv's shape); Auth0's own callback is a
+          separate /callback route and is unaffected. */}
+      <Route
+        path="/"
+        element={isDerivCallback() ? <GatedApp initialDevice={initialDevice} /> : <Landing />}
+      />
+      {/* Legal pages -- were standalone public/legal/*.html files that
+          bypassed the app entirely (own <head>, missing favicon, a
+          css/img path that never existed post-deploy). Public routes so
+          they stay reachable without login, same as before. */}
+      <Route path="/legal/terms" element={<LegalTerms />} />
+      <Route path="/legal/policy" element={<LegalPolicy />} />
+      <Route path="/legal/cookie" element={<LegalCookie />} />
+      <Route path="/legal/eula" element={<LegalEula />} />
+      <Route path="/legal/liability" element={<LegalLiability />} />
+      <Route path="/legal/data-deletion" element={<LegalDataDeletion />} />
+      {/* Everything else: the app shell itself (no sign-in gate -- the
+          legacy login wall was removed 2026-10-05; the backend enforces
+          verified identity where it matters). */}
+      <Route path="/*" element={<GatedApp initialDevice={initialDevice} />} />
+    </Routes>
   );
 }
 

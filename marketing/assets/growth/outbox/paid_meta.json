@@ -1,0 +1,216 @@
+{
+  "note": "All objects are PAUSED/INACTIVE by design.",
+  "payload": {
+    "adset": {
+      "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+      "billing_event": "IMPRESSIONS",
+      "daily_budget": 20,
+      "name": "priv-growth-2026-10-08 \u00b7 ['US', 'CA', 'GB', 'AU']",
+      "optimization_goal": "LEAD_GENERATION",
+      "start_time": "now",
+      "status": "PAUSED",
+      "targeting": {
+        "age_max": 54,
+        "age_min": 25,
+        "flexible_spec": [
+          {
+            "interests": [
+              {
+                "id": "Forex trading",
+                "name": "Forex trading"
+              },
+              {
+                "id": "Day trading",
+                "name": "Day trading"
+              },
+              {
+                "id": "Technical analysis",
+                "name": "Technical analysis"
+              },
+              {
+                "id": "Algorithmic trading",
+                "name": "Algorithmic trading"
+              },
+              {
+                "id": "Financial markets",
+                "name": "Financial markets"
+              }
+            ]
+          }
+        ],
+        "geo_locations": {
+          "countries": [
+            "US",
+            "CA",
+            "GB",
+            "AU"
+          ]
+        },
+        "publisher_platforms": [
+          "facebook",
+          "instagram"
+        ]
+      }
+    },
+    "campaign": {
+      "name": "priv-growth-2026-10-08",
+      "objective": "LEADS",
+      "special_ad_categories": [],
+      "status": "PAUSED"
+    },
+    "creatives": [
+      {
+        "creative": {
+          "degrees_of_freedom_spec": {
+            "creative_features_spec": {
+              "standard_enhancements": {
+                "enroll_status": "OPT_OUT"
+              }
+            }
+          },
+          "object_story_spec": {
+            "link_data": {
+              "call_to_action_action_type": "WATCH_MORE",
+              "caption": "priv.sansmercantile.com",
+              "description": "",
+              "link": "https://priv.sansmercantile.com",
+              "message": "Nobody taught you this in demo.",
+              "name": "Entry. Two targets. One stop."
+            },
+            "page_id": "${PAGE_ID}"
+          }
+        },
+        "name": "priv-growth-2026-10-08 \u00b7 video \u00b7 0",
+        "status": "PAUSED"
+      },
+      {
+        "creative": {
+          "degrees_of_freedom_spec": {
+            "creative_features_spec": {
+              "standard_enhancements": {
+                "enroll_status": "OPT_OUT"
+              }
+            }
+          },
+          "object_story_spec": {
+            "link_data": {
+              "call_to_action_action_type": "WATCH_MORE",
+              "caption": "priv.sansmercantile.com",
+              "description": "",
+              "link": "https://priv.sansmercantile.com",
+              "message": "Nobody taught you this in demo.",
+              "name": "Entry. Two targets. One stop."
+            },
+            "page_id": "${PAGE_ID}"
+          }
+        },
+        "name": "priv-growth-2026-10-08 \u00b7 video \u00b7 1",
+        "status": "PAUSED"
+      },
+      {
+        "creative": {
+          "degrees_of_freedom_spec": {
+            "creative_features_spec": {
+              "standard_enhancements": {
+                "enroll_status": "OPT_OUT"
+              }
+            }
+          },
+          "object_story_spec": {
+            "link_data": {
+              "call_to_action_action_type": "WATCH_MORE",
+              "caption": "priv.sansmercantile.com",
+              "description": "",
+              "link": "https://priv.sansmercantile.com",
+              "message": "Nobody taught you this in demo.",
+              "name": "Entry. Two targets. One stop."
+            },
+            "page_id": "${PAGE_ID}"
+          }
+        },
+        "name": "priv-growth-2026-10-08 \u00b7 video \u00b7 2",
+        "status": "PAUSED"
+      },
+      {
+        "creative": {
+          "degrees_of_freedom_spec": {
+            "creative_features_spec": {
+              "standard_enhancements": {
+                "enroll_status": "OPT_OUT"
+              }
+            }
+          },
+          "object_story_spec": {
+            "link_data": {
+              "call_to_action_action_type": "LEARN_MORE",
+              "caption": "priv.sansmercantile.com",
+              "description": "",
+              "link": "https://priv.sansmercantile.com",
+              "message": "Nobody taught you this in demo.",
+              "name": "Entry. Two targets. One stop."
+            },
+            "page_id": "${PAGE_ID}"
+          }
+        },
+        "name": "priv-growth-2026-10-08 \u00b7 static \u00b7 3",
+        "status": "PAUSED"
+      },
+      {
+        "creative": {
+          "degrees_of_freedom_spec": {
+            "creative_features_spec": {
+              "standard_enhancements": {
+                "enroll_status": "OPT_OUT"
+              }
+            }
+          },
+          "object_story_spec": {
+            "link_data": {
+              "call_to_action_action_type": "LEARN_MORE",
+              "caption": "priv.sansmercantile.com",
+              "description": "",
+              "link": "https://priv.sansmercantile.com",
+              "message": "Nobody taught you this in demo.",
+              "name": "Entry. Two targets. One stop."
+            },
+            "page_id": "${PAGE_ID}"
+          }
+        },
+        "name": "priv-growth-2026-10-08 \u00b7 static \u00b7 4",
+        "status": "PAUSED"
+      },
+      {
+        "creative": {
+          "degrees_of_freedom_spec": {
+            "creative_features_spec": {
+              "standard_enhancements": {
+                "enroll_status": "OPT_OUT"
+              }
+            }
+          },
+          "object_story_spec": {
+            "link_data": {
+              "call_to_action_action_type": "LEARN_MORE",
+              "caption": "priv.sansmercantile.com",
+              "description": "",
+              "link": "https://priv.sansmercantile.com",
+              "message": "Nobody taught you this in demo.",
+              "name": "Entry. Two targets. One stop."
+            },
+            "page_id": "${PAGE_ID}"
+          }
+        },
+        "name": "priv-growth-2026-10-08 \u00b7 static \u00b7 5",
+        "status": "PAUSED"
+      }
+    ],
+    "disclaimer": "Trading involves risk. Past performance is not indicative of future results.",
+    "rules": {
+      "kill_ctr_below": 0.005,
+      "min_spend_no_conversion": 3.0,
+      "rotate_every_days": 7,
+      "scale_ctr_above": 0.03
+    }
+  },
+  "platform": "META"
+}

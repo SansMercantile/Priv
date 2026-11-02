@@ -19,7 +19,6 @@ if (typeof window !== "undefined") {
           configurable: true,
           enumerable: true,
         });
-        console.log("[SANS Shim] Successfully configured writable getter/setter for window.fetch.");
       } else {
         console.warn("[SANS Shim] window.fetch is not configurable.");
       }

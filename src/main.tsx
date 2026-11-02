@@ -4,6 +4,14 @@ import { createRoot } from "react-dom/client";
 import AuthRoot from "./AuthRoot.tsx";
 import "./index.css";
 
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch((error) => {
+      console.warn("Priv Core offline shell could not be registered:", error);
+    });
+  });
+}
+
 // Intercept and absorb unpreventable cross-origin iframe and script error events
 if (typeof window !== "undefined") {
   // Override console.error to filter out third-party iframe errors and noisy script warnings
@@ -61,7 +69,9 @@ if (typeof window !== "undefined") {
       // Quietly absorb
       return;
     }
-    originalConsoleWarn.apply(console, args);
+    // Pass a control-char-stripped copy so a tainted message can't forge
+    // extra log lines (CR/LF log injection).
+    originalConsoleWarn(message.replace(/[\r\n\u0000-\u001F\u007F]+/g, " "));
   };
 
   // Error event listener with preventDefault and stopPropagation

@@ -1,22 +1,18 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBrokerConnections } from "../lib/useBrokerConnections";
-import { initiateDerivLogin, getDerivAccounts, getActiveLoginId, getAuthInfo, fetchDerivAccounts } from "../lib/derivAuth";
+import { userHeader } from "../lib/userHeader";
+import { DERIV_SIGNUP_URL } from "../lib/derivAuth/oauth";
+import DerivConnectCard from "./DerivConnectCard";
 import { 
   DollarSign, 
   TrendingUp, 
   TrendingDown, 
   Users, 
   Activity, 
-  ShieldCheck, 
-  Zap,
   Activity as DiagnosticIcon,
-  HardDrive,
-  Cpu,
-  Terminal,
   BrainCircuit,
   Lock,
-  ArrowUpRight,
   Coins
 } from "lucide-react";
 import { MetricCard } from "./MetricCard";
@@ -102,10 +98,10 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
 
   const lastPoint = data[data.length - 1] || { sentiment: 0.5 };
   const sentimentLabel = lastPoint.sentiment > 0.7 
-    ? "Bullish" 
+    ? "Rising" 
     : lastPoint.sentiment < 0.3 
-      ? "Bearish" 
-      : "Neutral";
+      ? "Falling" 
+      : "Flat";
 
   const sentimentColor = lastPoint.sentiment > 0.7 
     ? "text-green-400" 
@@ -121,16 +117,21 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
           Performance & Sentiment Engine
         </h3>
         <div className="flex items-center space-x-4 text-xs font-mono text-gray-400">
-          <span>REAL-TIME P&L</span>
+          <span>REALIZED P&L</span>
           <div className="flex items-center space-x-1.5">
             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-white/60">SENTIMENT: <span className={`${sentimentColor} font-bold`}>{sentimentLabel}</span></span>
+            <span className="text-white/60">TREND: <span className={`${sentimentColor} font-bold`}>{sentimentLabel}</span></span>
           </div>
         </div>
       </div>
 
       <div className="relative">
         <canvas ref={canvasRef} className="w-full h-64 rounded bg-neutral-900/40 border border-white/10" />
+        {!data.length && (
+          <div className="absolute inset-0 rounded bg-neutral-900/40 flex items-center justify-center text-[11px] font-mono text-zinc-500">
+            No settled trades in the selected window
+          </div>
+        )}
         <div className="absolute top-2 left-2 flex space-x-4 text-[9px] font-mono text-white/30">
           <div>SCALE: DYNAMIC</div>
           <div>DPR: {window.devicePixelRatio || 1}</div>
@@ -152,56 +153,43 @@ interface LogAction {
 
 export const ActiveConsoleLog: React.FC = () => {
   const [logs, setLogs] = useState<LogAction[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  const templates = [
-    { type: "agi", message: "AGI Core processed emotional sentiment analysis", agent: "Empathy Engine" },
-    { type: "agent", message: "Quantitative Agent identified arbitrage opportunity", agent: "Quant-Alpha-7" },
-    { type: "data", message: "Ingested 2.3K new market data points", agent: "Data Fusion" },
-    { type: "security", message: "Zero-knowledge proof verification completed", agent: "ZKP Verifier" },
-    { type: "execution", message: "High-frequency trade executed in 0.002s", agent: "Execution Engine" },
-    { type: "agi", message: "Unified Consciousness updated strategy weights", agent: "AGI Core" },
-    { type: "agent", message: "Risk Agent adjusted position sizing", agent: "Risk-Guardian" },
-    { type: "data", message: "Alternative data source integrated", agent: "IoT Ingestor" },
-    { type: "security", message: "Blockchain logger recorded 47 transactions", agent: "Immutable Logger" },
-    { type: "execution", message: "CPPN Evolver discovered new pattern", agent: "Pattern Evolver" }
-  ];
-
-  const categoryStyles = {
-    agi: { color: "text-white/80", bg: "bg-white/[0.03]", border: "border-white/10" },
-    agent: { color: "text-white/80", bg: "bg-white/[0.03]", border: "border-white/10" },
-    data: { color: "text-white/80", bg: "bg-white/[0.03]", border: "border-white/10" },
-    security: { color: "text-white/80", bg: "bg-white/[0.03]", border: "border-white/10" },
-    execution: { color: "text-white/80", bg: "bg-white/[0.03]", border: "border-white/10" }
-  };
-
+  // Real agent activity from the backend (/api/v1/agents/activity).
+  // A random template generator ("AGI Core processed emotional
+  // sentiment analysis" etc.) used to fabricate this feed every 4-8s;
+  // it now renders exactly what the orchestrator reports, or an honest
+  // empty/error state.
   useEffect(() => {
-    // Generate initial logs
-    const initial = Array.from({ length: 6 }, (_, i) => {
-      const templ = templates[Math.floor(Math.random() * templates.length)];
-      return {
-        id: i,
-        type: templ.type as any,
-        message: templ.message,
-        agent: templ.agent,
-        timestamp: Date.now() - i * 15000
-      };
-    });
-    setLogs(initial);
-
-    // Scroll timer for new logs
-    const interval = setInterval(() => {
-      const templ = templates[Math.floor(Math.random() * templates.length)];
-      const nextLogItem: LogAction = {
-        id: Date.now(),
-        type: templ.type as any,
-        message: templ.message,
-        agent: templ.agent,
-        timestamp: Date.now()
-      };
-      setLogs(prev => [nextLogItem, ...prev.slice(0, 9)]);
-    }, Math.random() * 4000 + 4000);
-
-    return () => clearInterval(interval);
+    let isMounted = true;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/v1/agents/activity?limit=10");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!isMounted) return;
+        const items: any[] = data?.data?.activities || data?.activities || [];
+        setLogs(items.slice(0, 10).map((a: any, i: number) => ({
+          id: i,
+          type: "agent",
+          message: a.description || `${a.agent_name || "Agent"} is ${a.status || "idle"}`,
+          agent: a.agent_name || a.agent_id || "agent",
+          timestamp: a.timestamp ? Date.parse(a.timestamp) || Date.now() : Date.now(),
+        })));
+        setError(null);
+      } catch (e: any) {
+        if (isMounted) {
+          setLogs([]);
+          setError(e?.message || "Activity endpoint unreachable.");
+        }
+      }
+    };
+    load();
+    const interval = setInterval(load, 15000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const timeDiffStr = (time: number) => {
@@ -219,12 +207,14 @@ export const ActiveConsoleLog: React.FC = () => {
       </h3>
       
       <div className="flex-1 space-y-3 overflow-y-auto max-h-[350px] scrollbar-hide">
-        {logs.map((item) => {
-          const style = categoryStyles[item.type] || categoryStyles.data;
-          return (
-            <div 
-              key={item.id} 
-              className={`flex items-center justify-between p-3 rounded border ${style.border} ${style.bg} transition-all duration-300 hover:bg-white/[0.04]`}
+        {error ? (
+          <p className="text-xs text-zinc-500 font-mono">Agent activity unavailable: {error}</p>
+        ) : logs.length === 0 ? (
+          <p className="text-xs text-zinc-500 font-mono">No agent activity reported yet.</p>
+        ) : logs.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-center justify-between p-3 rounded border border-white/10 bg-white/[0.03] transition-all duration-300 hover:bg-white/[0.04]"
             >
               <div className="flex items-center space-x-3 min-w-0">
                 <div className="w-1 h-1 bg-white/40 rounded-full flex-shrink-0" />
@@ -234,7 +224,6 @@ export const ActiveConsoleLog: React.FC = () => {
                   </p>
                   <p className="text-[9px] text-white/40 font-mono flex items-center">
                     <span className="font-bold mr-2 text-white/60">[{item.agent}]</span>
-                    <span>TYPE: {item.type.toUpperCase()}</span>
                   </p>
                 </div>
               </div>
@@ -242,8 +231,7 @@ export const ActiveConsoleLog: React.FC = () => {
                 {timeDiffStr(item.timestamp)}
               </div>
             </div>
-          );
-        })}
+          ))}
       </div>
     </div>
   );
@@ -291,12 +279,7 @@ interface DashboardOverviewProps {
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, setActiveSection }) => {
   const navigate = useNavigate();
-  const { hasRealDeriv, hasDemoDeriv, loading: brokerLoading } = useBrokerConnections();
-
-  const isLiveMode = localStorage.getItem("demoMode") === "false";
-  const isBinanceConnected = !isLiveMode || localStorage.getItem("ex_conn_binance") === "true";
-  const isCoinbaseConnected = !isLiveMode || localStorage.getItem("ex_conn_coinbase") === "true";
-  const isHmrcConnected = !isLiveMode || localStorage.getItem("tax_conn_hmrc") === "true";
+  const { hasRealDeriv, hasDemoDeriv, connections: brokerConnections, loading: brokerLoading } = useBrokerConnections();
 
   const [livePositions, setLivePositions] = useState<any[]>([]);
   const [xmId, setXmId] = useState<string>("");
@@ -304,8 +287,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
   const [xmBalance, setXmBalance] = useState<number>(0);
 
   // Bloomberg S&P live linked parameters
-  const [credits, setCredits] = useState<number>(() => {
-    return parseFloat(localStorage.getItem("xm_usage_credits") || "842.15");
+  const [credits, setCredits] = useState<number | null>(() => {
+    const raw = localStorage.getItem("xm_usage_credits");
+    const n = raw == null ? NaN : parseFloat(raw);
+    return Number.isFinite(n) ? n : null;
   });
   const [riskAppetite, setRiskAppetite] = useState<string>(() => {
     return localStorage.getItem("xm_user_risk_appetite") || "Aggressive";
@@ -313,16 +298,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
   const [leverage, setLeverage] = useState<number>(() => {
     return parseInt(localStorage.getItem("xm_profile_leverage") || "20");
   });
-  const [advisorStance, setAdvisorStance] = useState<string>("balanced");
 
   useEffect(() => {
     const handleSync = () => {
-      const liveCreds = parseFloat(localStorage.getItem("xm_usage_credits") || "842.15");
-      const liveRisk = localStorage.getItem("xm_user_risk_appetite") || "Aggressive";
-      const liveLeverage = parseInt(localStorage.getItem("xm_profile_leverage") || "20");
-      setCredits(liveCreds);
-      setRiskAppetite(liveRisk);
-      setLeverage(liveLeverage);
+      const raw = localStorage.getItem("xm_usage_credits");
+      const n = raw == null ? NaN : parseFloat(raw);
+      setCredits(Number.isFinite(n) ? n : null);
+      setRiskAppetite(localStorage.getItem("xm_user_risk_appetite") || "Aggressive");
+      setLeverage(parseInt(localStorage.getItem("xm_profile_leverage") || "20"));
     };
     
     handleSync();
@@ -334,56 +317,75 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
     };
   }, []);
 
-  // Map user risk tolerance automatically to SANS Advisor stance defaults
+  // Real open positions across ALL of the caller's linked accounts
+  // (uid-scoped GET /api/v1/portfolio/positions), replacing the dead
+  // xm_positions localStorage feed that nothing has ever written --
+  // it left this table permanently empty. Rows keep the table's
+  // shape; the ticket shows which account holds the contract.
   useEffect(() => {
-    if (riskAppetite === "Conservative") {
-      setAdvisorStance("conservative");
-    } else if (riskAppetite === "Moderate") {
-      setAdvisorStance("balanced");
-    } else {
-      setAdvisorStance("aggressive");
-    }
-  }, [riskAppetite]);
-
-  useEffect(() => {
-    const syncDynamicData = () => {
+    let cancelled = false;
+    const syncRealPositions = async () => {
       try {
-        const savedPos = localStorage.getItem("xm_positions");
-        if (savedPos) {
-          setLivePositions(JSON.parse(savedPos));
-        } else {
+        const res = await fetch("/api/v1/portfolio/positions", { headers: await userHeader() });
+        if (!res.ok) throw new Error(String(res.status));
+        const json = await res.json();
+        const rows: any[] = json?.data?.positions || [];
+        if (cancelled) return;
+        setPositionsLoaded(true);
+        setLivePositions(
+          rows.map((p: any) => {
+            const ct = String(p.contract_type || "").toUpperCase();
+            const side = ["PUT", "MULTDOWN", "SELL", "SHORT"].includes(ct) ? "SELL" : "BUY";
+            const acct = String(p.broker_id || "").split("_").slice(-1)[0];
+            return {
+              id: p.order_id ? `${acct}:${p.order_id}` : acct || "—",
+              symbol: p.symbol || "—",
+              side,
+              lots: p.quantity ?? "—",
+              entryPrice: typeof p.avg_cost === "number" ? p.avg_cost : null,
+              currentPrice: typeof p.current_price === "number" ? p.current_price : null,
+              pnl: typeof p.unrealized_pnl === "number" ? p.unrealized_pnl : null,
+            };
+          })
+        );
+      } catch {
+        if (!cancelled) {
           setLivePositions([]);
+          setPositionsLoaded(true);
         }
-      } catch (e) {
-        setLivePositions([]);
       }
-      
-      // Real Deriv account info (from the client-side OAuth session), not
-      // a fake XM Global fallback. Live balance isn't fetched here - that
-      // needs a real-time call to Deriv's API, not yet built - so we show
-      // the real account ID/currency and are honest that balance is
-      // unavailable rather than displaying a fabricated number.
-      const derivAccounts = getDerivAccounts() || [];
-      const activeId = getActiveLoginId();
-      const activeAccount = derivAccounts.find((a) => a.account_id === activeId) || derivAccounts[0];
-      setXmId(activeAccount?.account_id || "");
-      setXmServer(activeAccount?.currency || "");
     };
 
-    syncDynamicData();
-    const t = setInterval(syncDynamicData, 1500);
-    return () => clearInterval(t);
+    syncRealPositions();
+    const t = setInterval(syncRealPositions, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
   }, []);
+
+  // Real Deriv account info, from the backend connections list (see
+  // oauth_api.py _list_user_connections) rather than the retired
+  // client-side OAuth session. Live balance isn't fetched here -- that
+  // needs a real-time call to Deriv's API, not yet built -- so we show
+  // the real account ID/currency and are honest that balance is
+  // unavailable rather than displaying a fabricated number.
+  useEffect(() => {
+    const derivConn = brokerConnections.find((c) => c.broker === "deriv") as
+      (typeof brokerConnections[number] & { account_id?: string; currency?: string }) | undefined;
+    setXmId(derivConn?.account_id || "");
+    setXmServer(derivConn?.currency || "");
+  }, [brokerConnections]);
 
   const [stats, setStats] = useState(() => {
     const isLive = localStorage.getItem("demoMode") === "false";
 
     if (isLive) {
-      // No real-time balance/risk/agent-count endpoints exist yet for live
-      // accounts. Showing fabricated numbers here would mislead a real
-      // trader into thinking they have real P&L/risk data. Be honest
-      // instead: null means "not available yet", rendered as such below,
-      // not randomized like the clearly-labeled demo simulation is.
+      // Live AND demo both show real Deriv data (demo = real Deriv demo
+      // account, live = real Deriv live account). Nothing here is
+      // fabricated: null means "not loaded yet", rendered as such below.
+      // Real balances arrive from GET /api/v1/auth/deriv/balances in the
+      // effect further down; agent counts arrive from the backend registry.
       return {
         totalProfit: null as number | null,
         dailyReturn: null as number | null,
@@ -394,17 +396,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
       };
     }
 
-    const baseBal = 10000.0;
-    const binanceBal = localStorage.getItem("ex_conn_binance") === "true" ? 148251.52 : 0.0;
-    const coinbaseBal = localStorage.getItem("ex_conn_coinbase") === "true" ? 92410.88 : 0.0;
-    const combinedVal = baseBal + binanceBal + coinbaseBal;
+    // Demo opens with the same honest nulls; the balances effect fills
+    // in the real Deriv demo balance once it loads. No base figures, no
+    // exchange placeholders, no random walk -- ever.
     return {
-      totalProfit: combinedVal,
-      dailyReturn: 12.34,
-      activeAgents: 12,
-      dataPoints: 847392,
-      riskScore: 23.5,
-      executionSpeed: 0.003
+      totalProfit: null as number | null,
+      dailyReturn: null as number | null,
+      activeAgents: null as number | null,
+      dataPoints: null as number | null,
+      riskScore: null as number | null,
+      executionSpeed: null as number | null,
     };
   });
 
@@ -412,42 +413,184 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
   // the backend's agent registry, not a hardcoded guess.
   const [liveTotalAgents, setLiveTotalAgents] = useState<number | null>(null);
 
-  // Live-mode real data: actual Deriv balance (re-fetched from Deriv's own
-  // API, not just the cached value from login) and actual backend agent
-  // counts. Runs only when in real mode with a real Deriv account, polls
-  // periodically so numbers stay current rather than going stale.
+  // Realized wins/losses for this mode's Deriv account, from settled
+  // contracts (GET /api/v1/history/performance). Drives the wins/losses
+  // strip, the equity curve and the daily-return card; null until the
+  // first successful response ("—"), never fabricated.
+  const [perf, setPerf] = useState<{
+    trades: number;
+    wins: number;
+    losses: number;
+    win_rate: number | null;
+    net_pnl: number;
+    profit_factor: number | null;
+    today_pnl: number;
+    daily_return_pct: number | null;
+    balance: number | null;
+    curve: { t: number; v: number }[];
+    days: number;
+  } | null>(null);
+
+  // All-time realized P&L for this mode's account (same endpoint, no
+  // day window) so the strip answers "overall P&L", not just last 30d.
+  const [perfAll, setPerfAll] = useState<{
+    trades: number;
+    wins: number;
+    losses: number;
+    win_rate: number | null;
+    net_pnl: number;
+    profit_factor: number | null;
+  } | null>(null);
+
+  // True once the open-positions poll has answered at least once, so the
+  // Open P&L card can show "—" while loading instead of a fake $0.00.
+  const [positionsLoaded, setPositionsLoaded] = useState(false);
+
+  // Real data in BOTH modes: demo shows the real Deriv DEMO account,
+  // live shows the real Deriv LIVE account (GET /api/v1/auth/deriv/
+  // balances, resolved server-side through the linked adapters), plus
+  // real backend agent counts. Polls so numbers stay current. Anything
+  // unavailable stays null ("—") rather than fabricated.
   useEffect(() => {
-    if (demoMode || !hasRealDeriv) return;
+    const wantLive = !demoMode;
+    // The agent registry is public: always fetch it so Active Agents fills
+    // even before (or without) a linked Deriv account. Account-scoped
+    // numbers below stay gated on the mode's real linked account.
+    const accountScoped = wantLive ? hasRealDeriv : hasDemoDeriv;
     let cancelled = false;
 
     const refreshRealData = async () => {
-      // Real agent status from the backend's actual agent registry.
+      // Real agent status from the backend's actual agent registry --
+      // ONE response drives both numbers so active/total can never
+      // disagree (the old 31/12 came from two endpoints racing).
       try {
         const res = await fetch("/api/v1/agents/status_with_reputation");
         const json = await res.json();
         if (!cancelled && json?.data?.summary) {
-          setStats(prev => ({ ...prev, activeAgents: json.data.summary.active_agents }));
-          setLiveTotalAgents(json.data.summary.total_agents);
+          const s = json.data.summary;
+          setStats(prev => ({ ...prev, activeAgents: s.active_agents }));
+          setLiveTotalAgents(s.total_agents);
+        } else if (!cancelled) {
+          throw new Error("no summary");
         }
       } catch {
-        // leave as-is (null/stale) rather than fabricate a number
+        // Fallback: plain registry count for BOTH numbers, never a
+        // hardcoded denominator.
+        try {
+          const res = await fetch("/api/v1/agents/status");
+          const json = await res.json();
+          const n = json?.data?.agents?.length;
+          if (!cancelled && typeof n === "number") {
+            setStats(prev => ({ ...prev, activeAgents: n }));
+            setLiveTotalAgents(n);
+          }
+        } catch {
+          // leave as-is (null/stale) rather than fabricate a number
+        }
       }
 
-      // Real Deriv balance - re-fetch from Deriv directly, not the
-      // possibly-stale cached value from initial login.
+      // Everything below is scoped to the mode's linked account -- without
+      // one the endpoints resolve an empty balance/no settled contracts,
+      // so skip the calls entirely rather than render their nulls.
+      if (!accountScoped) return;
+
+      // Real Deriv balance for this mode's account -- SUMMED across
+      // every account in the mode (one account's balance was shown
+      // before while other linked accounts went invisible).
       try {
-        const authInfo = getAuthInfo();
-        if (authInfo) {
-          const accounts = await fetchDerivAccounts(authInfo);
-          const activeId = getActiveLoginId();
-          const realAccount = accounts.find(a => a.account_id === activeId && a.account_type === "real")
-            || accounts.find(a => a.account_type === "real");
-          if (!cancelled && realAccount?.balance !== undefined) {
-            setStats(prev => ({ ...prev, totalProfit: parseFloat(realAccount.balance as string) }));
+        // MUST carry userHeader: without an identity the backend resolves
+        // "anonymous", finds no linked account, and every balance stays
+        // null ("—") even with a connected Deriv account.
+        const t0 = performance.now();
+        const res = await fetch("/api/v1/auth/deriv/balances", { headers: await userHeader() });
+        const json = await res.json();
+        const latencySec = (performance.now() - t0) / 1000;
+        const rows: any[] = json?.data?.balances || [];
+        const modeRows = rows.filter((r: any) =>
+          wantLive ? r.account_type !== "demo" : r.account_type === "demo"
+        );
+        let sum = 0;
+        let counted = 0;
+        for (const r of modeRows) {
+          if (typeof r.balance === "number") {
+            sum += r.balance;
+            counted += 1;
           }
         }
+        if (!cancelled && counted > 0) {
+          setStats(prev => ({
+            ...prev,
+            totalProfit: sum,
+            dailyReturn: null,
+            // Execution Spd: EWMA of this call's real round-trip
+            // (browser -> proxy -> EC2 -> Deriv). Measured, never faked.
+            executionSpeed: prev.executionSpeed == null
+              ? latencySec
+              : prev.executionSpeed * 0.7 + latencySec * 0.3,
+          }));
+        }
       } catch {
-        // leave as-is rather than fabricate a number
+        // leave as-is (null) rather than fabricate a number
+      }
+
+      // Realized wins/losses + cumulative equity curve from this mode's
+      // settled contracts. available:false (no linked account in mode)
+      // clears the strip so stale other-mode numbers can't linger; any
+      // failure leaves the honest "—".
+      try {
+        const res = await fetch(
+          `/api/v1/history/performance?days=30&mode=${wantLive ? "live" : "demo"}`,
+          { headers: await userHeader() }
+        );
+        const json = await res.json();
+        const d = json?.data;
+        if (!cancelled && d?.available) {
+          setPerf(d);
+          if (typeof d.daily_return_pct === "number") {
+            setStats(prev => ({ ...prev, dailyReturn: d.daily_return_pct }));
+          }
+          const curve = Array.isArray(d.curve) ? d.curve : [];
+          setChartData(
+            curve.length > 0
+              ? curve.map((pt: any, i: number, arr: any[]) => ({
+                  time: pt.t * 1000,
+                  value: pt.v,
+                  volume: 0,
+                  sentiment: i === 0 ? 0.5 : arr[i].v > arr[i - 1].v ? 0.85 : 0.15,
+                }))
+              : []
+          );
+        } else if (!cancelled) {
+          setPerf(null);
+          setChartData([]);
+        }
+      } catch {
+        // leave as-is rather than fabricate performance numbers
+      }
+
+      // All-time realized P&L (same endpoint, no day window) -- the
+      // "overall" figure. available:false clears it like the 30d strip.
+      try {
+        const res = await fetch(
+          `/api/v1/history/performance?days=3650&mode=${wantLive ? "live" : "demo"}`,
+          { headers: await userHeader() }
+        );
+        const json = await res.json();
+        const d = json?.data;
+        if (!cancelled && d?.available) {
+          setPerfAll({
+            trades: d.trades,
+            wins: d.wins,
+            losses: d.losses,
+            win_rate: d.win_rate,
+            net_pnl: d.net_pnl,
+            profit_factor: d.profit_factor,
+          });
+        } else if (!cancelled) {
+          setPerfAll(null);
+        }
+      } catch {
+        // leave as-is rather than fabricate all-time numbers
       }
     };
 
@@ -457,100 +600,53 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
       cancelled = true;
       clearInterval(interval);
     };
-  }, [demoMode, hasRealDeriv]);
+  }, [demoMode, hasRealDeriv, hasDemoDeriv]);
+
+  // Data Points: REAL rows from the Deriv chart feed (the same endpoint
+  // the terminal's native chart renders), re-checked every 5 minutes.
+  // The card was never wired to anything before -- null stays "—", never
+  // a fabricated ingestion rate.
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/brokers/deriv/candles?symbol=R_100&timeframe=1h&limit=400", {
+          headers: await userHeader(),
+        });
+        const body = await res.json();
+        const n = Array.isArray(body?.candles) ? body.candles.length : 0;
+        if (!cancelled && n > 0) setStats(prev => ({ ...prev, dataPoints: n }));
+      } catch {
+        // keep previous value (or null -> "—") rather than fabricate
+      }
+    };
+    load();
+    const timer = window.setInterval(load, 5 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
 
-  useEffect(() => {
-    // Generate base charts
-    const initialData = Array.from({ length: 50 }, (_, i) => ({
-      time: Date.now() - (50 - i) * 2000,
-      value: 100 + Math.random() * 50 - 25,
-      volume: Math.random() * 1000000,
-      sentiment: Math.random()
-    }));
-    setChartData(initialData);
+  // NOTE: no fabricated chart points. The performance canvas renders the
+  // real cumulative equity curve from /api/v1/history/performance
+  // (settled contracts) and stays empty otherwise. A random walk here
+  // would be fake P&L on a real-money screen.
 
-    // Dynamic metrics generation loop - demo mode ONLY. Live mode's numbers
-    // stay null (see above) until real backend endpoints for balance/risk/
-    // agent-count exist; randomizing fake data for a real account would be
-    // actively misleading, not just a cosmetic placeholder.
-    const interval = setInterval(() => {
-      setStats(prev => {
-        const isLive = localStorage.getItem("demoMode") === "false";
-        if (isLive) {
-          return prev;
-        }
-        const binanceBal = localStorage.getItem("ex_conn_binance") === "true" ? 148251.52 : 0.0;
-        const coinbaseBal = localStorage.getItem("ex_conn_coinbase") === "true" ? 92410.88 : 0.0;
-        const dynamicTotal = 10000.0 + binanceBal + coinbaseBal;
-        return {
-          ...prev,
-          totalProfit: dynamicTotal,
-          dailyReturn: (prev.dailyReturn ?? 12.34) + (Math.random() - 0.5) * 0.15,
-          dataPoints: (prev.dataPoints ?? 847392) + Math.floor(Math.random() * 20),
-          riskScore: Math.max(0, Math.min(100, (prev.riskScore ?? 23.5) + (Math.random() - 0.5) * 0.2)),
-          executionSpeed: 0.001 + Math.random() * 0.004
-        };
-      });
-
-      setChartData(prev => {
-        const lastVal = prev.length > 0 ? prev[prev.length - 1].value : 100;
-        const lastSentiment = prev.length > 0 ? prev[prev.length - 1].sentiment : 0.5;
-        const newPoint = {
-          time: Date.now(),
-          value: lastVal + (Math.random() - 0.5) * 5,
-          volume: Math.random() * 1000000,
-          sentiment: Math.max(0, Math.min(1, lastSentiment + (Math.random() - 0.5) * 0.1))
-        };
-        return [...prev.slice(1), newPoint];
-      });
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Sync agents status and balance with backend APIs dynamically
-  useEffect(() => {
-    // 1. Live agents count from backend
-    fetch("/api/v1/agents/status")
-      .then(res => res.json())
-      .then(result => {
-        if (result && result.data && result.data.agents) {
-          setStats(prev => ({
-            ...prev,
-            activeAgents: result.data.agents.length
-          }));
-        }
-      })
-      .catch(err => console.error("Error pulling live agent stats:", err));
-
-    if (isLiveMode && hasRealDeriv) {
-      fetch(`/api/v1/auth/connections`)
-        .then(res => res.json())
-        .then(result => {
-          const derivConn = (result?.data?.connections || []).find((c: any) => c.broker === "deriv" && c.account_type === "live");
-          const balance = derivConn?.token_meta?.balance;
-          if (typeof balance === "number") {
-            localStorage.setItem("xm_balance", balance.toString());
-            setStats(prev => ({
-              ...prev,
-              totalProfit: balance,
-              dailyReturn: 0.0
-            }));
-          }
-        })
-        .catch(err => console.error("Error fetching live Deriv account balance:", err));
-    }
-  }, [demoMode, hasRealDeriv]);
+  // (Removed: a second agent-count effect used to race the one above,
+  // which is how active/total could disagree. One source now.)
 
   const getSovereignGrade = () => {
-    if (riskAppetite === "Conservative") return { g: "AAA GRADE", desc: "Capital Shielded", color: "text-emerald-400 border-emerald-900/50 bg-emerald-950/30" };
-    if (riskAppetite === "Moderate") return { g: "A- GRADE", desc: "Optimal Balance", color: "text-sky-450 border-sky-900/50 bg-sky-950/30" };
-    if (riskAppetite === "Aggressive") return { g: "BB+ GRADE", desc: "Speculative Spread", color: "text-[#e11d48] border-rose-900/50 bg-rose-950/30" };
-    return { g: "CCC+ LEVERAGED", desc: "High-Yield HFT", color: "text-amber-500 border-amber-900/50 bg-amber-950/30" };
+    if (riskAppetite === "Conservative") return { g: "CONSERVATIVE", desc: "Capital Shielded", color: "text-emerald-400 border-emerald-900/50 bg-emerald-950/30" };
+    if (riskAppetite === "Moderate") return { g: "MODERATE", desc: "Optimal Balance", color: "text-sky-450 border-sky-900/50 bg-sky-950/30" };
+    return { g: "AGGRESSIVE", desc: "Speculative Spread", color: "text-[#e11d48] border-rose-900/50 bg-rose-950/30" };
   };
   const gradeInfo = getSovereignGrade();
+
+  // Unrealized P&L across every open position the poll returned.
+  const openPnl = livePositions.reduce((s, p) => s + (p.pnl ?? 0), 0);
 
   if (!demoMode && !brokerLoading && !hasRealDeriv) {
     return (
@@ -559,24 +655,19 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
           <div className="mx-auto w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20 text-red-500">
             <Lock className="w-5 h-5 animate-pulse" />
           </div>
-          
+
           <div className="space-y-2">
             <h2 className="text-2xl font-serif italic text-white font-normal">Live Dashboard Locked</h2>
             <p className="text-zinc-400 text-xs max-w-md mx-auto leading-relaxed">
-              Because you have disabled the Demo Environment, standard simulated stats (like fake $2.8M margins and randomized charts) are removed. You must connect a verified Deriv account to link your genuine live data.
+              Live mode shows your real Deriv account data. Connect your Deriv account below to link it.
+              Demo mode shows your real Deriv demo account — no simulations, no placeholder figures.
             </p>
           </div>
 
-          <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
-            <button
-              onClick={() => initiateDerivLogin()}
-              className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-mono font-bold text-xs rounded border border-white/10 transition-all duration-300 flex items-center justify-center space-x-2 cursor-pointer"
-            >
-              <span>CONNECT DERIV ACCOUNT</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </button>
-            <div className="mt-2 text-[11px] text-zinc-500 font-mono flex items-center gap-3 justify-center">
-              <a href="https://deriv.com/signup" target="_blank" rel="noopener noreferrer" className="underline">Don't have an account? Sign up</a>
+          <div className="pt-2 max-w-md mx-auto text-left">
+            <DerivConnectCard />
+            <div className="mt-3 text-[11px] text-zinc-500 font-mono text-center">
+              <a href={DERIV_SIGNUP_URL} target="_blank" rel="noopener noreferrer" className="underline">Don't have an account? Sign up</a>
             </div>
           </div>
         </div>
@@ -598,10 +689,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
           </p>
         </div>
         
-        {/* Bloomberg-class Sovereign Header Rail */}
+        {/* Header rail */}
         <div className="flex flex-wrap items-center gap-2.5">
           <div className={`px-2.5 py-1.5 border rounded font-mono text-[9px] flex flex-col justify-center ${gradeInfo.color}`}>
-            <span className="text-zinc-500 leading-none mb-0.5 text-[8px] uppercase font-black">SOVEREIGN RISK CLASS</span>
+            <span className="text-zinc-500 leading-none mb-0.5 text-[8px] uppercase font-black">RISK APPETITE</span>
             <strong className="font-extrabold leading-none">{gradeInfo.g}</strong>
           </div>
 
@@ -612,18 +703,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
 
           <div className="px-2.5 py-1.5 border border-rose-950/30 bg-rose-950/15 text-rose-450 rounded font-mono text-[9px] flex flex-col justify-center">
             <span className="text-zinc-500 leading-none mb-0.5 text-[8px] uppercase">GAS FUEL RESERVES</span>
-            <strong className="font-extrabold leading-none">{credits.toFixed(2)} PRIV</strong>
-          </div>
-
-          <div className="px-3 py-2.5 bg-white/5 rounded border border-white/10 flex items-center space-x-1.5 font-mono text-[10px] font-black h-full">
-            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-white/70 uppercase">NODE: ACTIVE</span>
+            <strong className="font-extrabold leading-none">{credits == null ? "—" : `${credits.toFixed(2)} PRIV`}</strong>
           </div>
         </div>
       </div>
 
-      {/* Demo/Simulation disclosure panel — rewritten so it no longer claims demo
-          performance predicts live results. Real users can reach this page. */}
+      {/* Data honesty panel: both modes show real Deriv data. */}
       <div className="p-5 border border-white/5 bg-gradient-to-br from-neutral-950/25 via-[#0d0708]/5 to-black rounded-lg space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-white/5">
           <div className="flex items-center space-x-2.5">
@@ -631,46 +716,62 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="font-serif italic text-white text-md tracking-wide">Demo Mode Notice</span>
+            <span className="font-serif italic text-white text-md tracking-wide">Real Data Notice</span>
           </div>
           <span className="font-mono text-[9px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded uppercase font-extrabold tracking-widest animate-pulse">
-            DEMO ARBITRAGE MODE
+            {demoMode ? "DEMO DERIV FEED" : "LIVE DERIV FEED"}
           </span>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs font-mono">
+          {demoMode && (
           <div className="p-3 bg-white/[0.01] border border-white/5 rounded-lg space-y-1">
-            <span className="text-[9.5px] font-bold text-rose-500 uppercase tracking-wider block">Simulated Data</span>
+            <span className="text-[9.5px] font-bold text-emerald-500 uppercase tracking-wider block">Demo Mode</span>
             <p className="text-zinc-400 font-sans text-[11px] leading-relaxed font-light">
-              Figures shown in Demo Mode are simulated for demonstration purposes and do not reflect real market
-              activity or a real account balance.
+              Figures shown in Demo Mode are your real Deriv demo account balance and activity —
+              real data, zero risk.
             </p>
           </div>
+          )}
+          {!demoMode && (
           <div className="p-3 bg-white/[0.01] border border-white/5 rounded-lg space-y-1">
-            <span className="text-[9.5px] font-bold text-rose-500 uppercase tracking-wider block">Live Mode Is Separate</span>
+            <span className="text-[9.5px] font-bold text-emerald-500 uppercase tracking-wider block">Live Mode</span>
             <p className="text-zinc-400 font-sans text-[11px] leading-relaxed font-light">
-              Real Mode uses your connected broker's live data. It runs independently of the demo simulation above.
+              Live Mode shows your connected Deriv live account. Connect an account to link it.
             </p>
           </div>
+          )}
           <div className="p-3 bg-white/[0.01] border border-white/5 rounded-lg space-y-1">
             <span className="text-[9.5px] font-bold text-[#FF6B35] uppercase tracking-wider block">No Performance Guarantee</span>
             <p className="text-zinc-400 font-sans text-[11px] leading-relaxed font-light font-normal text-zinc-350">
-              Demo Mode results do not predict or guarantee how a live, funded account will perform. Past or
-              simulated performance is not indicative of future results.
+              Demo results do not predict or guarantee how a live, funded account will perform. Past
+              performance is not indicative of future results.
             </p>
           </div>
         </div>
       </div>
 
       {/* Metrics Bento Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
         <MetricCard
-          title="Total Profit"
+          title="Account Balance"
           value={stats.totalProfit === null ? "—" : `$${stats.totalProfit.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           change={stats.dailyReturn === null ? "Live data pending" : (stats.dailyReturn > 0 ? `+${stats.dailyReturn.toFixed(2)}%` : `${stats.dailyReturn.toFixed(2)}%`)}
           icon={DollarSign}
           trend={stats.dailyReturn === null ? "stable" : (stats.dailyReturn > 0 ? "up" : "down")}
           color="green"
+        />
+        <MetricCard
+          title="Open P&L"
+          value={
+            !positionsLoaded
+              ? "—"
+              : `${openPnl >= 0 ? "+" : "-"}$${Math.abs(openPnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          }
+          change={`${livePositions.length} open position${livePositions.length === 1 ? "" : "s"} · unrealized`}
+          icon={TrendingUp}
+          trend={!positionsLoaded || openPnl === 0 ? "stable" : openPnl > 0 ? "up" : "down"}
+          color={!positionsLoaded || openPnl === 0 ? "blue" : openPnl > 0 ? "green" : "red"}
         />
         <MetricCard
           title="Daily Return"
@@ -682,7 +783,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         />
         <MetricCard
           title="Active Agents"
-          value={stats.activeAgents === null ? "—" : `${stats.activeAgents}/${liveTotalAgents ?? 12}`}
+          value={stats.activeAgents === null ? "—" : `${stats.activeAgents}/${liveTotalAgents ?? stats.activeAgents}`}
           change="Execution cluster"
           icon={Users}
           trend="stable"
@@ -692,50 +793,32 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         <MetricCard
           title="Data Points"
           value={stats.dataPoints === null ? "—" : stats.dataPoints.toLocaleString()}
-          change="+2.3K / min"
+          change="Deriv R_100 candle feed"
           icon={Activity}
           trend="up"
           color="purple"
           onClick={() => setActiveSection("data-ingestion")}
         />
         <MetricCard
-          title="Risk Score"
-          value={
-            riskAppetite === "Conservative" 
-              ? "15.2/100" 
-              : riskAppetite === "Moderate" 
-                ? "32.4/100" 
-                : riskAppetite === "Aggressive" 
-                  ? "58.4/100" 
-                  : "88.2/100"
-          }
-          change={
-            riskAppetite === "Conservative" 
-              ? "AAA Grade Capital Protection" 
-              : riskAppetite === "Moderate" 
-                ? "A- Sharpe Optimized" 
-                : riskAppetite === "Aggressive" 
-                  ? "BB+ Speculative Spread" 
-                  : "CCC+ Leveraged Exposure"
-          }
-          icon={ShieldCheck}
-          trend={riskAppetite === "Conservative" ? "stable" : "up"}
+          title="Risk Appetite"
+          value={riskAppetite || "—"}
+          change="from your profile settings"
+          icon={Users}
+          trend="stable"
           color={
             riskAppetite === "Conservative" 
               ? "green" 
               : riskAppetite === "Moderate" 
                 ? "blue" 
-                : riskAppetite === "Aggressive" 
-                  ? "yellow" 
-                  : "red"
+                : "red"
           }
           onClick={() => setActiveSection("security")}
         />
         <MetricCard
           title="Execution Spd"
           value={stats.executionSpeed === null ? "—" : `${stats.executionSpeed.toFixed(3)}s`}
-          change="Average latency"
-          icon={Zap}
+          change="avg balance-API round-trip"
+          icon={Activity}
           trend="stable"
           color="green"
         />
@@ -743,7 +826,73 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
 
       {/* Analytics Bento Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-4">
+          {/* Realized wins/losses strip: settled contracts only (the
+              numbers a P&L screen must show, straight from profit_table). */}
+          <div className="metric-card rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="font-mono text-[9px] text-white/50 uppercase tracking-widest">
+                Realized P&amp;L &middot; Last {perf?.days ?? 30} Days
+              </span>
+              <span className="font-mono text-[9px] text-white/40 uppercase tracking-widest">
+                {perf
+                  ? `${perf.trades} settled · ${perfAll ? perfAll.trades : "—"} all-time`
+                  : "settled trades loading…"}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-3">
+              {[
+                {
+                  label: "Win Rate",
+                  value: perf?.win_rate == null ? "—" : `${(perf.win_rate * 100).toFixed(1)}%`,
+                  cls: "text-white",
+                },
+                {
+                  label: "Wins",
+                  value: perf ? String(perf.wins) : "—",
+                  cls: "text-emerald-400",
+                },
+                {
+                  label: "Losses",
+                  value: perf ? String(perf.losses) : "—",
+                  cls: "text-red-400",
+                },
+                {
+                  label: "Net P&L (30d)",
+                  value: perf
+                    ? `${perf.net_pnl >= 0 ? "+" : "-"}$${Math.abs(perf.net_pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : "—",
+                  cls: perf == null ? "text-white" : perf.net_pnl >= 0 ? "text-emerald-400" : "text-red-400",
+                },
+                {
+                  label: "Profit Factor",
+                  value: perf?.profit_factor == null ? "—" : perf.profit_factor.toFixed(2),
+                  cls: "text-white",
+                },
+                {
+                  label: "Overall P&L",
+                  value: perfAll
+                    ? `${perfAll.net_pnl >= 0 ? "+" : "-"}$${Math.abs(perfAll.net_pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : "—",
+                  cls: perfAll == null ? "text-white" : perfAll.net_pnl >= 0 ? "text-emerald-400" : "text-red-400",
+                },
+                {
+                  label: "Overall W / L",
+                  value: perfAll ? `${perfAll.wins} / ${perfAll.losses}` : "—",
+                  cls: "text-white",
+                },
+              ].map(cell => (
+                <div key={cell.label} className="border border-white/5 bg-white/[0.02] rounded-lg px-3 py-2">
+                  <div className="text-[9px] text-white/40 uppercase tracking-wider font-mono">
+                    {cell.label}
+                  </div>
+                  <div className={`font-mono text-sm font-bold mt-0.5 ${cell.cls}`}>
+                    {cell.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
           <PerformanceChart data={chartData} />
         </div>
         <div>
@@ -756,25 +905,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-white/5 gap-3">
           <div>
             <h3 className="text-lg font-serif italic text-white flex items-center font-normal">
-              <BrainCircuit className="w-5 h-5 mr-2 text-[#FF6B35] animate-pulse" />
-              Sovereign AI Financial Advisor
+              <BrainCircuit className="w-5 h-5 mr-2 text-[#FF6B35]" />
+              Financial Advisor
             </h3>
             <p className="text-white/40 text-xs mt-0.5 font-light font-mono">
-              Unifies active front-end balances, linked tax platforms, and backend execution rules to determine the best financial outcome.
+              Portfolio and tax guidance is still being built and does not currently perform any real analysis.
             </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono text-stone-500 uppercase">Advisor Stance:</span>
-            <select
-              id="advisorStanceSelect"
-              value={advisorStance}
-              onChange={(e) => setAdvisorStance(e.target.value)}
-              className="bg-neutral-950 border border-[#e11d48]/30 rounded px-2.5 py-1 text-xs text-rose-450 focus:outline-none focus:border-rose-500 font-mono font-bold"
-            >
-              <option value="conservative">Conservative (Shield Capital)</option>
-              <option value="balanced">Dynamic Growth (Balanced P&L)</option>
-              <option value="aggressive">Sovereign Arbitrage (Max Leverage)</option>
-            </select>
           </div>
         </div>
 
@@ -817,48 +953,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
                 </span>
                 <span className="text-[9px] font-mono text-zinc-500 uppercase">
                   {(hasRealDeriv || hasDemoDeriv) ? (hasRealDeriv ? "Real Account" : "Demo Account") : "Auth Standby"}
-                </span>
-              </div>
-            </div>
-
-            {/* Binance Exchange Node */}
-            <div className="flex items-center justify-between p-3 rounded bg-neutral-950/60 border border-white/5 hover:border-white/15 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className={`w-2 h-2 rounded-full ${isBinanceConnected ? "bg-emerald-500 animate-pulse" : "bg-zinc-600 animate-pulse"}`} />
-                <div>
-                  <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">Binance Exchange Node</h4>
-                  <span className="text-[10px] font-mono text-zinc-500 mt-0.5 uppercase block">
-                    {isBinanceConnected ? "Active Ledger Node • API Sync" : "Awaiting API Key Inbound"}
-                  </span>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className={`text-sm font-mono font-bold block ${isBinanceConnected ? "text-white" : "text-zinc-650"}`}>
-                  {isBinanceConnected ? "Not yet wired" : "$0.00"}
-                </span>
-                <span className={`text-[9px] font-mono uppercase block ${isBinanceConnected ? "text-emerald-500" : "text-zinc-500"}`}>
-                  {isBinanceConnected ? "Active Sync" : "Not Linked"}
-                </span>
-              </div>
-            </div>
-
-            {/* Coinbase custodial node */}
-            <div className="flex items-center justify-between p-3 rounded bg-neutral-950/60 border border-white/5 hover:border-white/15 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className={`w-2 h-2 rounded-full ${isCoinbaseConnected ? "bg-emerald-500 animate-pulse" : "bg-zinc-600 animate-pulse"}`} />
-                <div>
-                  <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">Coinbase Custodial Segment</h4>
-                  <span className="text-[10px] font-mono text-zinc-500 mt-0.5 uppercase block">
-                    {isCoinbaseConnected ? "Institutional Vault Link" : "Awaiting Vault API"}
-                  </span>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className={`text-sm font-mono font-bold block ${isCoinbaseConnected ? "text-white" : "text-zinc-650"}`}>
-                  {isCoinbaseConnected ? "Not yet wired" : "$0.00"}
-                </span>
-                <span className={`text-[9px] font-mono uppercase block ${isCoinbaseConnected ? "text-emerald-500" : "text-zinc-500"}`}>
-                  {isCoinbaseConnected ? "Active Sync" : "Not Linked"}
                 </span>
               </div>
             </div>
@@ -927,7 +1021,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
                   </thead>
                   <tbody className="divide-y divide-white/5 font-mono text-[10.5px]">
                     {livePositions.map((pos) => {
-                      const isUp = pos.pnl >= 0;
+                      const isUp = pos.pnl !== null && pos.pnl !== undefined && pos.pnl >= 0;
                       return (
                         <tr key={pos.id} className="hover:bg-white/5 transition">
                           <td className="py-2.5">
@@ -943,11 +1037,21 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
                             {pos.lots}
                           </td>
                           <td className="py-2.5 text-right text-zinc-300">
-                            <div>{pos.entryPrice?.toFixed(5)}</div>
-                            <div className="text-[9px] text-zinc-500">{pos.currentPrice?.toFixed(5)}</div>
+                            <div>{pos.entryPrice?.toFixed(5) ?? "—"}</div>
+                            <div className="text-[9px] text-zinc-500">{pos.currentPrice?.toFixed(5) ?? "—"}</div>
                           </td>
-                          <td className={`py-2.5 text-right font-bold ${isUp ? "text-emerald-400" : "text-rose-400"}`}>
-                            {isUp ? "+" : ""}{pos.pnl?.toFixed(2)} USD
+                          <td
+                            className={`py-2.5 text-right font-bold ${
+                              pos.pnl === null || pos.pnl === undefined
+                                ? "text-zinc-500"
+                                : isUp
+                                ? "text-emerald-400"
+                                : "text-rose-400"
+                            }`}
+                          >
+                            {pos.pnl === null || pos.pnl === undefined
+                              ? "—"
+                              : `${isUp ? "+" : ""}${pos.pnl.toFixed(2)} USD`}
                           </td>
                         </tr>
                       );
@@ -959,41 +1063,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
           </div>
       </div>
 
-      {/* Low bento health card log */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="metric-card rounded p-5 flex items-center space-x-4 border-white/10">
-          <div className="p-3 bg-white/5 rounded">
-            <HardDrive className="w-4 h-4 text-white/60" />
-          </div>
-          <div>
-            <div className="text-[9px] font-mono text-white/40 tracking-widest uppercase">DATABASE STORAGE</div>
-            <div className="text-sm font-medium text-white font-serif italic">SM Blockchain Clusters</div>
-            <div className="text-[9px] mt-0.5 font-mono text-emerald-500">STATUS: REPLICATED (100%)</div>
-          </div>
-        </div>
-
-        <div className="metric-card rounded p-5 flex items-center space-x-4 border-white/10">
-          <div className="p-3 bg-white/5 rounded">
-            <Cpu className="w-4 h-4 text-white/60" />
-          </div>
-          <div>
-            <div className="text-[9px] font-mono text-white/40 tracking-widest uppercase">AGI PROCESSING ENGINE</div>
-            <div className="text-sm font-medium text-white font-serif italic">Dual-Core Architecture</div>
-            <div className="text-[9px] mt-0.5 font-mono text-white/50">INTELLIGENCE LAYER: OPTIMAL</div>
-          </div>
-        </div>
-
-        <div className="metric-card rounded p-5 flex items-center space-x-4 border-white/10">
-          <div className="p-3 bg-white/5 rounded">
-            <BrainCircuit className="w-4 h-4 text-white/60" />
-          </div>
-          <div>
-            <div className="text-[9px] font-mono text-white/40 tracking-widest uppercase">NEURAL LINK LATENCY</div>
-            <div className="text-sm font-medium text-white font-serif italic">Subatomic Integrations</div>
-            <div className="text-[9px] mt-0.5 font-mono text-white/50">STRETCH CORRELATION: 0.9997</div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

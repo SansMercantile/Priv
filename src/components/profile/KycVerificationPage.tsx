@@ -42,7 +42,7 @@ const emptyForm = () => ({
   address:   { street_line_1: '', street_line_2: '', city: '', province_state: '', postal_code: '', country: '', verified: false },
   financial: { employment_status: '', employer_name: '', occupation: '', source_of_funds: '', annual_income_range: '', net_worth_range: '', is_politically_exposed: false, pep_details: '' },
   trading:   { years_trading_experience: '', trading_knowledge_level: '', risk_appetite: '' },
-  tax: { tax_residency_countries: [] as string[], tax_identification_number: '', us_person_fatca: false, fatca_declaration_acknowledged: false },
+  tax: { tax_residency_countries: [] as string[], tax_identification_number: '', has_no_tax_number: false, us_person_fatca: false, fatca_declaration_acknowledged: false },
   contact: { email: '', phone_country_code: '+27', phone_number: '' },
   declarations: { terms_accepted: false, privacy_accepted: false, aml_consent: false, sanctions_screening_consent: false, accurate_information_declaration: false },
 });
@@ -61,35 +61,37 @@ function Field({ label, children, required }: { label: string; children: React.R
 const ic = () => 'w-full p-3 rounded-lg bg-zinc-900/90 text-white border border-zinc-800 focus:outline-none focus:ring-1 focus:ring-rose-500/50 focus:border-rose-500/50 transition text-sm font-mono';
 const sc = () => `${ic()} cursor-pointer`;
 
-// ─── Google Maps address autocomplete hook ────────────────────────────────────
-function useGoogleMapsAutocomplete(
-  inputRef: React.RefObject<HTMLInputElement>,
-  onPlace: (place: google.maps.places.PlaceResult) => void
-) {
-  useEffect(() => {
-    const apiKey = (window as any).__GOOGLE_MAPS_KEY__ || (import.meta as any).env?.VITE_GOOGLE_MAPS_KEY;
-    if (!apiKey || !(window as any).google?.maps?.places) {
-      // Load Google Maps script if not present
-      if (apiKey && !document.getElementById('gmaps-script')) {
-        const s = document.createElement('script');
-        s.id = 'gmaps-script';
-        s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-        s.async = true;
-        s.onload = () => initAC();
-        document.head.appendChild(s);
-      }
-      return;
-    }
-    initAC();
+// ─── Address autocomplete (provider-neutral, backed by AWS Location Service
+// via /api/v1/location/autocomplete — never calls a maps provider directly) ──
+interface AddressSuggestion {
+  label: string;
+  municipality: string;
+  region: string;
+  country: string;
+  postal_code: string;
+}
 
-    function initAC() {
-      if (!inputRef.current || !(window as any).google?.maps?.places) return;
-      const ac = new (window as any).google.maps.places.Autocomplete(inputRef.current, {
-        types: ['address'],
-      });
-      ac.addListener('place_changed', () => onPlace(ac.getPlace()));
-    }
-  }, [inputRef, onPlace]);
+function useAddressAutocomplete(query: string) {
+  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 3) { setSuggestions([]); return; }
+    let cancelled = false;
+    setLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const res: any = await apiClient.addressAutocomplete(q);
+        if (!cancelled) setSuggestions(res?.data?.suggestions || []);
+      } catch (e) {
+        if (!cancelled) setSuggestions([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, 300); // debounce
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [query]);
+  return { suggestions, loading };
 }
 
 // ─── Face Camera Modal ────────────────────────────────────────────────────────
@@ -173,19 +175,22 @@ function FaceCameraModal({
 // ─── Document AI Verify Badge ─────────────────────────────────────────────────
 function VerifyBadge({ result }: { result: any }) {
   if (!result) return null;
-  const ok = result.verified || result.match;
+  const ok = !!(result.verified || result.match || result.face_match ||
+    (result.is_live_person === true && result.good_quality !== false));
   return (
     <div className={`mt-2 p-2 rounded-lg border text-[10px] font-mono flex items-center gap-2 ${ok ? 'bg-emerald-950/30 border-emerald-800/50 text-emerald-400' : 'bg-amber-950/30 border-amber-800/50 text-amber-400'}`}>
       {ok ? <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />}
-      <span>AI: {result.notes || (ok ? 'Verified' : 'Needs review')} — confidence {result.confidence ?? '?'}%</span>
+      <span>AI: {result.notes || (ok ? 'Verified' : 'Needs review')}{result.confidence != null ? ` — confidence ${result.confidence}%` : ''}</span>
     </div>
   );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-interface KycVerificationPageProps { demoMode?: boolean; onSuccess?: () => void; }
+// KYC ALWAYS runs the real backend path (server draft, AI verification, real
+// admin queue). The trading demo/live toggle must never fake identity checks.
+interface KycVerificationPageProps { onSuccess?: () => void; }
 
-export default function KycVerificationPage({ demoMode = false, onSuccess }: KycVerificationPageProps) {
+export default function KycVerificationPage({ onSuccess }: KycVerificationPageProps) {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState(emptyForm);
@@ -193,6 +198,7 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [completion, setCompletion] = useState(0);
   const [showCamera, setShowCamera] = useState(false);
@@ -202,6 +208,53 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
   const [verifyingDoc, setVerifyingDoc] = useState<string | null>(null);
   const [addressVerified, setAddressVerified] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
+  // Outstanding-items popup: listing of required (*) fields still empty.
+  const [outstanding, setOutstanding] = useState<Array<{ label: string; step: number }> | null>(null);
+
+  // Every *-marked field must be filled before dispatch. Returns the
+  // missing items with their step so the popup can jump straight there.
+  const validateAll = (): Array<{ label: string; step: number }> => {
+    const missing: Array<{ label: string; step: number }> = [];
+    const need = (cond: any, label: string, step: number) => {
+      if (!cond) missing.push({ label, step });
+    };
+    const p = form.personal, id = form.identity, a = form.address;
+    const f = form.financial, t = form.trading, tx = form.tax, d = form.declarations;
+    need(p.legal_first_name?.trim(), "Legal first name", 0);
+    need(p.legal_last_name?.trim(), "Legal last name", 0);
+    need(p.date_of_birth, "Date of birth", 0);
+    need(p.nationality?.trim(), "Nationality", 0);
+    need(p.country_of_residence, "Country of residence", 0);
+    need(id.document_number?.trim(), "Document number", 0);
+    need(id.issuing_country, "Issuing country", 0);
+    need(a.street_line_1?.trim(), "Street address", 1);
+    need(a.city?.trim(), "City", 1);
+    need(a.country, "Address country", 1);
+    need(form.contact.phone_number?.trim(), "Phone number", 5);
+    need(f.employment_status, "Employment status", 2);
+    need(f.source_of_funds, "Source of funds", 2);
+    need(t.years_trading_experience, "Trading experience", 2);
+    need(t.trading_knowledge_level, "Knowledge level", 2);
+    need(t.risk_appetite, "Risk appetite", 2);
+    if (f.is_politically_exposed) need(f.pep_details?.trim(), "PEP duties / associations", 2);
+    need((tx.tax_residency_countries || []).length > 0, "Tax residency country", 3);
+    if (!tx.has_no_tax_number) need(tx.tax_identification_number?.trim(), "Tax identification number (or tick 'no tax number')", 3);
+    need(tx.fatca_declaration_acknowledged, needsFatca ? "FATCA / CRS acknowledgement" : "CRS tax self-certification", 3);
+    need(d.terms_accepted, "Terms of Execution acceptance", 3);
+    need(d.privacy_accepted, "Privacy consent", 3);
+    need(d.aml_consent, "AML/CTF screening consent", 3);
+    need(d.sanctions_screening_consent, "Sanctions screening consent", 3);
+    need(uploads['id_front'], "Government ID / Passport (front) upload", 4);
+    // Back side mandatory only for card-type documents with two sides.
+    // Passports carry everything on the front.
+    if (['national_id', 'drivers_license', 'residence_permit'].includes(id.document_type)) {
+      need(uploads['id_back'], "ID card back upload (required for card documents)", 4);
+    }
+    need(uploads['proof_of_address'], "Proof of residence upload (< 3 months)", 4);
+    need(selfieBase64, "Biometric selfie capture", 4);
+    need(d.accurate_information_declaration, "Perjury declaration checkbox", 5);
+    return missing;
+  };
 
   // Selected tax countries info
   const selectedTaxCountries = (form.tax.tax_residency_countries || [])
@@ -209,49 +262,86 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
     .filter(Boolean) as typeof COUNTRIES;
   const needsFatca = selectedTaxCountries.some(c => c.fatcaRelevant);
 
-  // Google Maps autocomplete
-  useGoogleMapsAutocomplete(addressInputRef as any, (place) => {
-    const comps = place.address_components || [];
-    const get = (type: string) => comps.find(c => c.types.includes(type))?.long_name || '';
-    const getShort = (type: string) => comps.find(c => c.types.includes(type))?.short_name || '';
-    patch('address', 'street_line_1', `${get('street_number')} ${get('route')}`.trim());
-    patch('address', 'city', get('locality') || get('sublocality'));
-    patch('address', 'province_state', get('administrative_area_level_1'));
-    patch('address', 'postal_code', get('postal_code'));
-    patch('address', 'country', get('country'));
+  // Address autocomplete (provider-neutral, AWS Location Service-backed)
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const { suggestions: addressSuggestions, loading: addressLoading } = useAddressAutocomplete(form.address.street_line_1);
+
+  const selectAddressSuggestion = (s: AddressSuggestion) => {
+    patch('address', 'street_line_1', s.label);
+    if (s.municipality) patch('address', 'city', s.municipality);
+    if (s.region) patch('address', 'province_state', s.region);
+    if (s.postal_code) patch('address', 'postal_code', s.postal_code);
+    if (s.country) patch('address', 'country', s.country);
     patch('address', 'verified', true);
     setAddressVerified(true);
-  });
+    setShowSuggestions(false);
+  };
 
   useEffect(() => {
-    const email = localStorage.getItem('xm_account_email') || 'client@merchant.priv';
+    const email = localStorage.getItem('xm_account_email') || '';
     setForm(f => ({ ...f, contact: { ...f.contact, email } }));
   }, []);
 
   useEffect(() => {
-    if (demoMode) {
-      const draft = localStorage.getItem('kyc_draft_demo');
-      if (draft) { try { setForm(JSON.parse(draft)); } catch (_) {} }
-      return;
-    }
-    (async () => {
+    let cancelled = false;
+    let loaded = false;
+    const loadDraft = async () => {
       try {
         const data = await apiClient.getKycRecord();
-        if (data?.personal) setForm(f => ({ ...f, ...data }));
+        if (!cancelled && data?.personal) setForm(f => ({ ...f, ...data }));
         const st = await apiClient.getKycStatus();
-        setCompletion(st?.completion_percent ?? 0);
+        if (!cancelled) setCompletion(st?.completion_percent ?? 0);
+        loaded = true;
       } catch (e) { console.warn('KYC load:', e); }
-    })();
-  }, [demoMode]);
+    };
+    loadDraft();
+    // The token getter registers after children mount (LoginGate); a
+    // tokenless first load now throws without a request (safeFetchAuthed),
+    // so re-run once auth is ready instead of leaving the draft unloaded.
+    const onAuthReady = () => { if (!loaded && !cancelled) loadDraft(); };
+    window.addEventListener("priv:auth-ready", onAuthReady);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("priv:auth-ready", onAuthReady);
+    };
+  }, []);
+
+  // "Draft saved ✓" feedback reverts to plain Save after a few seconds.
+  useEffect(() => {
+    if (!savedAt) return;
+    const t = setTimeout(() => setSavedAt(null), 5000);
+    return () => clearTimeout(t);
+  }, [savedAt]);
 
   const patch = (section: string, field: string, value: any) =>
     setForm(f => ({ ...f, [section]: { ...(f as any)[section], [field]: value } }));
 
+  // Shape uploads for draft/submit: metadata always, byte payload so the
+  // server can offload it to encrypted S3 (records keep references only).
+  const serializableUploads = (includeBytes: boolean) =>
+    Object.entries(uploads).map(([type, d]) => ({
+      type,
+      url: d.url || '#',
+      filename: d.filename,
+      ...(includeBytes && d.base64
+        ? {
+            dataUrl: `data:${d.mimeType || 'image/jpeg'};base64,${d.base64}`,
+            mime_type: d.mimeType || 'image/jpeg',
+            ai_verdict: docVerifyResults[type],
+          }
+        : {}),
+    }));
+
   const saveDraft = useCallback(async () => {
-    if (demoMode) { localStorage.setItem('kyc_draft_demo', JSON.stringify(form)); return; }
     setSaving(true);
-    try { await apiClient.saveKycDraft(form); } catch (e) { console.warn(e); } finally { setSaving(false); }
-  }, [demoMode, form]);
+    try {
+      const res: any = await apiClient.saveKycDraft({ ...(form as any), documents: serializableUploads(true) });
+      if (res?.success === false) throw new Error(res?.detail || 'server rejected the draft');
+      setSavedAt(Date.now());
+    } catch (e: any) {
+      setError(`Draft save failed — ${e?.message || 'network error'}. Your entries stay on this page; retry Save.`);
+    } finally { setSaving(false); }
+  }, [form, uploads, docVerifyResults]);
 
   const handleUpload = async (file: File | null, docKey: string) => {
     if (!file) return;
@@ -268,7 +358,7 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
       setUploads(u => ({ ...u, [docKey]: { filename: file.name, url, base64, mimeType: file.type } }));
 
       // Trigger AI document verification in background
-      if (!demoMode && docKey.startsWith('id_')) {
+      if (docKey.startsWith('id_')) {
         setVerifyingDoc(docKey);
         try {
           const result = await apiClient.verifyDocument(base64, file.type, {
@@ -279,7 +369,10 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
             issuingCountry: form.identity.issuing_country,
           });
           setDocVerifyResults(r => ({ ...r, [docKey]: result }));
-        } catch (e) { console.warn('Doc verify:', e); }
+        } catch (e: any) {
+          // Honest fallback instead of a blank badge: flag for manual review.
+          setDocVerifyResults(r => ({ ...r, [docKey]: { verified: false, confidence: null, notes: `AI check unavailable (${e?.message || 'error'}) — sent for manual review` } }));
+        }
         finally { setVerifyingDoc(null); }
       }
     } catch (e: any) { setError(e.message || 'Upload failed'); }
@@ -290,13 +383,13 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
     setShowCamera(false);
     setSelfieBase64(base64);
     const docBase64 = uploads['id_front']?.base64;
-    if (!demoMode) {
-      try {
-        const result = await apiClient.verifyFace(base64, docBase64);
-        setFaceVerifyResult(result);
-      } catch (e) { console.warn('Face verify:', e); }
-    } else {
-      setFaceVerifyResult({ is_live_person: true, good_quality: true, face_match: true, confidence: 92, notes: 'Demo mode verification' });
+    try {
+      const result = await apiClient.verifyFace(base64, docBase64);
+      setFaceVerifyResult(result);
+    } catch (e: any) {
+      // Honest fallback instead of a fake pass: queue for manual review.
+      setFaceVerifyResult({ face_match: false, confidence: null,
+        notes: `AI liveness check unavailable (${e?.message || 'error'}) — selfie queued for manual review` });
     }
   };
 
@@ -304,7 +397,15 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
   const back = () => setStep(s => Math.max(s - 1, 0));
 
   const submit = async () => {
-    setSubmitting(true); setError(null);
+    setSubmitting(true); setError(null); setOutstanding(null);
+    // Every *-marked field must be filled: pop up exactly what is
+    // outstanding (with jump-to-step) instead of failing server-side.
+    const missing = validateAll();
+    if (missing.length > 0) {
+      setSubmitting(false);
+      setOutstanding(missing);
+      return;
+    }
     const payload = {
       ...form,
       fullName: `${form.personal.legal_first_name} ${form.personal.legal_last_name}`,
@@ -316,19 +417,19 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
       netWorthRange: form.financial.net_worth_range || '< R50k',
       tradingExperience: form.trading.years_trading_experience || 'None',
       selfieBase64: selfieBase64 || undefined,
-      documents: Object.entries(uploads).map(([type, d]) => ({ type, url: d.url || '#', filename: d.filename })),
+      documents: serializableUploads(true),
     };
-    if (demoMode) {
-      localStorage.setItem('xm_kyc_status', 'submitted');
-      const q = JSON.parse(localStorage.getItem('kyc_applications_queue') || '[]');
-      q.push({ id: `KYC-DEMO-${Date.now()}`, ...payload, status: 'pending', submittedAt: new Date().toLocaleString() });
-      localStorage.setItem('kyc_applications_queue', JSON.stringify(q));
-      setTimeout(() => { setSubmitting(false); onSuccess ? onSuccess() : navigate('/dashboard'); }, 1200);
-      return;
-    }
     try {
-      await apiClient.submitKyc(payload);
+      const res: any = await apiClient.submitKyc(payload);
       localStorage.setItem('xm_kyc_status', 'submitted');
+      try {
+        const appId = res?.application?.id || res?.id;
+        if (appId) localStorage.setItem('xm_kyc_ref', String(appId));
+        localStorage.setItem('xm_kyc_submitted_at', new Date().toISOString());
+        if (res?.emailed === false) {
+          console.warn('KYC emailed copy failed:', res?.email_error || 'unknown');
+        }
+      } catch (_) { /* storage best-effort */ }
       onSuccess ? onSuccess() : navigate('/dashboard');
     } catch (e: any) {
       setError(e.response?.data?.detail || e.message || 'Submission failed');
@@ -374,12 +475,12 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
       </div>
     ),
 
-    // Step 1 — Address (Google Maps)
+    // Step 1 — Address
     1: (
       <div className="space-y-5 mt-4">
         <div className="flex items-center gap-2 text-xs font-mono text-zinc-400 bg-zinc-900/40 p-3 rounded-lg border border-zinc-800">
           <MapPin className="w-4 h-4 text-rose-400 flex-shrink-0"/>
-          Start typing your address — Google Maps will auto-complete and verify it.
+          Start typing your address and select a suggestion to auto-fill and verify it.
         </div>
         <div className="grid grid-cols-1 gap-5">
           <Field label="Street address line 1" required>
@@ -388,13 +489,33 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
                 ref={addressInputRef}
                 className={ic()}
                 value={form.address.street_line_1}
-                onChange={e => { patch('address','street_line_1',e.target.value); setAddressVerified(false); }}
+                onChange={e => { patch('address','street_line_1',e.target.value); setAddressVerified(false); setShowSuggestions(true); }}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                 placeholder="Start typing your address..."
+                autoComplete="off"
               />
               {addressVerified && (
                 <span className="absolute right-3 top-3 flex items-center gap-1 text-emerald-400 text-[10px] font-mono">
                   <CheckCircle className="w-3.5 h-3.5"/> Verified
                 </span>
+              )}
+              {showSuggestions && (addressLoading || addressSuggestions.length > 0) && (
+                <div className="absolute z-20 mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl max-h-56 overflow-y-auto">
+                  {addressLoading && (
+                    <div className="px-3 py-2 text-[11px] font-mono text-zinc-500">Searching...</div>
+                  )}
+                  {addressSuggestions.map((s, i) => (
+                    <button
+                      type="button"
+                      key={i}
+                      onMouseDown={() => selectAddressSuggestion(s)}
+                      className="w-full text-left px-3 py-2 text-[11px] font-mono text-zinc-200 hover:bg-zinc-800 transition border-b border-zinc-800 last:border-0"
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
           </Field>
@@ -417,7 +538,7 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
         </div>
         {!addressVerified && form.address.street_line_1 && (
           <p className="text-amber-400 text-[10px] font-mono flex items-center gap-1">
-            <AlertCircle className="w-3 h-3"/> Address not yet verified via Google Maps — please select from the autocomplete dropdown.
+            <AlertCircle className="w-3 h-3"/> Address not yet verified — please select a suggestion from the dropdown.
           </p>
         )}
       </div>
@@ -520,9 +641,27 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
       {selectedTaxCountries.map(c => (
         <div key={c.code} className="p-4 bg-zinc-900/40 rounded-xl border border-zinc-800">
           <p className="text-rose-400 font-mono text-[10px] uppercase tracking-widest mb-3 font-bold">{c.name} — Tax Details</p>
-          <Field label={c.tinLabel} required>
-            <input className={ic()} value={form.tax.tax_identification_number} onChange={e => patch('tax','tax_identification_number',e.target.value)} placeholder={c.tinFormat}/>
+          <Field label={c.tinLabel} required={!form.tax.has_no_tax_number}>
+            <input
+              className={ic()}
+              value={form.tax.has_no_tax_number ? '' : form.tax.tax_identification_number}
+              disabled={form.tax.has_no_tax_number}
+              onChange={e => patch('tax','tax_identification_number',e.target.value)}
+              placeholder={form.tax.has_no_tax_number ? 'No tax number declared' : c.tinFormat}
+            />
           </Field>
+          <label className="mt-2 flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              className="accent-rose-500"
+              checked={!!form.tax.has_no_tax_number}
+              onChange={e => {
+                patch('tax','has_no_tax_number',e.target.checked);
+                if (e.target.checked) patch('tax','tax_identification_number','');
+              }}
+            />
+            <span className="text-[11px] font-mono text-zinc-400">I do not have a tax number</span>
+          </label>
           {c.fatcaRelevant && (
             <div className="mt-3 p-3 bg-amber-950/20 border border-amber-800/30 rounded-lg text-xs font-mono text-amber-300 flex items-start gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5"/>
@@ -538,8 +677,8 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
           <ShieldCheck className="w-4 h-4"/> Compliance Attestation — Sovereign Trust Framework
         </h3>
         {[
-          { section:'tax', field:'us_person_fatca', text:'I am a US person (citizen, resident, green card) for FATCA compliance', show: true },
-          { section:'tax', field:'fatca_declaration_acknowledged', text:'I acknowledge the FATCA / CRS reporting policies', show: true },
+          { section:'tax', field:'us_person_fatca', text:'I am a US person (citizen, resident, green card holder) for FATCA compliance', show: needsFatca },
+          { section:'tax', field:'fatca_declaration_acknowledged', text: needsFatca ? 'I acknowledge the FATCA / CRS reporting policies' : 'I confirm my tax residency details are complete and accurate (CRS self-certification)', show: true },
           { section:'declarations', field:'terms_accepted', text:'I accept the general SANS Mercantile Terms of Execution', show: true },
           { section:'declarations', field:'privacy_accepted', text:'I consent to the processing of identity profiles in alignment with localized privacy rules', show: true },
           { section:'declarations', field:'aml_consent', text:'I voluntarily submit to AML/CTF automated screenings', show: true },
@@ -561,15 +700,15 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
         <ShieldCheck className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0"/>
         <div>
           <p className="text-xs font-mono font-bold text-white uppercase tracking-wider">AI-Assisted Document Verification</p>
-          <p className="text-[10px] text-zinc-400 mt-0.5 leading-relaxed">Uploaded documents are analysed by our Gemini AI engine to verify authenticity, cross-reference personal details, and flag anomalies in real time.</p>
+          <p className="text-[10px] text-zinc-400 mt-0.5 leading-relaxed">Uploaded documents are analysed by our AI verification engine to verify authenticity, cross-reference personal details, and flag anomalies in real time.</p>
         </div>
       </div>
 
       {/* Document uploads */}
       {[
-        { key:'id_front', label:'Government ID / Passport (Front)', desc:'Must show photo, name, ID number, DOB and expiry clearly.' },
-        { key:'id_back',  label:'National ID Card (Back — if applicable)', desc:'Barcode, machine-readable zone, or signature strip.' },
-        { key:'proof_of_address', label:'Proof of Residence (< 3 months)', desc:'Utility bill or bank statement. Name + address must match form.' },
+        { key:'id_front', label:'Government ID / Passport (Front) *', desc:'Must show photo, name, ID number, DOB and expiry clearly.' },
+        { key:'id_back',  label:`National ID Card (Back${['national_id','drivers_license','residence_permit'].includes(form.identity.document_type) ? ' — required' : ' — if applicable'})`, desc:'Barcode, machine-readable zone, or signature strip.' },
+        { key:'proof_of_address', label:'Proof of Residence (< 3 months) *', desc:'Utility bill or bank statement. Name + address must match form.' },
       ].map(({ key, label, desc }) => (
         <div key={key} className="border border-zinc-800 bg-zinc-950/60 rounded-xl p-4 hover:bg-zinc-950 transition">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -639,7 +778,7 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
       <div className="p-3 bg-zinc-950 rounded border border-zinc-800 flex items-start gap-3">
         <input type="checkbox" id="solemnDecl" className="mt-1 accent-rose-500" checked={form.declarations.accurate_information_declaration} onChange={e => patch('declarations','accurate_information_declaration',e.target.checked)}/>
         <label htmlFor="solemnDecl" className="text-[11px] font-mono text-zinc-300 leading-relaxed">
-          <strong>Solemn Attestation:</strong> I declare under penalty of perjury that all details and uploaded files correspond strictly to my legal, true, and active personal assets, accounts, and residential status.
+          <strong>I declare under penalty of perjury that all details and uploaded files correspond strictly to my legal, true, and active personal assets, accounts, and residential status.</strong>
         </label>
       </div>
 
@@ -675,8 +814,9 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
                 <ShieldCheck className="w-5 h-5 text-rose-500"/> SANS AML Compliance Dossier
               </h2>
               <p className="text-[10px] text-zinc-400 font-mono mt-1">
-                {demoMode ? 'PROVISIONAL SANDBOX SESSION' : `Ledger completion: ${completion}%`}
+                {`Ledger completion: ${completion}%`}
                 {saving && <span className="ml-2 text-rose-400">· Saving...</span>}
+                {!saving && savedAt && <span className="ml-2 text-emerald-400">· Draft saved ✓</span>}
               </p>
             </div>
             <span className="px-2 py-1 bg-rose-950/40 text-rose-400 font-bold border border-rose-900/50 rounded-md font-mono text-[9px]">
@@ -700,6 +840,43 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
             </div>
           )}
 
+          {/* Outstanding-items popup: every *-marked field still empty */}
+          {outstanding && (
+            <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 p-4">
+              <div className="w-full max-w-md bg-zinc-950 border border-rose-500/30 rounded-2xl p-6 space-y-4">
+                <div>
+                  <h2 className="text-base font-bold text-white font-mono">
+                    {outstanding.length} required item{outstanding.length === 1 ? "" : "s"} outstanding
+                  </h2>
+                  <p className="text-[11px] text-zinc-400 font-mono mt-1">
+                    Fill the starred (*) fields below, then dispatch again.
+                  </p>
+                </div>
+                <ul className="space-y-1.5 max-h-64 overflow-y-auto">
+                  {outstanding.map((m, i) => (
+                    <li key={i}>
+                      <button
+                        type="button"
+                        onClick={() => { setOutstanding(null); setStep(m.step); }}
+                        className="w-full text-left px-3 py-2 rounded-lg border border-zinc-800 bg-zinc-900/40 hover:border-rose-500/50 text-xs font-mono text-zinc-200 transition"
+                      >
+                        <span className="text-rose-400 font-bold">•</span> {m.label}
+                        <span className="text-zinc-500"> — step {m.step + 1}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => setOutstanding(null)}
+                  className="w-full py-2 border border-zinc-700 rounded-lg text-xs font-mono text-zinc-300 hover:text-white transition"
+                >
+                  Back to the form
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="min-h-[300px] border border-zinc-800/60 bg-zinc-900/10 p-5 rounded-xl">
             {stepContent[step]}
           </div>
@@ -712,8 +889,9 @@ export default function KycVerificationPage({ demoMode = false, onSuccess }: Kyc
             </button>
             <div className="flex gap-2">
               <button type="button" onClick={saveDraft} disabled={saving}
-                className="px-3 py-2 border border-zinc-800 bg-zinc-950 text-zinc-400 font-mono text-[11px] rounded-lg hover:bg-zinc-900 transition flex items-center gap-1">
-                <Save className="w-3.5 h-3.5"/> Save
+                className="px-3 py-2 border border-zinc-800 bg-zinc-950 text-zinc-400 font-mono text-[11px] rounded-lg hover:bg-zinc-900 transition flex items-center gap-1 disabled:opacity-50">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : savedAt ? <CheckCircle className="w-3.5 h-3.5 text-emerald-400"/> : <Save className="w-3.5 h-3.5"/>}
+                {saving ? 'Saving…' : savedAt ? 'Saved ✓' : 'Save'}
               </button>
               {step < STEPS.length - 1 ? (
                 <button type="button" onClick={next}

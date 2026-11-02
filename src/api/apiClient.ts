@@ -1,15 +1,27 @@
 // High-integrity API Client for SANS PRIV Core KYC, Profile, and billing services
 import { getAppUserId } from "../lib/appUserId";
+import { getAuthToken } from "../lib/authToken";
 
-const BASE = (import.meta as any).env?.VITE_API_BASE_URL || "";
+// NOTE (AWS migration): all calls go same-origin through the /api/*
+// proxy to the live backend. The retired Azure host previously read from
+// VITE_API_BASE_URL is deliberately no longer used.
 
-function withUserHeader(headers?: HeadersInit): HeadersInit {
-  return { ...(headers || {}), "X-User-Id": getAppUserId() };
+// X-User-Id is always sent (it's what the pre-login Deriv-connect flow
+// relies on), but when a verified Auth0 session exists we also send the
+// access token. The backend (oauth_api.py _resolve_user_id) always
+// prefers the verified Bearer token over X-User-Id when both are
+// present, so a signed-in user's identity can't be overridden by
+// tampering with the anonymous header.
+async function withUserHeader(headers?: HeadersInit): Promise<HeadersInit> {
+  const merged: Record<string, string> = { ...(headers as Record<string, string> || {}), "X-User-Id": getAppUserId() };
+  const token = await getAuthToken();
+  if (token) merged["Authorization"] = `Bearer ${token}`;
+  return merged;
 }
 
 async function safeFetch(url: string, options?: RequestInit) {
-  const fullUrl = `${BASE}${url}`;
-  const response = await fetch(fullUrl, { ...options, headers: withUserHeader(options?.headers) });
+  const fullUrl = url;
+  const response = await fetch(fullUrl, { ...options, headers: await withUserHeader(options?.headers) });
   const contentType = response.headers.get("content-type") || "";
   // Guard: if server returns HTML (404 page, error page) instead of JSON,
   // throw a human-readable error instead of "Unexpected token 'T'..."
@@ -29,14 +41,28 @@ async function safeFetch(url: string, options?: RequestInit) {
   return data;
 }
 
-// The EC2 Priv Core backend (trading engine, broker OAuth, agents) is a
-// DIFFERENT service from whatever VITE_API_BASE_URL points at (currently
-// the Azure KYC/profile/billing service). Broker/OAuth calls must always
-// use a relative path so they go through vercel.json's /api/* proxy to
-// EC2, never prefixed with BASE - otherwise they get sent cross-origin to
-// Azure, which doesn't have these routes and doesn't allow our origin.
+// Verified-only endpoints (require_verified_user_id on the backend: the
+// signals surface + subscriptions/me). Without a live Auth0 session the
+// server answers 401 no matter what, so for signed-out / demo / expired-
+// session visitors we skip the request entirely instead of spamming the
+// console with 401s. Callers already catch and fall back to their
+// defaults (free tier, empty lists), so behavior is unchanged -- only
+// the noise goes away. withUserHeader still runs for everything else
+// (the pre-login Deriv flow relies on the anonymous X-User-Id header).
+async function safeFetchAuthed(url: string, options?: RequestInit) {
+  const token = await getAuthToken();
+  if (!token) {
+    throw Object.assign(new Error("Sign in to view this."), {
+      response: { data: { detail: "Sign in to view this." }, status: 401 },
+    });
+  }
+  return safeFetchRelative(url, options);
+}
+
+// Broker/OAuth calls always use a relative path so they go through the
+// same-origin /api/* proxy to the live backend, never a cross-origin host.
 async function safeFetchRelative(url: string, options?: RequestInit) {
-  const response = await fetch(url, { ...options, headers: withUserHeader(options?.headers) });
+  const response = await fetch(url, { ...options, headers: await withUserHeader(options?.headers) });
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.includes("application/json")) {
     const text = await response.text();
@@ -69,25 +95,61 @@ export const apiClient = {
     return { data };
   },
 
-  // KYC handlers
-  getKycRecord: () => safeFetch("/api/kyc/record"),
-  getKycStatus: () => safeFetch("/api/kyc/status"),
+  put: async (url: string, bodyData?: any) => {
+    const data = await safeFetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: bodyData ? JSON.stringify(bodyData) : undefined,
+    });
+    return { data };
+  },
+
+  delete: async (url: string) => {
+    const data = await safeFetch(url, { method: "DELETE" });
+    return { data };
+  },
+
+  // KYC handlers (relative: served by kyc_compat_api.py, mounted at
+  // /api/kyc in main.py -- confirmed live: GET /api/kyc/status -> 401
+  // (route exists, needs auth), not 404. Do NOT change these to
+  // /api/v1/kyc/* -- that's a DIFFERENT, older router (kyc_api.py) that
+  // lacks /record, /verify-document, and /verify-face entirely.
+  getKycRecord: () => safeFetchAuthed("/api/kyc/record"),
+  getKycStatus: () => safeFetchAuthed("/api/kyc/status"),
   saveKycDraft: (form: any) =>
-    safeFetch("/api/kyc/draft", {
+    safeFetchRelative("/api/kyc/draft", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     }),
   submitKyc: (form: any) =>
-    safeFetch("/api/kyc/submit", {
+    safeFetchRelative("/api/kyc/submit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     }),
 
-  // AI document verification (sends base64 image to Gemini via backend)
+  // Provider-neutral address autocomplete / geocode (AWS Location Service
+  // via backend/api/location_api.py, mounted at /api/v1/location). Never
+  // call a maps provider directly from the browser.
+  addressAutocomplete: (q: string, limit = 8) =>
+    safeFetchRelative(`/api/v1/location/autocomplete?q=${encodeURIComponent(q)}&limit=${limit}`),
+  addressGeocode: (label: string) =>
+    safeFetchRelative("/api/v1/location/geocode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label }),
+    }),
+
+  // AI document verification (sends base64 image to Gemini via backend).
+  // NOTE: confirmed live this currently returns 501 "Document
+  // verification not configured (Bedrock vision unavailable)" -- the
+  // route exists and is wired correctly, but its backend dependency
+  // (AWS Bedrock vision) isn't configured in this environment. Frontend
+  // callers should handle a 501 gracefully rather than treating it as a
+  // generic failure.
   verifyDocument: (documentBase64: string, mimeType: string, formData: any) =>
-    safeFetch("/api/kyc/verify-document", {
+    safeFetchRelative("/api/kyc/verify-document", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ documentBase64, mimeType, formData }),
@@ -95,7 +157,7 @@ export const apiClient = {
 
   // AI face / liveness verification
   verifyFace: (selfieBase64: string, documentBase64?: string) =>
-    safeFetch("/api/kyc/verify-face", {
+    safeFetchRelative("/api/kyc/verify-face", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ selfieBase64, documentBase64, mimeType: "image/jpeg" }),
@@ -116,6 +178,180 @@ export const apiClient = {
   getBrokerCatalog: () => safeFetchRelative("/api/v1/auth/brokers"),
   disconnectBroker: (broker: string, accountType: string = "live") =>
     safeFetchRelative(`/api/v1/auth/connections/${broker}?account_type=${accountType}`, { method: "DELETE" }),
+
+  // Multi-account Deriv management: every linked loginid, per-type
+  // defaults, and the resolved active account for a mode.
+  getDerivAccounts: () => safeFetchRelative("/api/v1/auth/deriv/accounts"),
+  // Real per-account balances (demo + live), resolved server-side
+  // through the linked adapters. balance=null means unreachable,
+  // never zero-filled.
+  getDerivBalances: () => safeFetchRelative("/api/v1/auth/deriv/balances"),
+  // Self-heal for rotted OAuth sessions: renews stored sessions via
+  // refresh_token and re-registers adapters. No-ops when nothing is
+  // stored. Called once when the account list comes back empty.
+  refreshDerivSession: () =>
+    safeFetchRelative("/api/v1/auth/deriv/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    }),
+  setDerivDefault: (loginid: string) =>
+    safeFetchRelative("/api/v1/auth/deriv/default-account", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ loginid }),
+    }),
+  getActiveDerivAccount: (mode: "demo" | "live") =>
+    safeFetchRelative(`/api/v1/auth/deriv/active-account?mode=${mode}`),
+
+  // Billing / PayFast. payment_api.router is mounted at /api/v1/payment
+  // in main.py (fixed: it was previously mounted with no prefix at all,
+  // making it unreachable through the vercel /api/* proxy -- confirmed
+  // live: GET /plans -> 200 with real data, but GET /api/plans -> 404
+  // before this fix). Always relative, through the same proxy as
+  // everything else above -- never the retired Azure BASE. The backend
+  // resolves the paying user from the verified Auth0 Bearer token sent
+  // by withUserHeader() above, never from a client-supplied user id.
+  getPlans: () => safeFetchRelative("/api/v1/payment/plans"),
+  getMySubscription: () => safeFetchAuthed("/api/v1/payment/subscriptions/me"),
+  createPayfastSubscription: (payload: {
+    plan_id: string;
+    return_url: string;
+    cancel_url: string;
+    notify_url: string;
+    user_email?: string;
+    user_first_name?: string;
+    user_last_name?: string;
+    billing_frequency?: string;
+  }) =>
+    safeFetchRelative("/api/v1/payment/payfast/create-subscription", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  createPayfastPayment: (payload: {
+    plan_id: string;
+    return_url: string;
+    cancel_url: string;
+    notify_url: string;
+    user_email?: string;
+    user_first_name?: string;
+    user_last_name?: string;
+  }) =>
+    safeFetchRelative("/api/v1/payment/payfast/create-payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  cancelPayfastSubscription: (subscriptionId: string) =>
+    safeFetchRelative(`/api/v1/payment/payfast/cancel-subscription/${subscriptionId}`, { method: "POST" }),
+
+  // Subscriber signals (mounted at /api/v1/signals). Preferences choose
+  // the instruments per paid tier; history mixes the caller's issued
+  // signals with the global landing-ticket archive.
+  getSignalTiers: () => safeFetchAuthed("/api/v1/signals/tiers"),
+  getSignalCategories: () => safeFetchAuthed("/api/v1/signals/categories"),
+  getSignalPreferences: () => safeFetchAuthed("/api/v1/signals/preferences"),
+  setSignalPreferences: (payload: {
+    category: string;
+    instruments: string[];
+    delivery_channel: string;
+    contact_email?: string;
+    contact_phone?: string;
+    broker?: string;
+  }) =>
+    safeFetchAuthed("/api/v1/signals/preferences", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  getSignalHistory: (limit: number = 50) =>
+    safeFetchAuthed(`/api/v1/signals/history?limit=${limit}`),
+  getCurrentSignal: () => safeFetchRelative("/api/signals/current"),
+  // In-app signal notifications: items + unread count (signals issued
+  // after the last read), and the read-ack that advances the marker.
+  getSignalNotifications: (limit: number = 25) =>
+    safeFetchAuthed(`/api/v1/signals/notifications?limit=${limit}`),
+  markSignalNotificationsRead: () =>
+    safeFetchAuthed("/api/v1/signals/notifications/read", { method: "POST" }),
+  // Web push for position alerts (opened / TP hit / SL hit) on this device.
+  getVapidPublicKey: () =>
+    safeFetchRelative("/api/v1/signals/push/vapid-public-key"),
+  pushSubscribe: (subscription: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+    safeFetchRelative("/api/v1/signals/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(subscription),
+    }),
+  pushUnsubscribe: (endpoint: string) =>
+    safeFetchRelative("/api/v1/signals/push/unsubscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint }),
+    }),
+  testPush: () => safeFetchRelative("/api/v1/signals/push/test", { method: "POST" }),
+
+  // Contact OTP verification + emotion check-in log (backend/api/verify_api.py).
+  // Verified-only (require_verified_user_id): skip entirely without a token
+  // instead of firing a console-visible 401 on every signed-out mount.
+  getVerifiedContacts: () => safeFetchAuthed("/api/v1/verify/contacts"),
+  requestOtp: (channel: string, contact: string) =>
+    safeFetchRelative("/api/v1/verify/otp/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel, contact }),
+    }),
+  confirmOtp: (channel: string, contact: string, code: string) =>
+    safeFetchRelative("/api/v1/verify/otp/confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel, contact, code }),
+    }),
+  // Server-side profile (client_profiles row + verified contacts). The
+  // single source of truth so data follows the account across devices;
+  // localStorage is only a fast-paint cache (backend/api/identity_sync_api.py).
+  // Verified-only endpoint: safeFetchAuthed skips the request when no
+  // token exists yet (see getVerifiedContacts).
+  getMyProfile: () => safeFetchAuthed("/api/v1/identity/me"),
+  updateMyProfile: (fields: {
+    email?: string; // accepted only when the account has no email yet
+    given_name?: string;
+    family_name?: string;
+    phone?: string;
+    country?: string;
+    experience?: string;
+    trading_goal?: string;
+    risk_appetite?: string;
+    leverage?: number;
+    node_tier?: string;
+  }) =>
+    safeFetchRelative("/api/v1/identity/profile", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fields),
+    }),
+  getEmotionHistory: (days: number = 30) =>
+    safeFetchRelative(`/api/v1/verify/emotion/history?days=${days}`),
+  getEmotionCheckin: (id: number) =>
+    safeFetchRelative(`/api/v1/verify/emotion/checkin/${id}`),
+  deleteEmotionCheckin: (id: number) =>
+    safeFetchRelative(`/api/v1/verify/emotion/checkin/${id}`, { method: "DELETE" }),
+
+  // Referrals: own code/link/count + one-time bind of a landing ?ref=.
+  getMyReferral: () => safeFetchRelative("/api/v1/referrals/me"),
+  bindReferral: (code: string) =>
+    safeFetchRelative("/api/v1/referrals/bind", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    }),
+
+  // Tax: full eTax country registry + the caller's own country.
+  getTaxCountries: () => safeFetchRelative("/api/v1/tax/supported_countries"),
+  getMyTaxCountry: () => safeFetchRelative("/api/v1/tax/my-country"),
+
+  // Signal broker directory (Deriv OAuth + XM/IFX/FBS affiliate links).
+  getSignalBrokers: () => safeFetchRelative("/api/v1/signals/brokers"),
 };
 
 export default apiClient;

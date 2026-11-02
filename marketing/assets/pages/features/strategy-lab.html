@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Strategy lab — backtest before you risk capital</title><meta name="description" content="Backtest any strategy on real candles with pinned boards, run history and reproducible parameters in the Priv strategy lab.">
+<meta name="robots" content="index,follow"><link rel="canonical" href="https://www.sansmercantile.com/growth/features/strategy-lab">
+<meta property="og:type" content="website"><meta property="og:site_name" content="Priv">
+<meta property="og:title" content="Strategy lab — backtest before you risk capital"><meta property="og:description" content="Backtest any strategy on real candles with pinned boards, run history and reproducible parameters in the Priv strategy lab.">
+<meta property="og:url" content="https://www.sansmercantile.com/growth/features/strategy-lab">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Strategy lab — backtest before you risk capital">
+<meta name="twitter:description" content="Backtest any strategy on real candles with pinned boards, run history and reproducible parameters in the Priv strategy lab.">
+<meta name="theme-color" content="#050715">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Priv", "applicationCategory": "Autonomous Trading Desk", "operatingSystem": "Web, Windows, macOS, Android, iOS, Linux", "description": "Backtest any strategy on real candles with pinned boards, run history and reproducible parameters in the Priv strategy lab.", "url": "https://www.sansmercantile.com/growth/features/strategy-lab", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free tier. Paid plans from $29/month."}, "publisher": {"@type": "Organization", "name": "Sans Mercantile"}, "subjectOf": {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does a backtest predict future returns?", "acceptedAnswer": {"@type": "Answer", "text": "No. It shows how a rule would have behaved historically. Past performance is not indicative of future results."}}, {"@type": "Question", "name": "Can I share a board?", "acceptedAnswer": {"@type": "Answer", "text": "Yes \u2014 boards are shareable with your own account."}}]}}</script>
+<style>
+:root{--gold:#d4af37;--navy:#0a0e27;--deep:#050715;--cyan:#00d4ff;--muted:#94a3b8;--white:#f8fafc}
+*{box-sizing:border-box}body{margin:0;background:var(--deep);color:var(--white);
+font:16px/1.65 "Segoe UI",system-ui,sans-serif}
+a{color:var(--gold)} .wrap{max-width:1040px;margin:0 auto;padding:0 24px}
+header{padding:22px 0;border-bottom:1px solid rgba(212,175,55,.18)}
+.brand{font-weight:800;letter-spacing:.34em;color:var(--gold);text-decoration:none}
+nav{float:right;font-size:14px}nav a{color:var(--muted);margin-left:18px;text-decoration:none}
+.hero{padding:76px 0 54px;background:radial-gradient(1000px 420px at 78% 8%,rgba(212,175,55,.14),transparent 70%),var(--navy)}
+.eyebrow{font:700 12px/1 Consolas,monospace;letter-spacing:.32em;color:var(--gold);text-transform:uppercase}
+h1{font-size:clamp(32px,5vw,54px);line-height:1.08;margin:18px 0 14px;font-weight:800}
+.sub{font-size:19px;color:#cbd5e1;max-width:44ch}
+.proof{display:flex;flex-wrap:wrap;gap:26px;margin-top:34px}
+.proof b{display:block;font-size:30px;color:var(--gold);font-weight:800}
+.proof span{font-size:13px;color:var(--muted)}
+.btn{display:inline-block;margin-top:30px;background:var(--gold);color:#0a0e27;
+padding:15px 30px;border-radius:999px;font-weight:800;text-decoration:none}
+.btn.ghost{background:transparent;color:var(--gold);border:1px solid var(--gold)}
+section{padding:56px 0;border-top:1px solid rgba(148,163,184,.14)}
+h2{font-size:26px;margin:0 0 18px}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{padding:13px 14px;text-align:left;border-bottom:1px solid rgba(148,163,184,.16)}
+th{font:700 12px/1 Consolas,monospace;letter-spacing:.16em;color:var(--gold);text-transform:uppercase}
+td.bad{color:#f87171}td.good{color:#4ade80}
+.faq details{border-bottom:1px solid rgba(148,163,184,.16);padding:14px 0}
+.faq summary{cursor:pointer;font-weight:700;font-size:17px}
+.faq p{color:#cbd5e1;margin:10px 0 0}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px}
+.card{background:rgba(11,16,44,.72);border:1px solid rgba(212,175,55,.28);
+border-radius:16px;padding:22px}
+.card h3{margin:0 0 8px;font-size:18px}
+.card p{color:var(--muted);font-size:14px;margin:0}
+mark.pop{background:var(--gold);color:#0a0e27;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:800}
+.risk{font-size:12.5px;color:var(--muted);background:rgba(5,7,21,.9);
+border-top:1px solid rgba(148,163,184,.2);padding:22px 0;margin:0}
+footer{padding:34px 0;color:var(--muted);font-size:13px;border-top:1px solid rgba(148,163,184,.14)}
+</style></head>
+<body>
+<header><div class="wrap"><a class="brand" href="https://priv.sansmercantile.com">PRIV</a>
+<nav><a href="https://priv.sansmercantile.com">Product</a><a href="https://priv.sansmercantile.com#pricing">Pricing</a>
+<a href="https://www.sansmercantile.com/growth/trust/reviews">Reviews</a><a href="https://www.sansmercantile.com/priv">Download</a></nav></div></header>
+<div class="hero"><div class="wrap">
+<p class="eyebrow">autonomous trading desk</p>
+<h1>Prove it before you risk it.</h1>
+<p class="sub">Pinned boards, run history and reproducible parameters on real candles.</p>
+<a class="btn" href="https://priv.sansmercantile.com">Start free — no card required</a>
+<div class="proof"><div><b>$0</b><span>to start</span></div><div><b>7</b><span>timeframes per market</span></div><div><b>28s</b><span>decision cycle</span></div><div><b>0</b><span>funds held by Priv</span></div></div>
+</div></div>
+<main>
+<section><h2>What the lab gives you</h2><div class="cols"><div class="card"><h3>Pinned boards</h3><p>Keep the variants worth arguing about on one board.</p></div><div class="card"><h3>Run history</h3><p>Every run stored with its parameters, so results reproduce.</p></div><div class="card"><h3>Seven timeframes</h3><p>Test the same idea from one minute to one day.</p></div></div></section>
+<section><h2>Before / after</h2><table><thead><tr><th>Without Priv</th><th>With Priv</th></tr></thead><tbody><tr><td class="bad">Trusting a backtest nobody can rerun</td><td class="good">Parameters stored with every run</td></tr><tr><td class="bad">Changing three things at a time</td><td class="good">One variable per board</td></tr><tr><td class="bad">Demo-account confidence</td><td class="good">Real candles, real spread assumptions</td></tr></tbody></table></section>
+<section class="faq"><h2>Questions people actually ask</h2><details><summary>Does a backtest predict future returns?</summary><p>No. It shows how a rule would have behaved historically. Past performance is not indicative of future results.</p></details><details><summary>Can I share a board?</summary><p>Yes — boards are shareable with your own account.</p></details></section>
+<section><h2>Start free</h2>
+<p class="sub">No card for the free tier. Connect your own broker through official OAuth —
+funds never leave your account.</p>
+<a class="btn" href="https://priv.sansmercantile.com">Open priv.sansmercantile.com</a>
+<a class="btn ghost" href="https://www.sansmercantile.com/priv">Download the app</a></section>
+</main>
+<p class="risk">Trading involves risk. Past performance is not indicative of future results. Priv holds no client funds and stores no broker
+credentials in the clear. <a href="https://priv.sansmercantile.com/risk">Full risk disclosure</a>.</p>
+<footer><div class="wrap">© 2026 Sans Mercantile · priv.sansmercantile.com ·
+A Sans Mercantile fintech product</div></footer>
+</body></html>

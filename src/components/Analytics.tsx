@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { BarChart2, RefreshCw, AlertTriangle, PieChart, TrendingUp } from "lucide-react";
+import { userHeader } from "../lib/userHeader";
 
 export default function Analytics({ demoMode }: { demoMode?: boolean }) {
   const [performance, setPerformance] = useState<any>(null);
@@ -7,14 +8,22 @@ export default function Analytics({ demoMode }: { demoMode?: boolean }) {
   const [risk, setRisk] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // First load or explicit Refresh only -- the 15s background poll
+  // updates data silently (flipping loading every tick made the refresh
+  // icon spin perpetually and any loading-gated UI flash on a loop).
+  const loadedRef = useRef(false);
 
-  const fetchAll = async () => {
-    setLoading(true);
+  const fetchAll = async (manual = false) => {
+    if (manual || !loadedRef.current) setLoading(true);
     try {
+      // Identity + mode required: without them the backend can't resolve
+      // the caller's linked adapter and every panel stays "—".
+      const headers = await userHeader();
+      const mode = demoMode ? "demo" : "live";
       const [perfRes, allocRes, riskRes] = await Promise.all([
-        fetch("/api/v1/analytics/portfolio/performance"),
-        fetch("/api/v1/analytics/portfolio/allocation"),
-        fetch("/api/v1/analytics/risk/metrics"),
+        fetch(`/api/v1/analytics/portfolio/performance?mode=${mode}`, { headers }),
+        fetch(`/api/v1/analytics/portfolio/allocation?mode=${mode}`, { headers }),
+        fetch(`/api/v1/analytics/risk/metrics?mode=${mode}`, { headers }),
       ]);
       const [perfData, allocData, riskData] = await Promise.all([perfRes.json(), allocRes.json(), riskRes.json()]);
       setPerformance(perfData);
@@ -25,14 +34,16 @@ export default function Analytics({ demoMode }: { demoMode?: boolean }) {
       setError(err.message || "Could not load analytics.");
     } finally {
       setLoading(false);
+      loadedRef.current = true;
     }
   };
 
   useEffect(() => {
+    loadedRef.current = false;
     fetchAll();
     const interval = setInterval(fetchAll, 15000);
     return () => clearInterval(interval);
-  }, []);
+  }, [demoMode]);
 
   return (
     <div className="space-y-6">
@@ -45,7 +56,7 @@ export default function Analytics({ demoMode }: { demoMode?: boolean }) {
           <p className="text-white/40 text-xs mt-1 font-light">Real portfolio value and exposure from your live Deriv connection.</p>
         </div>
         <button
-          onClick={fetchAll}
+          onClick={() => fetchAll(true)}
           className="flex items-center space-x-2 px-3.5 py-2 hover:bg-white/10 text-white border border-white/10 rounded-lg font-mono text-xs transition"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />

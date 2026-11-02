@@ -2,18 +2,17 @@ import React, { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth0 } from "@auth0/auth0-react";
 import { LogOut } from "lucide-react";
+import apiClient from "../api/apiClient";
 import { 
   LayoutDashboard, 
   Brain, 
   Users, 
-  Activity, 
   ShieldCheck, 
   Terminal, 
-  Landmark,
   Newspaper,
-  BarChart2,
   History,
   Link2,
+  CreditCard,
   Menu,
   ChevronLeft,
   ChevronRight,
@@ -21,7 +20,10 @@ import {
   Smartphone,
   Laptop,
   Coins,
-  User
+  User,
+  Radio,
+  Contact,
+  Palette
 } from "lucide-react";
 import logo from "../assets/images/logo_1779280505672.png";
 
@@ -160,17 +162,19 @@ export const navigationItems: SectionItem[] = [
   { name: "Priv Dashboard", icon: LayoutDashboard, path: "/dashboard" },
   { name: "Identity & Profile", icon: User, path: "/dashboard/profile" },
   { name: "Broker Terminal", icon: Coins, path: "/dashboard/terminal" },
+  { name: "My Signals", icon: Radio, path: "/dashboard/signals" },
+  { name: "News", icon: Newspaper, path: "/dashboard/news" },
+  { name: "Strategies", icon: Terminal, path: "/dashboard/automation" },
   { name: "AGI Core", icon: Brain, path: "/dashboard/agi-core" },
   { name: "Multi-Agent Hub", icon: Users, path: "/dashboard/multi-agent" },
-  { name: "Data Ingest", icon: Activity, path: "/dashboard/data-ingestion" },
-  { name: "Security Check", icon: ShieldCheck, path: "/dashboard/security" },
-  { name: "Automation System", icon: Terminal, path: "/dashboard/automation" },
-  { name: "Tax Intelligence", icon: Landmark, path: "/dashboard/tax" },
-  { name: "Tactical News", icon: Newspaper, path: "/dashboard/news" },
-  { name: "Diagnostics Log", icon: BarChart2, path: "/dashboard/analytics" },
   { name: "History & Audit", icon: History, path: "/dashboard/history" },
-  { name: "SANS Network Link", icon: Link2, path: "/dashboard/connections" }
+  { name: "SANS Network Link", icon: Link2, path: "/dashboard/connections" },
+  { name: "Billing", icon: CreditCard, path: "/dashboard/billing" }
 ];
+// Removed from the main list (moved elsewhere in the product):
+// - Security Check   -> admin-only slot below (never shown to clients)
+// - Tax Intelligence -> Identity & Profile tab, next to Identity Registry KYC
+// - Data Ingest      -> SANS Network Link tab, admin-only
 
 export default function Sidebar({
   device,
@@ -187,6 +191,86 @@ export default function Sidebar({
     logout({ logoutParams: { returnTo: window.location.origin } });
   };
 
+  // Admin-gated Compliance Desk + Security Check links: visible only when
+  // the signed-in identity verifies as admin (GET /api/v1/admin/whoami).
+  // Hidden on any failure -- never leaks the routes' existence to clients.
+  const [showCompliance, setShowCompliance] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res: any = await apiClient.get("/api/v1/admin/whoami");
+        if (!cancelled && res?.data?.data?.admin) setShowCompliance(true);
+      } catch (_) {
+        /* stay hidden */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Unread in-app signal notifications, surfaced as a badge on the
+  // My Signals entry (feed itself lives in MySignals.tsx). Polled, not
+  // streamed -- the backend issues signals on a 15-min schedule.
+  const [sigUnread, setSigUnread] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res: any = await apiClient.getSignalNotifications(1);
+        const d = res?.data?.data ?? res?.data ?? {};
+        if (!cancelled) setSigUnread(Number(d.unread) || 0);
+      } catch {
+        /* feed unreachable: keep the last known count */
+      }
+    };
+    poll();
+    const interval = window.setInterval(poll, 60000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  // Strategies is a paid-tier surface: visible only once the real
+  // subscription says tier != free (admins always pass). The server-side
+  // route guard (RequirePaying in App.tsx) enforces the same rule on
+  // navigation; fail-closed while the check is in flight.
+  const [isPaying, setIsPaying] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const body: any = await apiClient.getMySubscription();
+        const sub = body?.subscription ?? (body && typeof body === "object" ? body : null);
+        if (!cancelled && sub?.tier && sub.tier !== "free") setIsPaying(true);
+      } catch (_) {
+        /* no subscription / offline: stay hidden */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const items: SectionItem[] = [];
+  for (const item of navigationItems) {
+    // Strategies: paying tiers + admin only.
+    if (item.path === "/dashboard/automation" && !isPaying && !showCompliance) continue;
+    items.push(item);
+    // Security Check keeps its old slot (after Multi-Agent Hub) but is
+    // never present for clients. Client CRM rides the same admin gate.
+    if (showCompliance && item.path === "/dashboard/multi-agent") {
+      items.push({ name: "Security Check", icon: ShieldCheck, path: "/dashboard/security" });
+      items.push({ name: "Client CRM", icon: Contact, path: "/dashboard/crm" });
+    }
+  }
+  if (showCompliance) {
+    items.push({ name: "Compliance Desk", icon: ShieldCheck, path: "/dashboard/admin/kyc" });
+    items.push({ name: "Marketing Studio", icon: Palette, path: "/dashboard/marketing" });
+  }
+
   // Mobile Top Bar
   if (isMobile) {
     return (
@@ -200,14 +284,14 @@ export default function Sidebar({
         
         {/* Horizontal Navigation List */}
         <div className="flex items-center space-x-1.5 overflow-x-auto max-w-[200px] sm:max-w-none scrollbar-hide py-1">
-          {navigationItems.map((item) => {
+          {items.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink
                 key={item.path}
                 to={item.path}
                 end={item.path === "/dashboard"}
-                className={({ isActive }) => `p-1.5 rounded transition ${
+                className={({ isActive }) => `relative p-1.5 rounded transition ${
                   isActive 
                     ? "bg-white/10 text-white border border-white/25" 
                     : "text-zinc-500 hover:text-white"
@@ -215,6 +299,9 @@ export default function Sidebar({
                 title={item.name}
               >
                 <Icon className="w-4 h-4" />
+                {item.path === "/dashboard/signals" && sigUnread > 0 && (
+                  <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-[#e11d48]" />
+                )}
               </NavLink>
             );
           })}
@@ -256,7 +343,7 @@ export default function Sidebar({
 
       {/* Navigation list */}
       <nav className="flex-1 space-y-1 overflow-y-auto scrollbar-hide">
-        {navigationItems.map((item) => {
+        {items.map((item) => {
           const Icon = item.icon;
           return (
             <NavLink
@@ -272,6 +359,17 @@ export default function Sidebar({
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
               {!isMinimized && <span>{item.name}</span>}
+              {!isMinimized && item.path === "/dashboard/signals" && sigUnread > 0 && (
+                <span
+                  data-testid="signals-unread-badge"
+                  className="ml-auto mr-6 min-w-[18px] px-1 text-center text-[9px] font-bold rounded-full bg-[#e11d48] text-white"
+                >
+                  {sigUnread > 99 ? "99+" : sigUnread}
+                </span>
+              )}
+              {isMinimized && item.path === "/dashboard/signals" && sigUnread > 0 && (
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#e11d48]" />
+              )}
               {!isMinimized && (
                 <div className="absolute right-2 text-[8px] font-mono text-zinc-600 opacity-0 group-hover:opacity-100 transition duration-200">
                   EXEC
@@ -287,23 +385,11 @@ export default function Sidebar({
         {/* Minifier, Demo toggler, Device preview */}
         <div className="space-y-2">
           {/* Demo Toggler */}
-          <button 
-            onClick={onDemoModeToggle}
-            className={`w-full py-2 px-3 rounded flex items-center justify-between border cursor-pointer select-none transition ${
-              demoMode 
-                ? "bg-orange-500/10 border-orange-500/30 text-orange-400" 
-                : "bg-white/3 border-white/5 text-zinc-400 hover:text-white"
-            }`}
-          >
-            {!isMinimized ? (
-              <>
-                <span>DEMO ENVIRONMENT</span>
-                <span className="text-[8px] px-1 bg-white/10 rounded">{demoMode ? "ON" : "OFF"}</span>
-              </>
-            ) : (
-              <Sparkles className="w-3.5 h-3.5 mx-auto" />
-            )}
-          </button>
+          <DerivAccountSwitcher
+            demoMode={demoMode}
+            onDemoModeToggle={onDemoModeToggle}
+            isMinimized={isMinimized}
+          />
 
           {/* Toggle minimizer */}
           <button 
@@ -362,5 +448,158 @@ export default function Sidebar({
         )}
       </div>
     </aside>
+  );
+}
+
+// Account switcher in the rise-fall pattern: no abstract mode flag,
+// the ACTIVE Deriv account (type + live balance) is the button, and a
+// dropdown lists every linked account to switch between. With no
+// linked accounts it degrades to the plain DEMO ENVIRONMENT toggle.
+// Demo/live follows the selected account's type via onDemoModeToggle.
+function DerivAccountSwitcher({
+  demoMode,
+  onDemoModeToggle,
+  isMinimized,
+}: {
+  demoMode: boolean;
+  onDemoModeToggle: () => void;
+  isMinimized: boolean;
+}) {
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [balances, setBalances] = useState<Record<string, { balance: number | null; currency: string }>>({});
+  const [open, setOpen] = useState(false);
+
+  const load = async () => {
+    try {
+      const res: any = await apiClient.getDerivAccounts();
+      setAccounts(res?.data?.data?.accounts ?? res?.data?.accounts ?? []);
+    } catch {
+      /* backend unreachable: keep fallback toggle */
+    }
+    try {
+      const res: any = await apiClient.getDerivBalances();
+      const rows: any[] = res?.data?.data?.balances ?? res?.data?.balances ?? [];
+      const map: Record<string, { balance: number | null; currency: string }> = {};
+      for (const r of rows) {
+        if (r?.loginid) map[r.loginid] = { balance: typeof r.balance === "number" ? r.balance : null, currency: r.currency || "" };
+      }
+      setBalances(map);
+    } catch {
+      /* balances stay unknown */
+    }
+  };
+
+  useEffect(() => {
+    load();
+    const interval = window.setInterval(load, 20000);
+    const onLinked = () => load();
+    window.addEventListener("priv:deriv-linked", onLinked);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("priv:deriv-linked", onLinked);
+    };
+  }, []);
+
+  const fmtBal = (loginid: string) => {
+    const b = balances[loginid];
+    if (!b || b.balance === null) return "—";
+    return `${b.balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${b.currency ? ` ${b.currency}` : ""}`;
+  };
+
+  // No linked accounts: the original mode toggle, unchanged behavior.
+  if (accounts.length === 0) {
+    return (
+      <button
+        onClick={onDemoModeToggle}
+        className={`w-full py-2 px-3 rounded flex items-center justify-between border cursor-pointer select-none transition ${
+          demoMode
+            ? "bg-orange-500/10 border-orange-500/30 text-orange-400"
+            : "bg-white/3 border-white/5 text-zinc-400 hover:text-white"
+        }`}
+      >
+        {!isMinimized ? (
+          <>
+            <span>DEMO ENVIRONMENT</span>
+            <span className="text-[8px] px-1 bg-white/10 rounded">{demoMode ? "ON" : "OFF"}</span>
+          </>
+        ) : (
+          <Sparkles className="w-3.5 h-3.5 mx-auto" />
+        )}
+      </button>
+    );
+  }
+
+  // Wallet-category accounts (Deriv money accounts) hold balance but are
+  // not tradeable targets -- keep them out of the switcher.
+  const tradeable = accounts.filter((a: any) => (a.category ?? "trading") === "trading");
+  const demoAccts = tradeable.filter((a: any) => a.account_type === "demo");
+  const liveAccts = tradeable.filter((a: any) => a.account_type !== "demo");
+  const active = (demoMode ? demoAccts[0] : liveAccts[0]) || tradeable[0] || accounts[0];
+  const activeIsDemo = active?.account_type === "demo";
+
+  const switchTo = (loginid: string, type: string) => {
+    setOpen(false);
+    const wantDemo = type === "demo";
+    if (wantDemo !== demoMode) onDemoModeToggle();
+  };
+
+  const row = (a: any) => {
+    const isDemo = a.account_type === "demo";
+    const isActive = a.loginid === active?.loginid;
+    return (
+      <button
+        key={a.loginid}
+        onClick={() => switchTo(a.loginid, a.account_type)}
+        className={`w-full text-left rounded-lg px-2.5 py-2 transition-colors ${
+          isActive ? "bg-white/10" : "hover:bg-white/5"
+        }`}
+      >
+        <span className={`text-[9px] font-bold uppercase ${isDemo ? "text-orange-400" : "text-emerald-400"}`}>
+          {isDemo ? "Demo account" : "Real account"}
+        </span>
+        <span className="block text-xs font-bold text-white font-mono mt-0.5">
+          {fmtBal(a.loginid)}
+        </span>
+        <span className="block text-[9px] text-zinc-500 font-mono truncate">{a.loginid}</span>
+      </button>
+    );
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        title={activeIsDemo ? "Demo account — click to switch" : "Real account — click to switch"}
+        className={`w-full py-2 px-3 rounded flex items-center justify-between border cursor-pointer select-none transition ${
+          activeIsDemo
+            ? "bg-orange-500/10 border-orange-500/30 text-orange-400"
+            : "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+        }`}
+      >
+        {!isMinimized ? (
+          <>
+            <span className="text-left">
+              <span className="block text-[8px] uppercase opacity-80">
+                {activeIsDemo ? "Demo account" : "Real account"}
+              </span>
+              <span className="block text-[11px] font-bold text-white font-mono">
+                {active ? fmtBal(active.loginid) : "—"}
+              </span>
+            </span>
+            <span className="text-zinc-500 text-xs">{open ? "▲" : "▼"}</span>
+          </>
+        ) : (
+          <span
+            className={`w-3.5 h-3.5 mx-auto rounded-full ${activeIsDemo ? "bg-orange-400" : "bg-emerald-400 animate-pulse"}`}
+          />
+        )}
+      </button>
+      {open && !isMinimized && (
+        <div className="absolute bottom-full mb-2 left-0 right-0 rounded-xl border border-white/10 bg-zinc-950 p-1.5 space-y-1 shadow-2xl z-50">
+          {demoAccts.map(row)}
+          {liveAccts.map(row)}
+        </div>
+      )}
+    </div>
   );
 }

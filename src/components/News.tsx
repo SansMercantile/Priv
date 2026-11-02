@@ -48,198 +48,18 @@ interface CalendarEvent {
   assessment: string;
 }
 
-const GLOBAL_CALENDAR_EVENTS: CalendarEvent[] = [
-  {
-    id: 1,
-    time: "12:30 UTC",
-    date: "May 22, 2026",
-    country: "USA",
-    currency: "USD",
-    event: "Core Retail Sales (MoM) (Apr)",
-    impact: "HIGH",
-    previous: "0.2%",
-    forecast: "0.4%",
-    actual: "0.6%",
-    state: "positive",
-    assessment: "US retail patterns represent incredibly resilient consumer spend lines, reinforcing a longer hawk horizon for the FOMC."
-  },
-  {
-    id: 2,
-    time: "08:00 UTC",
-    date: "May 21, 2026",
-    country: "EUR",
-    currency: "EUR",
-    event: "HCOB Eurozone Manufacturing PMI (May)",
-    impact: "HIGH",
-    previous: "45.7",
-    forecast: "46.2",
-    actual: "47.4",
-    state: "positive",
-    assessment: "European industrial sectors beat down contraction models. Provides temporary backing strength to local EUR spot indices."
-  },
-  {
-    id: 3,
-    time: "06:00 UTC",
-    date: "May 20, 2026",
-    country: "GBR",
-    currency: "GBP",
-    event: "Core CPI Inflation (YoY) (Apr)",
-    impact: "HIGH",
-    previous: "3.5%",
-    forecast: "2.1%",
-    actual: "2.3%",
-    state: "negative",
-    assessment: "Sticky UK services CPI exceeds forecasts. Restricts immediate Bank of England rate easing targets, keeping Sterling firm."
-  },
-  {
-    id: 4,
-    time: "23:30 UTC",
-    date: "May 21, 2026",
-    country: "JPN",
-    currency: "JPY",
-    event: "National Core CPI (YoY) (Apr)",
-    impact: "HIGH",
-    previous: "2.6%",
-    forecast: "2.2%",
-    actual: "2.2%",
-    state: "neutral",
-    assessment: "Inflation perfectly aligns with central bank targets. Steady pressure remains on BoJ for minor rate hikes in Q3 session."
-  },
-  {
-    id: 5,
-    time: "02:00 UTC",
-    date: "May 21, 2026",
-    country: "NZD",
-    currency: "NZD",
-    event: "RBNZ Interest Rate Decision",
-    impact: "HIGH",
-    previous: "5.50%",
-    forecast: "5.50%",
-    actual: "5.50%",
-    state: "neutral",
-    assessment: "Reserve Bank of New Zealand issued hawk warnings, delaying rate-cuts to early 2027. Kiwi holds value spreads."
-  },
-  {
-    id: 6,
-    time: "01:30 UTC",
-    date: "May 21, 2026",
-    country: "AUS",
-    currency: "AUD",
-    event: "Employment Change (Apr)",
-    impact: "HIGH",
-    previous: "-5.8k",
-    forecast: "20.0k",
-    actual: "38.5k",
-    state: "positive",
-    assessment: "Extremely tight labor statistics. Validates RBA's decision to maintain high-yield rates longer than peer Western banks."
-  },
-  {
-    id: 7,
-    time: "12:30 UTC",
-    date: "May 21, 2026",
-    country: "CAN",
-    currency: "CAD",
-    event: "Retail Sales (MoM) (Mar)",
-    impact: "MEDIUM",
-    previous: "-0.1%",
-    forecast: "0.0%",
-    actual: "-0.6%",
-    state: "negative",
-    assessment: "Canadian retail contraction points to high level of consumer strain, supporting case for an upcoming Bank of Canada easing path."
-  },
-  {
-    id: 8,
-    time: "18:00 UTC",
-    date: "May 20, 2026",
-    country: "USA",
-    currency: "USD",
-    event: "FOMC Meeting Minutes",
-    impact: "HIGH",
-    previous: "---",
-    forecast: "---",
-    actual: "Hawkish",
-    state: "neutral",
-    assessment: "Minutes emphasize consensus on rigid inflation barriers. Capital reallocations safely rotate toward high-yielding bills."
-  },
-  {
-    id: 9,
-    time: "14:00 UTC",
-    date: "May 25, 2026",
-    country: "USA",
-    currency: "USD",
-    event: "New Home Sales (MoM) (May)",
-    impact: "MEDIUM",
-    previous: "-8.6%",
-    forecast: "2.1%",
-    actual: "---",
-    state: "pending",
-    assessment: "Core real estate indices continue a soft contraction. Outperformance would trigger equity buying blocks."
-  },
-  {
-    id: 10,
-    time: "09:00 UTC",
-    date: "May 28, 2026",
-    country: "EUR",
-    currency: "EUR",
-    event: "ECB Interest Rate Decision",
-    impact: "HIGH",
-    previous: "4.50%",
-    forecast: "4.25%",
-    actual: "---",
-    state: "pending",
-    assessment: "High probability of standard 25bps ease. Focus centers on forward-looking comments relative to Euro carry pressure."
-  },
-  {
-    id: 11,
-    time: "07:00 UTC",
-    date: "May 29, 2026",
-    country: "CHE",
-    currency: "CHF",
-    event: "KOF Leading Indicators (May)",
-    impact: "MEDIUM",
-    previous: "101.8",
-    forecast: "102.1",
-    actual: "---",
-    state: "pending",
-    assessment: "Swiss forward indicators remain rigid. Suggests persisting Swiss Franc safe-haven hedge activity."
-  },
-  {
-    id: 12,
-    time: "12:30 UTC",
-    date: "Jun 05, 2026",
-    country: "USA",
-    currency: "USD",
-    event: "Non-Farm Employment Change (NFP)",
-    impact: "HIGH",
-    previous: "175k",
-    forecast: "185k",
-    actual: "---",
-    state: "pending",
-    assessment: "SANS core trigger point. Major labor reports printing below 160k acts as powerful federal policy easing catalyst."
-  },
-  {
-    id: 13,
-    time: "12:30 UTC",
-    date: "Jun 10, 2026",
-    country: "USA",
-    currency: "USD",
-    event: "Core CPI Inflation (YoY)",
-    impact: "HIGH",
-    previous: "3.6%",
-    forecast: "3.5%",
-    actual: "---",
-    state: "pending",
-    assessment: "Inherent inflation tracker. Reading above 3.5% will keep treasury rates locked at peaks until late winter sessions."
-  }
-];
 
-export default function News({ demoMode }: { demoMode?: boolean }) {
+export default function News() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"NEWS" | "CALENDAR">("NEWS");
   
-  // Dynamic Economic Calendar events state
-  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(GLOBAL_CALENDAR_EVENTS);
+  // Economic calendar: live backend feed only (/api/v1/economic-calendar,
+  // refreshed every 60s). Starts EMPTY -- a hardcoded seed table used to
+  // sit here (May 2026 fiction) and lingered whenever the feed faltered.
+  // An empty feed now renders an honest empty state, never stale fiction.
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [calendarLoading, setCalendarLoading] = useState<boolean>(false);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -247,14 +67,56 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
       setCalendarLoading(true);
       try {
         const response = await fetch("/api/v1/economic-calendar");
+        if (!active) return;
         if (response.ok) {
           const data = await response.json();
-          if (active && data.success && data.events && data.events.length > 0) {
-            setCalendarEvents(data.events);
+          if (data.success && Array.isArray(data.events)) {
+            // Map the backend shape {id,time,date,country,currency,event,
+            // impact,previous,forecast,actual} onto display rows, deriving
+            // the release state from actual-vs-forecast (numbers arrive as
+            // floats or null -- never invented).
+            const num = (v: any): number | null => {
+              if (v === null || v === undefined || v === "") return null;
+              const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^0-9.\-]/g, ""));
+              return Number.isFinite(n) ? n : null;
+            };
+            const mapped: CalendarEvent[] = data.events.map((e: any, i: number) => {
+              const a = num(e.actual);
+              const f = num(e.forecast);
+              const p = num(e.previous);
+              const fmt = (v: number | null) => (v === null ? "---" : String(v));
+              let state: CalendarEvent["state"] = "pending";
+              let assessment = `Scheduled — forecast ${fmt(f)} (prev ${fmt(p)}).`;
+              if (a !== null) {
+                if (f !== null && a > f) state = "positive";
+                else if (f !== null && a < f) state = "negative";
+                else state = "neutral";
+                assessment = `Released at ${fmt(a)} vs forecast ${fmt(f)} (prev ${fmt(p)}).`;
+              }
+              return {
+                id: typeof e.id === "number" ? e.id : i,
+                time: e.time || "--:--",
+                date: e.date || "",
+                country: e.country || e.currency || "",
+                currency: e.currency || "",
+                event: e.event || "Unknown event",
+                impact: (["HIGH", "MEDIUM", "LOW"].includes(e.impact) ? e.impact : "LOW") as CalendarEvent["impact"],
+                previous: fmt(p),
+                forecast: fmt(f),
+                actual: fmt(a),
+                state,
+                assessment,
+              };
+            });
+            setCalendarEvents(mapped);
+            setCalendarError(mapped.length === 0 ? "No upcoming events in the live feed right now." : null);
           }
+        } else {
+          setCalendarError("Live calendar feed unavailable (backend error).");
         }
       } catch (err) {
         console.warn("Could not retrieve live economic calendar events:", err);
+        if (active) setCalendarError("Live calendar feed unreachable.");
       } finally {
         if (active) setCalendarLoading(false);
       }
@@ -272,6 +134,7 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [realArticles, setRealArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [articlesError, setArticlesError] = useState<string | null>(null);
 
   // Analysis Modal States
   const [selectedAnalysis, setSelectedAnalysis] = useState<any | null>(null);
@@ -309,7 +172,7 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
       }
     } catch (err: any) {
       console.error("[SANS Analytical Core] Error during fundamental analysis:", err);
-      setAnalysisError(err.message || "Cognitive server feedback exception. Safe sandbox modes engaged.");
+      setAnalysisError(err.message || "Analysis engine unreachable.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -357,12 +220,15 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
         const count = Math.min(items.length, 12);
         for (let i = 0; i < count; i++) {
           const item = items[i];
-          const title = item.getElementsByTagName("title")[0]?.textContent || "Macro Financial Highlight";
+          const title = item.getElementsByTagName("title")[0]?.textContent || "(untitled headline)";
           const descriptionRaw = item.getElementsByTagName("description")[0]?.textContent || "";
           const pubDateStr = item.getElementsByTagName("pubDate")[0]?.textContent || "";
           const creator = item.getElementsByTagName("dc:creator")[0]?.textContent || "Yahoo Finance";
           
-          const summary = descriptionRaw.replace(/<[^>]*>?/gm, "").substring(0, 200) + "...";
+          // Extract plain text via the DOM (no regex sanitizer): React
+          // renders this as text, and textContent strips any markup.
+          const summaryDoc = new DOMParser().parseFromString(descriptionRaw, "text/html");
+          const summary = (summaryDoc.body.textContent || descriptionRaw).substring(0, 200) + "...";
           
           let timeStr = "12m ago";
           if (pubDateStr) {
@@ -378,8 +244,9 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
             }
           }
           
-          const sentimentOptions: Array<"Bullish" | "Neutral" | "Bearish"> = ["Bullish", "Neutral", "Neutral", "Bearish"];
-          const sentiment = sentimentOptions[Math.floor(Math.sin(i) * 2 + 2)] || "Neutral";
+          // RSS gives no sentiment signal -- report Neutral honestly
+          // rather than inventing one from the article index.
+          const sentiment = "Neutral";
           
           parsed.push({
             id: i + 500,
@@ -395,8 +262,12 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
         
         if (parsed.length > 0) {
           setRealArticles(parsed);
+          setArticlesError(null);
           return;
         }
+        // Fetch "succeeded" but yielded nothing usable (proxy error page,
+        // empty RSS, etc.) -- treat as a failed live feed.
+        setArticlesError("Live feed returned no usable headlines.");
       } catch (err) {
         console.warn("Failed fetching live Yahoo headlines, falling back to REST schema:", err);
       }
@@ -420,7 +291,7 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
                 const date = new Date(art.published);
                 const diffMs = Date.now() - date.getTime();
                 const diffMins = Math.floor(diffMs / 60000);
-                const diffHours = Math.floor(diffMins / 600);
+                const diffHours = Math.floor(diffMins / 60);
                 if (diffMins < 60 && diffMins > 0) {
                   timeStr = `${diffMins}m ago`;
                 } else if (diffHours < 24 && diffHours > 0) {
@@ -432,78 +303,34 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
 
               return {
                 id: index + 100,
-                title: art.title || art.headline || "Macro Financial Event Highlighted",
-                source: art.source || "SANS Integrated RSS",
+                title: art.title || art.headline || "(untitled headline)",
+                source: art.source || "Unknown source",
                 time: timeStr,
                 sentiment: mappedSentiment,
-                summary: art.summary || art.content || "The SANS sovereign analytical parser registered dynamic volatility shifts inside the asset indices, recommending optimal hedging metrics.",
+                summary: art.summary || art.content || "(no summary provided by the source feed)",
                 readTime: "2 min read",
                 tags: art.tags || ["Realtime", art.source ? art.source.replace("https://", "").replace("www.", "").split(".")[0] : "Market"]
               };
             });
             setRealArticles(formatted);
+            setArticlesError(null);
+            return;
           }
+          setArticlesError("REST fallback returned no articles.");
         })
-        .catch(err => console.error("Error fetching live briefs:", err));
+        .catch(err => {
+          console.error("Error fetching live briefs:", err);
+          setArticlesError("Live brief feed unreachable.");
+        });
     };
 
     fetchRealRssNews().finally(() => setLoading(false));
   }, []);
 
-  const defaultArticles: Article[] = [
-    {
-      id: 1,
-      title: "Global Supply Chain Congestion Prompts Autonomous Arbitrage Influx",
-      source: "SANS Intelligence Branch",
-      time: "12m ago",
-      sentiment: "Bullish",
-      summary: "Quantitative Arbitrage clusters initiated short-term spread maneuvers across SADC maritime carriers, projecting standard premium arbitrage margins above index bounds.",
-      readTime: "3 min read",
-      tags: ["Arbitrage", "Logistics", "Volume"]
-    },
-    {
-      id: 2,
-      title: "Federal Reserve Board Signals Volatility Constraints Adjustment",
-      source: "Financial Times Core",
-      time: "1h ago",
-      sentiment: "Neutral",
-      summary: "Simulated market strategies predict micro-adjustments following adjusted inflation outlooks. High-Frequency execution limits remain unchanged under security protocol AN-03.",
-      readTime: "5 min read",
-      tags: ["Macro", "Execution", "Fed"]
-    },
-    {
-      id: 3,
-      title: "GRA Announces Algorithmic Custom Exemption Verification Standard",
-      source: "Ghana Revenue Service Gate",
-      time: "3h ago",
-      sentiment: "Bullish",
-      summary: "New algorithmic customs declarations allow local nodes to autonomously apply for tax clearance exemptions, optimizing capital routing by up to 2.4%.",
-      readTime: "4 min read",
-      tags: ["Tax", "Compliance", "GRA"]
-    },
-    {
-      id: 4,
-      title: "Unprecedented Volume Spike Detected in Synthetic Bond Swaps",
-      source: "SANS Sovereign Node 3",
-      time: "5h ago",
-      sentiment: "Bullish",
-      summary: "Alternative Sentiment models captured rapid reallocation patterns into collateralized short-term sovereign yielding assets. Execution routers adjusted slippage parameters.",
-      readTime: "2 min read",
-      tags: ["Volume", "Bonds", "Sovereign"]
-    },
-    {
-      id: 5,
-      title: "Geopolitical Re-alignment Impacts West Africa Commodity Spreads",
-      source: "Reuters Corporate",
-      time: "8h ago",
-      sentiment: "Bearish",
-      summary: "Commodity arbitrage pipelines face temporary freight spikes. Risk-Guardian models designated specific trade sectors as 'Restricted' pending board consensus.",
-      readTime: "7 min read",
-      tags: ["Commodity", "Risk", "SADC"]
-    }
-  ];
-
-  const articles = realArticles.length > 0 ? [...realArticles, ...defaultArticles] : defaultArticles;
+  // Live feed only. The hardcoded demoArticles block (5 fabricated
+  // headlines presented as real) has been removed entirely -- with no
+  // live feed the list renders an honest empty state instead.
+  const articles = realArticles;
 
   const filteredArticles = articles.filter(art => {
     const matchesFilter = filter === "All" || art.tags.some(category => category.toLowerCase() === filter.toLowerCase()) || art.tags.includes(filter) || art.sentiment === filter;
@@ -551,7 +378,7 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
         <div>
           <h1 className="text-3xl font-serif italic text-white flex items-center">
             <Newspaper className="w-7 h-7 mr-3 text-white/70" />
-            Tactical Briefings & News
+            News
           </h1>
           <p className="text-white/40 text-xs mt-1 font-light">Sovereign alternative data stream and financial intelligence aggregator</p>
         </div>
@@ -603,7 +430,7 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
           {/* Filter and Search Bar */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-2 flex flex-wrap gap-1.5">
-              {["All", "Arbitrage", "Macro", "Tax", "Volume", "Risk", "Bullish", "Neutral", "Bearish"].map((category) => (
+              {["All", "Live", "Macro", "Bullish", "Neutral", "Bearish"].map((category) => (
                 <button
                   key={category}
                   onClick={() => setFilter(category)}
@@ -633,7 +460,22 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
           <div className="space-y-6">
             {filteredArticles.length === 0 ? (
               <div className="p-12 text-center rounded border border-white/10 bg-neutral-900/10 font-mono text-xs text-stone-500">
-                No active briefs found matching filter query in current timeline epoch.
+                {articlesError ? (
+                  <div className="space-y-3">
+                    <p className="text-amber-500/80">{articlesError}</p>
+                    <p>Live intelligence feed unavailable. No simulated briefs are substituted.</p>
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="px-3 py-1.5 rounded border border-white/10 text-white/70 hover:text-white hover:border-white/20 transition-colors cursor-pointer"
+                    >
+                      Retry feed
+                    </button>
+                  </div>
+                ) : filter !== "All" || searchQuery ? (
+                  "No active briefs found matching filter query in current timeline epoch."
+                ) : (
+                  "No briefs in the live feed right now."
+                )}
               </div>
             ) : (
               filteredArticles.map((art) => (
@@ -690,57 +532,49 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
       {/* 2. GLOBAL ECONOMIC CALENDAR TAB */}
       {activeTab === "CALENDAR" && (
         <div id="economic-calendar-section" className="space-y-6 animate-fadeIn">
-          {/* HIGH IMPACT WEEKLY TICKER TAPE */}
-          <div className="bg-red-950/20 border border-red-500/20 py-2.5 px-4 rounded-xl flex items-center overflow-hidden font-mono text-[10px] text-red-400 select-none shadow-[0_4px_12px_rgba(239,68,68,0.05)]">
-            <div className="flex items-center space-x-1.5 flex-shrink-0 z-10 bg-neutral-950 dark:bg-black pr-4 font-bold uppercase tracking-wider text-red-500 animate-pulse border-r border-red-500/20 mr-4">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-2 animate-ping" />
-              <span>HIGH IMPACT ALERTS (WEEKLY TAPE)</span>
-            </div>
-            
-            <style>{`
-              @keyframes marquee-economic {
-                0% { transform: translate3d(0, 0, 0); }
-                100% { transform: translate3d(-50%, 0, 0); }
-              }
-              .marquee-scroll-economic {
-                display: flex;
-                white-space: nowrap;
-                animation: marquee-economic 35s linear infinite;
-              }
-              .marquee-scroll-economic:hover {
-                animation-play-state: paused;
-              }
-            `}</style>
+          {/* HIGH IMPACT TICKER TAPE — built from the live calendar feed;
+              hidden entirely when the feed has no HIGH-impact events
+              (a hardcoded June-2026 NFP/CPI/ECB tape used to sit here
+              regardless of what was actually on the calendar). */}
+          {(() => {
+            const highImpact = calendarEvents.filter(ev => ev.impact === "HIGH");
+            if (highImpact.length === 0) return null;
+            const fmt = (v: string) => (v && v !== "---" ? v : "—");
+            return (
+              <div className="bg-red-950/20 border border-red-500/20 py-2.5 px-4 rounded-xl flex items-center overflow-hidden font-mono text-[10px] text-red-400 select-none shadow-[0_4px_12px_rgba(239,68,68,0.05)]">
+                <div className="flex items-center space-x-1.5 flex-shrink-0 z-10 bg-neutral-950 dark:bg-black pr-4 font-bold uppercase tracking-wider text-red-500 border-r border-red-500/20 mr-4">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-2" />
+                  <span>HIGH IMPACT ALERTS</span>
+                </div>
 
-            <div className="marquee-scroll-economic flex gap-8">
-              <span className="flex items-center gap-2">
-                <strong>[NFP]</strong> Non-Farm Employment Change — <span className="text-zinc-400">JUN 05, 12:30 UTC</span> &bull; Forecast: <span className="font-bold text-white">185k</span> (Previous: 175k) <span className="bg-red-500/20 text-[8px] px-1 py-0.5 rounded border border-red-500/20 font-bold">REVOLUTION ALERTS</span>
-              </span>
-              <span className="flex items-center gap-2">
-                <strong>[CPI]</strong> Core CPI Inflation YoY (USA) — <span className="text-zinc-400">JUN 10, 12:30 UTC</span> &bull; Forecast: <span className="font-bold text-white">3.5%</span> (Previous: 3.6%) <span className="bg-red-500/20 text-[8px] px-1 py-0.5 rounded border border-red-500/20 font-bold">HIGH VOLATILITY</span>
-              </span>
-              <span className="flex items-center gap-2">
-                <strong>[ECB]</strong> Eurozone Rate Decision — <span className="text-zinc-400">MAY 28, 09:00 UTC</span> &bull; Forecast: <span className="font-bold text-white">4.25%</span> (Previous: 4.50%) <span className="bg-amber-500/20 text-[8px] px-1 py-0.5 text-amber-400 rounded border border-amber-500/20 font-bold">RATE MOVE EXPECTED</span>
-              </span>
-              <span className="flex items-center gap-2">
-                <strong>[FOMC]</strong> US Meeting Minutes released — <span className="text-emerald-400">HAWKISH BIAS EXTENDED</span> &bull; SANS risk matrix advises buying spot metal above support <span className="bg-emerald-500/20 text-[8px] px-1 py-0.5 text-emerald-400 rounded border border-emerald-500/20 font-bold">METRICS RECORDED</span>
-              </span>
-              
-              {/* Duplicate for seamless looping marquee */}
-              <span className="flex items-center gap-2">
-                <strong>[NFP]</strong> Non-Farm Employment Change — <span className="text-zinc-400">JUN 05, 12:30 UTC</span> &bull; Forecast: <span className="font-bold text-white">185k</span> (Previous: 175k) <span className="bg-red-500/20 text-[8px] px-1 py-0.5 rounded border border-red-500/20 font-bold">REVOLUTION ALERTS</span>
-              </span>
-              <span className="flex items-center gap-2">
-                <strong>[CPI]</strong> Core CPI Inflation YoY (USA) — <span className="text-zinc-400">JUN 10, 12:30 UTC</span> &bull; Forecast: <span className="font-bold text-white">3.5%</span> (Previous: 3.6%) <span className="bg-red-500/20 text-[8px] px-1 py-0.5 rounded border border-red-500/20 font-bold">HIGH VOLATILITY</span>
-              </span>
-              <span className="flex items-center gap-2">
-                <strong>[ECB]</strong> Eurozone Rate Decision — <span className="text-zinc-400">MAY 28, 09:00 UTC</span> &bull; Forecast: <span className="font-bold text-white">4.25%</span> (Previous: 4.50%) <span className="bg-amber-500/20 text-[8px] px-1 py-0.5 text-amber-400 rounded border border-amber-500/20 font-bold">RATE MOVE EXPECTED</span>
-              </span>
-              <span className="flex items-center gap-2">
-                <strong>[FOMC]</strong> US Meeting Minutes released — <span className="text-emerald-400">HAWKISH BIAS EXTENDED</span> &bull; SANS risk matrix advises buying spot metal above support <span className="bg-emerald-500/20 text-[8px] px-1 py-0.5 text-emerald-400 rounded border border-emerald-500/20 font-bold">METRICS RECORDED</span>
-              </span>
-            </div>
-          </div>
+                <style>{`
+                  @keyframes marquee-economic {
+                    0% { transform: translate3d(0, 0, 0); }
+                    100% { transform: translate3d(-50%, 0, 0); }
+                  }
+                  .marquee-scroll-economic {
+                    display: flex;
+                    white-space: nowrap;
+                    animation: marquee-economic 35s linear infinite;
+                  }
+                  .marquee-scroll-economic:hover {
+                    animation-play-state: paused;
+                  }
+                `}</style>
+
+                <div className="marquee-scroll-economic flex gap-8">
+                  {[...highImpact, ...highImpact].map((ev, i) => (
+                    <span key={`${ev.id}-${i}`} className="flex items-center gap-2">
+                      <strong>[{ev.currency || ev.country}]</strong> {ev.event} —{" "}
+                      <span className="text-zinc-400">{ev.date} {ev.time}</span> &bull; Forecast:{" "}
+                      <span className="font-bold text-white">{fmt(ev.forecast)}</span>{" "}
+                      (Previous: {fmt(ev.previous)})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Calendar Controller Filters */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-neutral-950/60 p-4 rounded-xl border border-white/10">
@@ -815,7 +649,9 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
                   {filteredEvents.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-12 text-center text-xs font-mono text-stone-500">
-                        No macroeconomic calendar entries found in active search parameters.
+                        {calendarEvents.length === 0
+                          ? (calendarLoading ? "Loading live calendar…" : (calendarError || "No upcoming events in the live feed right now."))
+                          : "No macroeconomic calendar entries found in active search parameters."}
                       </td>
                     </tr>
                   ) : (
@@ -903,10 +739,16 @@ export default function News({ demoMode }: { demoMode?: boolean }) {
           <div className="p-4 bg-sky-500/5 rounded-xl border border-sky-500/20 flex flex-col md:flex-row items-center justify-between gap-2.5 font-mono text-[10px] text-sky-400">
             <div className="flex items-center space-x-2">
               <CheckCircle2 className="w-4 h-4 text-sky-400" />
-              <span>SANS CHANNELS MONITOR: Synchronized with 8 Sovereign Central Vault feeds.</span>
+              <span>
+                {calendarLoading
+                  ? "Fetching live economic calendar..."
+                  : calendarError
+                    ? calendarError
+                    : `Live calendar: ${calendarEvents.length} events from the FairEconomy/ForexFactory weekly feed.`}
+              </span>
             </div>
             <div className="text-zinc-500">
-              TIME INTERLOCK: CENTRAL DECENTRALIZED EPOCH SECURE
+              REFRESHED EVERY 60S
             </div>
           </div>
         </div>

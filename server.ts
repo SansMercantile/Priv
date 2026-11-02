@@ -27,10 +27,70 @@ import { GoogleGenAI } from "@google/genai";
 // NOTE: vite imported dynamically inside the dev-only branch below
 import { antiBotMiddleware, securityHeadersMiddleware } from "./src/middleware/antiBot.js";
 import { buildFallbackChatResponse } from "./src/utils/privChatResponse";
+import rateLimit from "express-rate-limit";
 
 const app = express();
 // Azure App Service injects PORT=8080; fall back to 3000 for local dev
 const PORT = parseInt(process.env.PORT || "3000", 10);
+
+// ── Safety helpers ──────────────────────────────────────────────────────────
+// Strip CR/LF and control chars so user-controlled values can't forge log lines.
+function logSafe(v: unknown): string {
+  return String(v).replace(/[\r\n\u0000-\u001F\u007F]+/g, " ").slice(0, 300);
+}
+
+// Validate dynamic store keys (emails/user ids/broker ids) before they are
+// used as property names: reject prototype-polluting keys and anything
+// outside a conservative charset.
+const SAFE_KEY_RE = /^[A-Za-z0-9@._+:\-]{1,128}$/;
+function safeKey(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  if (v === "__proto__" || v === "constructor" || v === "prototype") return null;
+  return SAFE_KEY_RE.test(v) ? v : null;
+}
+
+// Exact origins only (no wildcard subdomains) — credentialed CORS must never
+// be reflected for an attacker-controlled host.
+const ALLOWED_EXACT_ORIGINS = new Set<string>([
+  "https://priv.sansmercantile.com",
+  "https://priv.vercel.app",
+  "https://sansmercantile.com",
+  "https://privcoremini.sansmercantile.com",
+]);
+const ALLOWED_LOCAL_ORIGIN_RE = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/;
+
+// Host allowlist for the RSS proxy (prevents SSRF to arbitrary/internal hosts).
+const RSS_ALLOWED_HOSTS = new Set<string>([
+  "finance.yahoo.com",
+  "www.federalreserve.gov",
+  "federalreserve.gov",
+  "forexlive.com",
+  "www.forexlive.com",
+]);
+
+function isAllowedFeedUrl(raw: unknown): raw is string {
+  if (typeof raw !== "string") return false;
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" && RSS_ALLOWED_HOSTS.has(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+// Rate limit for the HTML/SPA fallback handlers (they read files from disk).
+const htmlFallbackLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 300,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  keyGenerator: (req) =>
+    (req.headers["x-forwarded-for"]?.toString().split(",")[0].trim()) ||
+    req.socket.remoteAddress ||
+    "unknown",
+  validate: { xForwardedForHeader: false },
+  message: { error: "Too many requests." },
+});
 
 function parseBedrockRegion(endpoint: string | undefined) {
   if (!endpoint) return undefined;
@@ -253,20 +313,11 @@ function getAIClient(): any | null {
 
 app.use(express.json());
 
-// ── CORS — allow Vercel frontend + local dev to reach this API ─────────────
-const ALLOWED_ORIGINS = [
-  // Vercel deployments (update with your actual Vercel domain)
-  /https:\/\/.*\.vercel\.app$/,
-  /https:\/\/.*\.sans-mercantile\.com$/,
-  /https:\/\/priv.*\.vercel\.app$/,
-  // Local development
-  /^http:\/\/localhost:\d+$/,
-  /^http:\/\/127\.0\.0\.1:\d+$/,
-];
-
+// ── CORS — allow the Priv frontend + local dev to reach this API ───────────
+// Exact-match origins only (helpers above); no wildcard subdomain reflection.
 app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin || "";
-  const allowed = ALLOWED_ORIGINS.some(pattern => pattern.test(origin));
+  const allowed = ALLOWED_EXACT_ORIGINS.has(origin) || ALLOWED_LOCAL_ORIGIN_RE.test(origin);
   if (allowed) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
@@ -307,6 +358,24 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+function sanitizeProxyPath(inputPath: string): string | null {
+  if (!inputPath.startsWith('/')) return null;
+
+  // Allow only expected URL path characters for API routes.
+  if (!/^\/[A-Za-z0-9\-._~/%]*$/.test(inputPath)) return null;
+
+  // Reject encoded or raw backslashes and traversal attempts.
+  const lower = inputPath.toLowerCase();
+  if (lower.includes('%5c') || inputPath.includes('\\')) return null;
+
+  const segments = inputPath.split('/');
+  for (const seg of segments) {
+    if (seg === '..' || seg.toLowerCase() === '%2e%2e') return null;
+  }
+
+  return inputPath;
+}
+
 // Proxy /api/v1 routes to Python backend on port 8000
 app.use("/api/v1", async (req, res) => {
   // Skip proxy for routes already defined in Express
@@ -316,8 +385,13 @@ app.use("/api/v1", async (req, res) => {
   }
   
   try {
-    const pythonBackendUrl = `http://localhost:8000/api/v1${req.path}`;
-    console.log(`Proxying ${req.method} ${req.path} to Python backend: ${pythonBackendUrl}`);
+    const sanitizedPath = sanitizeProxyPath(req.path);
+    if (!sanitizedPath) {
+      return res.status(400).json({ error: "Invalid proxy path" });
+    }
+
+    const pythonBackendUrl = `http://localhost:8000/api/v1${sanitizedPath}`;
+    console.log(`Proxying ${logSafe(req.method)} ${logSafe(req.path)} to Python backend: ${logSafe(pythonBackendUrl)}`);
     
     const response = await fetch(pythonBackendUrl, {
       method: req.method,
@@ -682,19 +756,21 @@ function loadRegisteredBrokersFromDisk() {
 try { loadRegisteredBrokersFromDisk(); } catch (e) { /* already handled */ }
 
 function kycKey(req: any): string {
-  // Prefer authenticated user id header; fall back to body email
-  return req.headers["x-user-id"] || req.body?.contact?.email || "anonymous";
+  // Prefer authenticated user id header; fall back to body email.
+  // Keys are validated so user-controlled values can never index
+  // prototype properties (e.g. __proto__ / constructor).
+  return safeKey(req.headers["x-user-id"]) || safeKey(req.body?.contact?.email) || "anonymous";
 }
 
 // GET /api/kyc/record — return saved draft or empty
 app.get("/api/kyc/record", (req, res) => {
-  const key = req.headers["x-user-id"] as string || "anonymous";
+  const key = safeKey(req.headers["x-user-id"]) || "anonymous";
   res.json(kycStore[key] || {});
 });
 
 // GET /api/kyc/status — return completion percentage
 app.get("/api/kyc/status", (req, res) => {
-  const key = req.headers["x-user-id"] as string || "anonymous";
+  const key = safeKey(req.headers["x-user-id"]) || "anonymous";
   const record = kycStore[key];
   if (!record) return res.json({ status: "not_started", completion_percent: 0 });
   const filled = Object.values(record).filter(
@@ -963,9 +1039,22 @@ function getSimulationRssXml(feedUrl: string): string {
 
 // Secure RSS proxy feed parser endpoint
 app.get("/api/rss", async (req, res) => {
-  const url = req.query.url as string;
+  // Query params may be arrays (?url=a&url=b) — reject anything that isn't a
+  // single string, then allowlist the host to prevent SSRF.
+  const rawUrl = req.query.url;
+  const url = typeof rawUrl === "string" ? rawUrl : "";
+
   if (!url) {
     return res.status(400).json({ error: "Missing url parameter" });
+  }
+
+  if (!isAllowedFeedUrl(url)) {
+    // Serve the simulated feed for anything outside the allowlist (same
+    // response shape as an offline feed) — never fetch arbitrary URLs.
+    const fallbackXml = getSimulationRssXml(url);
+    res.set("Content-Type", "application/xml");
+    res.send(fallbackXml);
+    return;
   }
 
   try {
@@ -974,6 +1063,7 @@ app.get("/api/rss", async (req, res) => {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "application/xml, text/xml, application/xhtml+xml, */*"
       },
+      redirect: "error",
       signal: AbortSignal.timeout(6000) // Ensure the request doesn't hang indefinitely
     });
 
@@ -985,7 +1075,7 @@ app.get("/api/rss", async (req, res) => {
     res.set("Content-Type", "application/xml");
     res.send(xmlText);
   } catch (error: any) {
-    console.log(`[SANS RSS] Active proxy simulated XML resolver engaged for url: ${url}`);
+    console.log(`[SANS RSS] Active proxy simulated XML resolver engaged for url: ${logSafe(url)}`);
     
     // Serve valid simulated XML instead of throwing hard error, preventing client-side console failures
     const fallbackXml = getSimulationRssXml(url);
@@ -1340,13 +1430,14 @@ Your primary task is to receive active balance, news, and the user's specific cu
 app.post("/api/brokers/register", async (req, res) => {
   try {
     const { broker_id, broker_type, config, session_token } = req.body || {};
-    if (!broker_id || !broker_type || !config) {
+    const safeBrokerId = safeKey(broker_id);
+    if (!safeBrokerId || !broker_type || !config) {
       return res.status(400).json({ success: false, error: "Missing broker_id, broker_type or config in body." });
     }
 
     // Minimal validation - do not log sensitive tokens
     const record: any = {
-      broker_id,
+      broker_id: safeBrokerId,
       broker_type,
       config: { ...config },
       created_at: new Date().toISOString()
@@ -1381,14 +1472,14 @@ app.post("/api/brokers/register", async (req, res) => {
       }
     }
 
-    registeredBrokers[broker_id] = record;
+    registeredBrokers[safeBrokerId] = record;
     // persist to disk (best-effort)
     try {
       saveRegisteredBrokersToDisk();
     } catch (e: unknown) {
       console.warn("[Brokers] persist warning:", e instanceof Error ? e.message : e);
     }
-    return res.json({ success: true, registered: true, broker_id, session_validated: !!record.session_validated });
+    return res.json({ success: true, registered: true, broker_id: safeBrokerId, session_validated: !!record.session_validated });
   } catch (err: any) {
     console.error("/api/brokers/register error:", err?.message || err);
     return res.status(500).json({ success: false, error: "internal_server_error" });
@@ -1399,7 +1490,8 @@ app.post("/api/brokers/register", async (req, res) => {
 // Returns stored broker record and performs optional server-side probes using stored session_token
 app.get("/api/brokers/registered/:id", async (req, res) => {
   try {
-    const id = req.params.id;
+    const id = safeKey(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: "invalid_id" });
     const record = registeredBrokers[id];
     if (!record) return res.status(404).json({ success: false, error: "not_found" });
 
@@ -1423,7 +1515,7 @@ app.get("/api/brokers/registered/:id", async (req, res) => {
         const ordersText = await orders.text();
         out.xm_orders = { status: orders.status, ok: orders.ok, snippet: ordersText.substring(0, 1024) };
       } catch (e: any) {
-        console.warn("[Brokers] xm probe failed for", id, e?.message || e);
+        console.warn("[Brokers] xm probe failed for", logSafe(id), e?.message || e);
         out.xm_probe_error = String(e?.message || e);
       }
     }
@@ -1441,16 +1533,17 @@ app.get("/api/brokers/registered/:id", async (req, res) => {
 app.post("/api/auth/xm-bridge", async (req, res) => {
   try {
     const { broker_id, session_token, config } = req.body || {};
-    if (!broker_id || !session_token) {
+    const safeBrokerId = safeKey(broker_id);
+    if (!safeBrokerId || !session_token) {
       return res.status(400).json({ success: false, error: "missing_broker_id_or_token" });
     }
 
-    console.log(`[XM-Bridge] Received automatic token push for ${broker_id}`);
+    console.log(`[XM-Bridge] Received automatic token push for ${logSafe(safeBrokerId)}`);
 
     const record: any = {
-      broker_id,
+      broker_id: safeBrokerId,
       broker_type: "xm",
-      config: config || { account_id: broker_id.replace("xm_user_account_", ""), server: "XMGlobal-Real 14" },
+      config: config || { account_id: safeBrokerId.replace("xm_user_account_", ""), server: "XMGlobal-Real 14" },
       created_at: new Date().toISOString()
     };
 
@@ -1470,7 +1563,7 @@ app.post("/api/auth/xm-bridge", async (req, res) => {
       record.session_status = "bridge_fetch_failed";
     }
 
-    registeredBrokers[broker_id] = record;
+    registeredBrokers[safeBrokerId] = record;
     saveRegisteredBrokersToDisk();
 
     return res.json({ success: true, session_validated: record.session_validated });
@@ -1487,13 +1580,13 @@ app.post("/api/auth/xm-bridge", async (req, res) => {
 app.get("/api/auth/xm-siphon", async (req, res) => {
   try {
     const cookie = req.headers.cookie || "";
-    const brokerId = req.query.broker_id as string;
+    const brokerId = safeKey(req.query.broker_id);
 
     if (!brokerId) {
       return res.status(400).json({ success: false, error: "missing_broker_id" });
     }
 
-    console.log(`[XM-Siphon] Attempting to capture session for ${brokerId}`);
+    console.log(`[XM-Siphon] Attempting to capture session for ${logSafe(brokerId)}`);
 
     if (cookie) {
       const record: any = {
@@ -1530,56 +1623,12 @@ app.get("/api/auth/xm-siphon", async (req, res) => {
   }
 });
 
-// POST /api/auth/xm-bridge
-// Specialized endpoint for browser extensions to push session tokens automatically.
-// Expects { broker_id, session_token, config }
-app.post("/api/auth/xm-bridge", async (req, res) => {
-  try {
-    const { broker_id, session_token, config } = req.body || {};
-    if (!broker_id || !session_token) {
-      return res.status(400).json({ success: false, error: "missing_broker_id_or_token" });
-    }
-
-    console.log(`[XM-Bridge] Received automatic token push for ${broker_id}`);
-
-    const record: any = {
-      broker_id,
-      broker_type: "xm",
-      config: config || { account_id: broker_id.replace("xm_user_account_", ""), server: "XMGlobal-Real 14" },
-      created_at: new Date().toISOString()
-    };
-
-    try {
-      const resp = await fetch("https://my.xm.com/member/", {
-        method: "GET",
-        headers: { "User-Agent": "PRIV-Server/1.0", "Cookie": session_token },
-        signal: AbortSignal.timeout(6000)
-      });
-      const text = await resp.text();
-      const validated = resp.ok && resp.status === 200 && (text.includes("Logout") || text.includes("My Account") || text.length > 500);
-      record.session_token = session_token;
-      record.session_validated = validated;
-      record.session_status = resp.status;
-    } catch (e: any) {
-      record.session_validated = false;
-      record.session_status = "bridge_fetch_failed";
-    }
-
-    registeredBrokers[broker_id] = record;
-    saveRegisteredBrokersToDisk();
-
-    return res.json({ success: true, session_validated: record.session_validated });
-  } catch (err: any) {
-    console.error("[XM-Bridge] error:", err?.message || err);
-    res.status(500).json({ success: false, error: "bridge_internal_error" });
-  }
-});
-
 // POST /api/brokers/registered/:id/token  — rotate/update session token
 app.post("/api/brokers/registered/:id/token", async (req, res) => {
   try {
-    const id = req.params.id;
+    const id = safeKey(req.params.id);
     const { session_token } = req.body || {};
+    if (!id) return res.status(400).json({ success: false, error: "invalid_id" });
     if (!session_token) return res.status(400).json({ success: false, error: "missing_session_token" });
     const record = registeredBrokers[id];
     if (!record) return res.status(404).json({ success: false, error: "not_found" });
@@ -1612,7 +1661,8 @@ app.post("/api/brokers/registered/:id/token", async (req, res) => {
 // DELETE /api/brokers/registered/:id/token  — remove stored session token
 app.delete("/api/brokers/registered/:id/token", (req, res) => {
   try {
-    const id = req.params.id;
+    const id = safeKey(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: "invalid_id" });
     const record = registeredBrokers[id];
     if (!record) return res.status(404).json({ success: false, error: "not_found" });
     delete record.session_token;
@@ -2180,9 +2230,58 @@ Output a valid JSON matching this schema exactly:
 
 import { spawn, execSync } from "child_process";
 
+// ── Marketing Studio ────────────────────────────────────────────────────────
+// In-house marketing engine: local poster/video compositor
+// (marketing/build/studio.py), local SAPI voice, Amazon Bedrock plates, and
+// script writing via this server's own AI provider. No competitor APIs.
+import { marketingRouter, setEngineAI } from "./server/marketing/routes.js";
+import { ASSETS_DIR } from "./server/marketing/local.js";
+app.use(
+  "/marketing-assets",
+  express.static(ASSETS_DIR, { maxAge: "1h", fallthrough: true, index: false })
+);
+app.use("/api/marketing", marketingRouter);
+
+// Marketing Studio engine: the script writer reuses whichever AI provider
+// this server already has wired (Bedrock or Gemini via getAIClient) so the
+// studio never needs its own credentials. Lazy — getAIClient() resolves on
+// first call, after env and ADC are in place.
+setEngineAI(async (prompt) => {
+  const ai = getAIClient();
+  if (!ai) {
+    throw new Error(
+      "No AI provider configured. Set GEMINI_API_KEY or AWS Bedrock credentials."
+    );
+  }
+  const response = await ai.models.generateContent({
+    model: getDefaultModel(),
+    contents: prompt,
+  });
+  const text =
+    response?.text ||
+    response?.candidates?.[0]?.content?.parts?.[0]?.text ||
+    "";
+  if (!text.trim()) throw new Error("AI provider returned empty script");
+  return text;
+}, getActiveProviderName());
+
 // Proxy `/api/v1/*`, `/api/brokers/*`, `/healthz`, `/readyz`, `/users` requests to the Python FastAPI backend on port 8000
 app.all(["/api/v1/*", "/api/brokers/*", "/healthz", "/readyz", "/users"], async (req, res) => {
-  const targetUrl = `http://127.0.0.1:8000${req.originalUrl}`;
+  const upstreamOrigin = "http://127.0.0.1:8000";
+  const parsedIncomingUrl = new URL(req.originalUrl, "http://localhost");
+  const normalizedPath = parsedIncomingUrl.pathname.replace(/\/{2,}/g, "/").replace(/\/$/, "") || "/";
+  const isAllowedPath =
+    normalizedPath === "/healthz" ||
+    normalizedPath === "/readyz" ||
+    normalizedPath === "/users" ||
+    normalizedPath.startsWith("/api/v1/") ||
+    normalizedPath.startsWith("/api/brokers/");
+
+  if (!isAllowedPath) {
+    return res.status(400).json({ error: "Invalid proxy path." });
+  }
+
+  const targetUrl = new URL(`${normalizedPath}${parsedIncomingUrl.search}`, upstreamOrigin).toString();
   try {
     const headers: Record<string, string> = {};
     for (const [key, value] of Object.entries(req.headers)) {
@@ -2416,7 +2515,7 @@ async function startServer() {
     app.use(vite.middlewares);
 
     // SPA fallback for client-side routing during development
-    app.use(async (req, res, next) => {
+    app.use(htmlFallbackLimiter, async (req, res, next) => {
       if (
         req.method !== "GET" ||
         req.path.startsWith("/api/") ||
@@ -2441,7 +2540,7 @@ async function startServer() {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     // SPA fallback — only for non-API routes; API 404s get proper JSON
-    app.use((req, res, next) => {
+    app.use(htmlFallbackLimiter, (req, res, next) => {
       if (req.path.startsWith("/api/")) {
         return res.status(404).json({ error: "API endpoint not found", path: req.path });
       }

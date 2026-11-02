@@ -9,6 +9,7 @@ export default defineConfig(() => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
+        '@deriv/core': path.resolve(__dirname, 'packages/deriv-core/src'),
       },
     },
     server: {

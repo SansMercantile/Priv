@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Link2, Globe, Server, Radio, ShieldCheck, Play, ArrowRight, Activity, Brain, Cpu, Landmark, Cloud, Database, Layers, Zap, Sparkles, RefreshCw, CheckCircle2, Terminal } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import apiClient from "../api/apiClient";
+import { probeAdmin } from "../api/adminProbe";
+import ClientConnections from "./ClientConnections";
+import { TaxPortalRow, ExchangeRow } from "./ConnectionRows";
 
 interface ConnectionNode {
   id: string;
@@ -55,10 +59,11 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
         setTimeout(() => {
           setIsSyncing(false);
           setSyncStep("");
+          // Persist only non-sensitive flags — never anything derived
+          // from the API key itself (clear-text storage rule).
           const newAi = { 
             active: true, 
-            provider: aiProvider, 
-            keyLength: apiKey.length || 16 
+            provider: aiProvider
           };
           setConnectedAi(newAi);
           localStorage.setItem("priv_connected_ai", JSON.stringify(newAi));
@@ -122,41 +127,57 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
   const [activeGateway, setActiveGateway] = useState("Rest API Gate");
 
   // Institutional-tier gate — Cluster/Gateway/AI-sync infrastructure UI is
-  // reserved for the Sovereign node tier. Reads the same xm_node_tier key
-  // UserProfileEditor writes, polling to stay in sync without a reload.
-  const [nodeTier, setNodeTier] = useState<string>(() => {
-    return localStorage.getItem("xm_node_tier") || "obsidian";
-  });
+  // reserved for the Autonomous node tier. Tier comes from the real
+  // subscription (GET /subscriptions/me -> tier, derived server-side by
+  // tier_for_plan_name from the row the user actually paid for), never
+  // from localStorage -- any client-side value is user-editable via
+  // devtools and must never be trusted for a paywall decision. Polls on
+  // an interval so an in-session upgrade unlocks without a reload.
+  // Admin accounts (per backend ADMIN_EMAILS) always pass regardless of tier.
+  const [nodeTier, setNodeTier] = useState<string>("free");
   useEffect(() => {
-    const syncTier = () => setNodeTier(localStorage.getItem("xm_node_tier") || "obsidian");
-    const interval = setInterval(syncTier, 900);
-    return () => clearInterval(interval);
+    let cancelled = false;
+    const syncTier = async () => {
+      try {
+        const res: any = await apiClient.getMySubscription();
+        const body = res?.data ?? res;
+        const sub = body?.subscription ?? (body && typeof body === "object" ? body : null);
+        if (!cancelled) setNodeTier(sub?.tier || "free");
+      } catch (_) {
+        /* offline/unauthenticated: stay on last known tier (defaults free) */
+      }
+    };
+    syncTier();
+    const interval = setInterval(syncTier, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
-  const isInstitutional = nodeTier === "sovereign";
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    // probeAdmin retries once per call; the interval re-probes so an
+    // admin whose first probe lost a race (Auth0 blip, token refresh)
+    // sees the admin surfaces without a page reload.
+    const syncAdmin = async () => {
+      const admin = await probeAdmin();
+      if (!cancelled) setIsAdmin(admin);
+    };
+    syncAdmin();
+    const interval = setInterval(syncAdmin, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+  const isInstitutional = isAdmin || nodeTier === "autonomous";
 
+  // Ordinary users get the client view (AI Core + own-country eTax +
+  // real brokers + referrals). The full cluster/gateway/sandbox page
+  // below stays admin/autonomous-only.
   if (!isInstitutional) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[420px] space-y-5 text-center px-6">
-        <div className="p-4 rounded-full bg-teal-500/10 border border-teal-500/30">
-          <ShieldCheck className="w-10 h-10 text-teal-400" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-serif italic text-white">Cluster Node Interconnections</h1>
-          <p className="text-white/40 text-sm mt-2 max-w-md">
-            Direct infrastructure control — cluster topology, gateway routing, and
-            sovereign AI synchronization — is available on the Sovereign node tier.
-          </p>
-        </div>
-        <button
-          onClick={() => navigate("/dashboard/profile")}
-          className="flex items-center space-x-2 px-5 py-2.5 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/40 rounded text-teal-300 text-sm font-medium transition-colors"
-        >
-          <Sparkles className="w-4 h-4" />
-          <span>Upgrade to Sovereign</span>
-          <ArrowRight className="w-4 h-4" />
-        </button>
-      </div>
-    );
+    return <ClientConnections />;
   }
 
   return (
@@ -166,7 +187,7 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
         <div>
           <h1 className="text-3xl font-serif italic text-white flex items-center">
             <Radio className="w-8 h-8 mr-3 text-white/75 animate-pulse" />
-            Cluster Node Interconnections
+            Cluster Interconnections
           </h1>
           <p className="text-white/40 text-xs mt-1 font-light">Manage and monitor physical server topologies and encrypted API pathways</p>
         </div>
@@ -299,6 +320,7 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
                 <label className="block text-[10px] font-mono text-zinc-500 uppercase tracking-wider mb-1">Encrypted Client-Side API Key</label>
                 <input
                   type="password"
+                  autoComplete="off"
                   value={connectedAi ? "••••••••••••••••••••••••" : apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   placeholder="Enter secure API key locally..."
@@ -373,7 +395,8 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
               <div>
                 <label className="block text-[10px] font-mono text-zinc-500 uppercase tracking-wider mb-1">Authorization Bearer Header</label>
                 <input 
-                  type="password" 
+                  type="password"
+                  autoComplete="off"
                   value="sans_merchant_ecc_token_sh_256"
                   className="w-full bg-neutral-900 border border-white/10 rounded p-2.5 text-xs text-white placeholder-zinc-650 focus:outline-none focus:border-white/30 font-mono"
                   readOnly
@@ -430,100 +453,9 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
                 { id: "hmrc", name: "HMRC Gateway Portal (UK)", location: "United Kingdom", desc: "SANS SADC tax-haven capital gains shield link" },
                 { id: "irs", name: "IRS e-File Direct Node (US)", location: "United States", desc: "Automated IRS tax relief forms optimization & reporting" },
                 { id: "sars", name: "SARS Revenue Gateway (ZA)", location: "South Africa", desc: "Corporate capital clearance certificates & transfer e-filing" },
-              ].map((tax) => {
-                const [username, setUsername] = useState("");
-                const [password, setPassword] = useState("");
-                const [isConnected, setIsConnected] = useState(() => {
-                  return localStorage.getItem(`tax_conn_${tax.id}`) === "true";
-                });
-                const [isPending, setIsPending] = useState(false);
-                const [step, setStep] = useState("");
-
-                const handleConnect = (e: React.FormEvent) => {
-                  e.preventDefault();
-                  if (!username || !password) return;
-                  setIsPending(true);
-                  setStep("Initiating secure SSL handshake to tax authority...");
-                  
-                  setTimeout(() => {
-                    setStep("Bypassing 2FA firewall protocols...");
-                    
-                    setTimeout(() => {
-                      setStep("Synchronizing structural corporate guidelines...");
-                      
-                      setTimeout(() => {
-                        setIsPending(false);
-                        setStep("");
-                        setIsConnected(true);
-                        localStorage.setItem(`tax_conn_${tax.id}`, "true");
-                      }, 1000);
-                    }, 800);
-                  }, 800);
-                };
-
-                const handleDisconnect = () => {
-                  setIsConnected(false);
-                  localStorage.removeItem(`tax_conn_${tax.id}`);
-                  setUsername("");
-                  setPassword("");
-                };
-
-                return (
-                  <div key={tax.id} className="p-4 border border-white/5 rounded bg-black/40 space-y-3.5 transition hover:border-white/10 text-xs">
-                    <div className="flex items-center justify-between animate-fadeIn">
-                      <div>
-                        <h4 className="text-xs font-mono font-bold text-white">{tax.name}</h4>
-                        <span className="text-[10px] text-zinc-500 leading-none block mt-0.5">{tax.location} &bull; {tax.desc}</span>
-                      </div>
-                      <span className={`text-[9px] font-mono uppercase px-2 py-0.5 rounded border ${
-                        isConnected 
-                          ? "bg-emerald-500/5 text-emerald-400 border-emerald-500/20" 
-                          : "bg-neutral-900 text-stone-500 border-white/5"
-                      }`}>
-                        {isConnected ? "CONNECTED (Live Feed)" : "NOT CONNECTED"}
-                      </span>
-                    </div>
-
-                    {isConnected ? (
-                      <div className="flex items-center justify-between bg-emerald-500/5 border border-emerald-500/10 p-2 rounded text-[10px] font-mono text-emerald-400">
-                        <span>● Authorized asset synchronization & tax filing pathways secure.</span>
-                        <button onClick={handleDisconnect} className="text-stone-400 hover:text-white underline text-[9.5px] cursor-pointer">
-                          DISCONNECT
-                        </button>
-                      </div>
-                    ) : isPending ? (
-                      <div className="p-3 border border-orange-500/20 bg-orange-500/5 text-orange-400 text-[10px] font-mono rounded animate-pulse">
-                        ⌛ {step}
-                      </div>
-                    ) : (
-                      <form onSubmit={handleConnect} className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 font-mono">
-                        <input 
-                          type="text" 
-                          placeholder="Portal ID / User"
-                          value={username}
-                          onChange={(e) => setUsername(e.target.value)}
-                          className="bg-neutral-955 border border-white/10 rounded p-1.5 text-[10px] text-white focus:outline-none focus:border-white/30"
-                          required
-                        />
-                        <input 
-                          type="password" 
-                          placeholder="Secret Passkey"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="bg-neutral-955 border border-white/10 rounded p-1.5 text-[10px] text-white focus:outline-none focus:border-white/30"
-                          required
-                        />
-                        <button 
-                          type="submit"
-                          className="bg-white hover:bg-neutral-200 text-neutral-950 font-bold text-[10px] py-1.5 px-3 rounded text-center transition cursor-pointer"
-                        >
-                          SIGN INTO PLATFORM
-                        </button>
-                      </form>
-                    )}
-                  </div>
-                );
-              })}
+              ].map((tax) => (
+                <TaxPortalRow key={tax.id} tax={tax} />
+              ))}
             </div>
           </div>
 
@@ -542,105 +474,9 @@ export default function Connections({ demoMode }: { demoMode?: boolean }) {
               {[
                 { id: "binance", name: "Binance Global (Ex-Lots)", desc: "Autonomous Spot, Futures, & Hedged Derivative Index Link", defaultBal: "$842,019.45" },
                 { id: "coinbase", name: "Coinbase Advanced Trade Network", desc: "Institutional Custody Vault & Leveraged Liquidity Inlet", defaultBal: "$610,064.77" },
-              ].map((ex) => {
-                const [apiKey, setApiKey] = useState("");
-                const [apiSecret, setApiSecret] = useState("");
-                const [isConnected, setIsConnected] = useState(() => {
-                  return localStorage.getItem(`ex_conn_${ex.id}`) === "true";
-                });
-                const [isPending, setIsPending] = useState(false);
-                const [step, setStep] = useState("");
-
-                const handleConnect = (e: React.FormEvent) => {
-                  e.preventDefault();
-                  if (!apiKey || !apiSecret) return;
-                  setIsPending(true);
-                  setStep("Handshaking Secure Websocket endpoint...");
-                  
-                  setTimeout(() => {
-                    setStep("Retrieving verified API keys rights (Spot, Leverage active)...");
-                    
-                    setTimeout(() => {
-                      setStep("Linking trading lots to PRIV automated pipeline...");
-                      
-                      setTimeout(() => {
-                        setIsPending(false);
-                        setStep("");
-                        setIsConnected(true);
-                        localStorage.setItem(`ex_conn_${ex.id}`, "true");
-                        // Automatically navigate to Profile focusing KYC steps
-                        navigate("/dashboard/profile?triggerKYC=true");
-                      }, 1000);
-                    }, 800);
-                  }, 800);
-                };
-
-                const handleDisconnect = () => {
-                  setIsConnected(false);
-                  localStorage.removeItem(`ex_conn_${ex.id}`);
-                  setApiKey("");
-                  setApiSecret("");
-                };
-
-                return (
-                  <div key={ex.id} className="p-4 border border-white/5 rounded bg-black/40 space-y-3.5 transition hover:border-white/10 text-xs">
-                    <div className="flex items-center justify-between animate-fadeIn">
-                      <div>
-                        <h4 className="text-xs font-mono font-bold text-white mb-0.5">{ex.name}</h4>
-                        <span className="text-[10px] text-zinc-550 leading-none block">{ex.desc}</span>
-                      </div>
-                      <span className={`text-[9px] font-mono uppercase px-2 py-0.5 rounded border ${
-                        isConnected 
-                          ? "bg-sky-500/5 text-sky-400 border-sky-500/20" 
-                          : "bg-neutral-900 text-stone-500 border-white/5"
-                      }`}>
-                        {isConnected ? `ACTIVE SYNC` : "NOT CONNECTED"}
-                      </span>
-                    </div>
-
-                    {isConnected ? (
-                      <div className="flex items-center justify-between bg-sky-500/5 border border-sky-500/10 p-2.5 rounded text-[10px] font-mono text-sky-400">
-                        <span className="flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 bg-sky-400 rounded-full animate-ping" />
-                          Connected &bull; Active Reserves: <strong className="text-white">{ex.defaultBal}</strong> ready for auto-arbitrage.
-                        </span>
-                        <button onClick={handleDisconnect} className="text-stone-300 hover:text-white underline text-[9.5px] cursor-pointer">
-                          DISCONNECT
-                        </button>
-                      </div>
-                    ) : isPending ? (
-                      <div className="p-3 border border-sky-500/20 bg-sky-500/5 text-sky-400 text-[10px] font-mono rounded animate-pulse">
-                        ⚡ {step}
-                      </div>
-                    ) : (
-                      <form onSubmit={handleConnect} className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 font-mono">
-                        <input 
-                          type="text" 
-                          placeholder="API Access Key"
-                          value={apiKey}
-                          onChange={(e) => setApiKey(e.target.value)}
-                          className="bg-neutral-955 border border-white/10 rounded p-1.5 text-[10px] text-white focus:outline-none focus:border-white/30"
-                          required
-                        />
-                        <input 
-                          type="password" 
-                          placeholder="API Secret Token"
-                          value={apiSecret}
-                          onChange={(e) => setApiSecret(e.target.value)}
-                          className="bg-neutral-955 border border-white/10 rounded p-1.5 text-[10px] text-white focus:outline-none focus:border-white/30"
-                          required
-                        />
-                        <button 
-                          type="submit"
-                          className="bg-sky-450 hover:bg-sky-500 text-black font-bold text-[10px] py-1.5 px-3 rounded text-center transition cursor-pointer"
-                        >
-                          SYNC WITH BINANCE
-                        </button>
-                      </form>
-                    )}
-                  </div>
-                );
-              })}
+              ].map((ex) => (
+                <ExchangeRow key={ex.id} ex={ex} />
+              ))}
             </div>
           </div>
         </div>
@@ -1079,6 +915,7 @@ ORDER BY trade_date DESC LIMIT 5;`);
                 <label className="text-[9.5px] uppercase font-mono text-zinc-500 block">Sovereign Connection URI</label>
                 <input
                   type="password"
+                  autoComplete="off"
                   value={mongoUri}
                   onChange={(e) => setMongoUri(e.target.value)}
                   className="w-full bg-black border border-white/10 rounded px-2 py-1 flex items-center font-mono text-[9.5px] text-zinc-400 focus:outline-none"

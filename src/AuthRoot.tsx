@@ -5,12 +5,19 @@ import App from "./App.tsx";
 
 const domain = (import.meta as any).env?.VITE_AUTH0_DOMAIN;
 const clientId = (import.meta as any).env?.VITE_AUTH0_CLIENT_ID;
+// Without an audience, Auth0 issues an opaque access token meant only for
+// the userinfo endpoint -- not a JWT, and not something the backend can
+// verify. The backend (backend/config/settings.py AUTH0_AUDIENCE) expects
+// this to match; both must point at the same registered Auth0 API.
+const audience = (import.meta as any).env?.VITE_AUTH0_AUDIENCE;
 
 const onRedirectCallback = (appState?: AppState) => {
+  // Land authenticated users in the app (where LoginGate's first-run
+  // onboarding pops for new accounts), never strand them on /callback.
   window.history.replaceState(
     {},
     document.title,
-    appState?.returnTo || window.location.pathname
+    appState?.returnTo || "/dashboard"
   );
 };
 
@@ -36,6 +43,7 @@ export default function AuthRoot() {
       clientId={clientId}
       authorizationParams={{
         redirect_uri: window.location.origin + "/callback",
+        ...(audience ? { audience } : {}),
       }}
       onRedirectCallback={onRedirectCallback}
       cacheLocation="localstorage"

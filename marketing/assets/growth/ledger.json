@@ -1,0 +1,406 @@
+{
+  "meta": [],
+  "updated": 1791452528,
+  "variants": {
+    "carousel-mechanism-nobody-taught-you-this-in-demo-entr-a79c62": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "mechanism",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "carousel",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "Nobody taught you this in demo.",
+        "id": "carousel-mechanism-nobody-taught-you-this-in-demo-entr-a79c62",
+        "predicted": 84
+      }
+    },
+    "carousel-mechanism-prove-it-before-you-risk-it-entry-t-52ec15": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "mechanism",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "carousel",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "Prove it before you risk it.",
+        "id": "carousel-mechanism-prove-it-before-you-risk-it-entry-t-52ec15",
+        "predicted": 76
+      }
+    },
+    "carousel-objection-nobody-taught-you-this-in-demo-entr-643731": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "objection",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "carousel",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "Nobody taught you this in demo.",
+        "id": "carousel-objection-nobody-taught-you-this-in-demo-entr-643731",
+        "predicted": 84
+      }
+    },
+    "carousel-objection-prove-it-before-you-risk-it-entry-t-6cc6ba": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "objection",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "carousel",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "Prove it before you risk it.",
+        "id": "carousel-objection-prove-it-before-you-risk-it-entry-t-6cc6ba",
+        "predicted": 76
+      }
+    },
+    "carousel-problem-nobody-taught-you-this-in-demo-entry-f020d1": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "problem",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "carousel",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "Nobody taught you this in demo.",
+        "id": "carousel-problem-nobody-taught-you-this-in-demo-entry-f020d1",
+        "predicted": 84
+      }
+    },
+    "carousel-problem-prove-it-before-you-risk-it-entry-two-43d6cb": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "problem",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "carousel",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "Prove it before you risk it.",
+        "id": "carousel-problem-prove-it-before-you-risk-it-entry-two-43d6cb",
+        "predicted": 76
+      }
+    },
+    "static-mechanism-nobody-taught-you-this-in-demo-entry-e3762a": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "mechanism",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "static",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "Nobody taught you this in demo.",
+        "id": "static-mechanism-nobody-taught-you-this-in-demo-entry-e3762a",
+        "predicted": 81
+      }
+    },
+    "static-mechanism-prove-it-before-you-risk-it-entry-two-40492a": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "mechanism",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "static",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "Prove it before you risk it.",
+        "id": "static-mechanism-prove-it-before-you-risk-it-entry-two-40492a",
+        "predicted": 73
+      }
+    },
+    "static-mechanism-the-alert-lands-before-you-ope-entry-62a313": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "mechanism",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "static",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "The alert lands before you open the chart.",
+        "id": "static-mechanism-the-alert-lands-before-you-ope-entry-62a313",
+        "predicted": 73
+      }
+    },
+    "static-objection-nobody-taught-you-this-in-demo-entry-f476ac": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "objection",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "static",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "Nobody taught you this in demo.",
+        "id": "static-objection-nobody-taught-you-this-in-demo-entry-f476ac",
+        "predicted": 81
+      }
+    },
+    "static-objection-prove-it-before-you-risk-it-entry-two-c7d0a3": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "objection",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "static",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "Prove it before you risk it.",
+        "id": "static-objection-prove-it-before-you-risk-it-entry-two-c7d0a3",
+        "predicted": 73
+      }
+    },
+    "static-problem-nobody-taught-you-this-in-demo-entry-tw-d2f26f": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "problem",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "static",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "Nobody taught you this in demo.",
+        "id": "static-problem-nobody-taught-you-this-in-demo-entry-tw-d2f26f",
+        "predicted": 81
+      }
+    },
+    "static-problem-prove-it-before-you-risk-it-entry-two-t-b5b1ad": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "problem",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "static",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "Prove it before you risk it.",
+        "id": "static-problem-prove-it-before-you-risk-it-entry-two-t-b5b1ad",
+        "predicted": 73
+      }
+    },
+    "static-problem-the-alert-lands-before-you-ope-entry-tw-83b675": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "problem",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "static",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "The alert lands before you open the chart.",
+        "id": "static-problem-the-alert-lands-before-you-ope-entry-tw-83b675",
+        "predicted": 73
+      }
+    },
+    "video-mechanism-nobody-taught-you-this-in-demo-entry-t-0e33a1": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "mechanism",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "video",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "Nobody taught you this in demo.",
+        "id": "video-mechanism-nobody-taught-you-this-in-demo-entry-t-0e33a1",
+        "predicted": 87
+      }
+    },
+    "video-mechanism-prove-it-before-you-risk-it-entry-two-5e7cad": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "mechanism",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "video",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "Prove it before you risk it.",
+        "id": "video-mechanism-prove-it-before-you-risk-it-entry-two-5e7cad",
+        "predicted": 79
+      }
+    },
+    "video-objection-nobody-taught-you-this-in-demo-entry-t-313fd5": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "objection",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "video",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "Nobody taught you this in demo.",
+        "id": "video-objection-nobody-taught-you-this-in-demo-entry-t-313fd5",
+        "predicted": 87
+      }
+    },
+    "video-objection-prove-it-before-you-risk-it-entry-two-1355e9": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "objection",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "video",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "Prove it before you risk it.",
+        "id": "video-objection-prove-it-before-you-risk-it-entry-two-1355e9",
+        "predicted": 79
+      }
+    },
+    "video-problem-nobody-taught-you-this-in-demo-entry-two-af8a84": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "problem",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "video",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "Nobody taught you this in demo.",
+        "id": "video-problem-nobody-taught-you-this-in-demo-entry-two-af8a84",
+        "predicted": 87
+      }
+    },
+    "video-problem-prove-it-before-you-risk-it-entry-two-ta-64856d": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1791449779,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "problem",
+        "body": "Every setup ships complete: entry, TP1, TP2 and a stop that trails to breakeven.",
+        "cta": "Start free \u2014 no card required",
+        "format": "video",
+        "headline": "Entry. Two targets. One stop.",
+        "hook": "Prove it before you risk it.",
+        "id": "video-problem-prove-it-before-you-risk-it-entry-two-ta-64856d",
+        "predicted": 79
+      }
+    }
+  }
+}

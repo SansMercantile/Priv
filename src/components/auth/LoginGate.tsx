@@ -1,154 +1,410 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
+import { getAppUserId } from "../../lib/appUserId";
+import { setAuthTokenGetter, setIdTokenGetter, getAuthToken } from "../../lib/authToken";
 import {
-  initiateDerivLogin,
   isDerivCallback,
-  handleDerivCallback,
-  fetchDerivAccounts,
-  getAuthInfo as getDerivAuthInfo,
-  getDerivAccounts,
+  derivReturnEmpty,
+  clearDerivPending,
+  markDerivDone,
+  consumeValidatedCallback,
   DerivOAuthError,
-} from "../../lib/derivAuth";
+} from "../../lib/derivAuth/oauth";
+import DerivConnectCard, { stashDerivConnectResult } from "../DerivConnectCard";
+import apiClient from "../../api/apiClient";
 
 interface LoginGateProps {
   children: React.ReactNode;
 }
 
-/** True if we have a real, non-expired Deriv session already (from a
- * previous visit). This is the source of truth for "logged in via Deriv" -
- * no separate flag needed, getAuthInfo() already checks expiry. */
-function hasDerivSession(): boolean {
-  return !!getDerivAuthInfo();
+// NOTE (AWS migration): backend calls go same-origin (/api/* proxy);
+// the retired Azure VITE_API_BASE_URL host is no longer referenced.
+
+/**
+ * Auth0 is the one login. Deriv is a BROKER connection made inside the
+ * app (profile brokers tab, dashboard locked screen, first-run onboarding)
+ * via the client-side PKCE flow (src/lib/derivAuth, auth.deriv.com), with
+ * tokens handed to the backend for real execution. Deriv never logs anyone
+ * into Priv itself.
+ *
+ * 2026-10-05: the blocking sign-in card (LoginScreen) was removed
+ * entirely -- the app opens for everyone, signed-in or not. The backend
+ * enforces verified identity per endpoint (401 "Sign in required" on
+ * account-scoped routes); anonymous browsing uses the device X-User-Id
+ * flow. Sign-in stays available from the landing page and the
+ * session-expired banner below.
+ */
+async function checkDerivConnected(): Promise<boolean> {
+  try {
+    const { data } = await apiClient.getBrokerConnections();
+    const connections = data?.data?.connections ?? data?.connections ?? [];
+    return connections.some((c: { broker: string }) => c.broker === "deriv");
+  } catch {
+    return false;
+  }
 }
 
-function useDerivCallbackHandler(onDone: (result: { success: boolean; message?: string }) => void) {
-  const [processing, setProcessing] = useState(isDerivCallback());
+/** Detects the backend's generic OAuth redirect (?broker=...&status=...),
+ * used by Deriv and Alpaca alike (see oauth_api.py _redirect_frontend).
+ * Cleans the URL afterward regardless of outcome. */
+function useBrokerOAuthCallbackHandler(onDone: (result: { broker: string; success: boolean; message?: string }) => void) {
+  const [processing, setProcessing] = useState(() => new URLSearchParams(window.location.search).has("broker"));
 
   useEffect(() => {
-    if (!isDerivCallback()) return;
-    (async () => {
-      try {
-        const authInfo = await handleDerivCallback();
-        await fetchDerivAccounts(authInfo);
-        onDone({ success: true });
-      } catch (err) {
-        const message = err instanceof DerivOAuthError ? err.message : "unknown_error";
-        onDone({ success: false, message });
-      } finally {
-        setProcessing(false);
-      }
-    })();
+    const params = new URLSearchParams(window.location.search);
+    const broker = params.get("broker");
+    if (!broker) return;
+
+    const status = params.get("status");
+    const message = params.get("message") || undefined;
+
+    const url = new URL(window.location.href);
+    ["broker", "status", "message"].forEach((p) => url.searchParams.delete(p));
+    window.history.replaceState(window.history.state, "", url.pathname + url.search);
+
+    onDone({ broker, success: status === "success", message });
+    setProcessing(false);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return processing;
 }
 
-function LoginScreen({ derivError }: { derivError?: string | null }) {
-  const { loginWithRedirect, isLoading } = useAuth0();
-  const [derivLoading, setDerivLoading] = useState(false);
-
-  const handleLogin = (connection?: string) => {
-    loginWithRedirect({
-      authorizationParams: connection ? { connection } : undefined,
-      appState: { returnTo: window.location.pathname },
-    });
-  };
-
-  const handleDerivLogin = async () => {
-    setDerivLoading(true);
-    await initiateDerivLogin();
-  };
-
-  return (
-    <div className="min-h-screen bg-black neural-grid matrix-bg flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-black/60 border border-white/10 rounded-2xl p-8 backdrop-blur-md shadow-2xl">
-        <h1 className="text-2xl font-semibold text-white mb-1 tracking-tight">
-          Sans Mercantile™
-        </h1>
-        <p className="text-sm text-white/50 mb-6">PRIV Core — sign in to continue</p>
-
-        {derivError && (
-          <div className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
-            Deriv connection failed ({derivError}). Please try again.
-          </div>
-        )}
-
-        <div className="space-y-3">
-          <button
-            onClick={handleDerivLogin}
-            disabled={derivLoading}
-            className="w-full flex items-center justify-center gap-3 rounded-lg bg-rose-600 text-white font-medium py-2.5 px-4 hover:bg-rose-500 transition disabled:opacity-50"
-          >
-            {derivLoading ? "Redirecting to Deriv…" : "Continue with Deriv"}
-          </button>
-
-          <div className="flex items-center gap-3 py-1">
-            <div className="h-px flex-1 bg-white/10" />
-            <span className="text-xs text-white/30">or</span>
-            <div className="h-px flex-1 bg-white/10" />
-          </div>
-
-          <button
-            onClick={() => handleLogin("google-oauth2")}
-            disabled={isLoading}
-            className="w-full flex items-center justify-center gap-3 rounded-lg bg-white text-black font-medium py-2.5 px-4 hover:bg-white/90 transition disabled:opacity-50"
-          >
-            Continue with Google
-          </button>
-
-          <button
-            disabled
-            title="Microsoft sign-in needs a real Azure AD app registration (Auth0's dev keys don't cover this provider)"
-            className="w-full flex items-center justify-center gap-3 rounded-lg bg-[#2f2f2f]/40 text-white/40 font-medium py-2.5 px-4 cursor-not-allowed"
-          >
-            Continue with Microsoft (coming soon)
-          </button>
-
-          <button
-            onClick={() => handleLogin("apple")}
-            disabled={isLoading}
-            className="w-full flex items-center justify-center gap-3 rounded-lg bg-white text-black font-medium py-2.5 px-4 hover:bg-white/90 transition disabled:opacity-50"
-          >
-            Continue with Apple
-          </button>
-
-          <div className="flex items-center gap-3 py-2">
-            <div className="h-px flex-1 bg-white/10" />
-            <span className="text-xs text-white/30">or</span>
-            <div className="h-px flex-1 bg-white/10" />
-          </div>
-
-          <button
-            onClick={() => handleLogin()}
-            disabled={isLoading}
-            className="w-full rounded-lg border border-white/15 text-white font-medium py-2.5 px-4 hover:bg-white/5 transition disabled:opacity-50"
-          >
-            Continue with email
-          </button>
-        </div>
-
-        <p className="text-xs text-white/30 mt-8 text-center">
-          By continuing you agree to Sans Mercantile's Terms of Service and Privacy Policy.
-        </p>
-      </div>
-    </div>
-  );
-}
-
 export default function LoginGate({ children }: LoginGateProps) {
-  const { isAuthenticated, isLoading, error } = useAuth0();
-  const [derivConnected, setDerivConnected] = useState(hasDerivSession());
-  const [derivError, setDerivError] = useState<string | null>(null);
+  const { isAuthenticated, isLoading, error, user, getAccessTokenSilently, getIdTokenClaims, loginWithRedirect } = useAuth0();
+  const [derivConnected, setDerivConnected] = useState(false);
+  const [derivChecked, setDerivChecked] = useState(false);
+  // True once the user chooses "continue anyway" on an Auth0 error screen
+  // (declared up here with the other hooks so the early-return below can
+  // safely consult it).
+  const [dismissedAuthError, setDismissedAuthError] = useState(false);
+  const linkedAnonymousRef = useRef(false);
 
-  const derivProcessing = useDerivCallbackHandler(({ success, message }) => {
+  // Registers the real token getter for apiClient.ts (a plain module that
+  // can't call useAuth0() itself) as soon as it's available, and clears it
+  // on logout so requests fall back to the anonymous flow rather than
+  // sending a stale/invalid token.
+  // Per-person browser cache: all xm_* profile/KYC keys are device-global
+  // in localStorage, so on a shared device a second person would otherwise
+  // inherit the first person's profile, email, avatar, and KYC status.
+  // On every identity change we wipe person-scoped keys, then prefill the
+  // profile shell from the Auth0 social profile (name, email, picture)
+  // instead of placeholders or anyone else's data.
+  const identityKey = user?.sub || null;
+  const lastIdentityRef = useRef<string | null>(null);
+  // True when Auth0 thinks we're signed in but can't produce a usable
+  // access token (silent renewal blocked/expired). Every Bearer call then
+  // 401s -- surfacing "sign in again" beats silent failures everywhere.
+  const [sessionExpired, setSessionExpired] = useState(false);
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setAuthTokenGetter(null);
+      setIdTokenGetter(null);
+      lastIdentityRef.current = null;
+      setSessionExpired(false);
+      return;
+    }
+    setAuthTokenGetter(() => getAccessTokenSilently());
+    // id_token for backend email resolution (admin gating): Auth0's
+    // /userinfo rejects the custom-audience access token above, but the
+    // id_token (aud = client_id) carries verified email claims the backend
+    // verifies locally against the tenant JWKS.
+    setIdTokenGetter(async () => {
+      const claims = await getIdTokenClaims();
+      return (claims as { __raw?: string } | undefined)?.__raw ?? null;
+    });
+    // The connections hook may already have fetched before this getter
+    // existed (anonymous uuid -> []). Tell every useBrokerConnections
+    // instance to re-fetch now that Bearer tokens are available.
+    try {
+      window.dispatchEvent(new Event("priv:auth-ready"));
+    } catch {
+      /* non-DOM environment */
+    }
+    // Probe token health once per identity: a throw here means the
+    // session is a cached shell with no working token.
+    getAccessTokenSilently()
+      .then(() => setSessionExpired(false))
+      .catch(() => setSessionExpired(true));
+    if (lastIdentityRef.current !== identityKey) {
+      lastIdentityRef.current = identityKey;
+      try {
+        const personKeys = [
+          "xm_user_profile", "xm_account_email", "xm_user_avatar",
+          "xm_kyc_status", "xm_kyc_ref", "xm_kyc_submitted_at",
+          "xm_user_risk_appetite", "xm_profile_leverage", "xm_risk_pct",
+          "xm_node_tier_display", "xm_preferred_strategies",
+          "priv_connected_ai", "priv-onboarded-deriv",
+        ];
+        for (const k of personKeys) localStorage.removeItem(k);
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const k = localStorage.key(i) || "";
+          if (k.startsWith("priv-onboarded-deriv:") || k.startsWith("priv-celebrated:")) {
+            localStorage.removeItem(k);
+          }
+        }
+      } catch (_) {
+        /* ignore */
+      }
+      // Prefill from the social profile (given/family name, email, picture)
+      // only into an empty shell -- never overwrite existing entries.
+      // Email-shaped values are NEVER names: some Google profiles carry
+      // the account email in name fields, which used to land in
+      // First/Last Legal Name on the profile.
+      try {
+        const raw = localStorage.getItem("xm_user_profile");
+        const profile = raw ? JSON.parse(raw) : {};
+        const given = (user?.given_name || "").trim();
+        const family = (user?.family_name || "").trim();
+        const full = (user?.name || "").trim();
+        const email = (user?.email || "").trim();
+        const picture = (user?.picture || "").trim();
+        const isName = (v: string) => !!v && !v.includes("@");
+        let changed = false;
+        const put = (k: string, v: string) => {
+          if (v && !profile[k]) {
+            profile[k] = v;
+            changed = true;
+          }
+        };
+        put("firstName", isName(given) ? given : "");
+        put("lastName", isName(family) ? family : "");
+        if (!profile.firstName && !profile.lastName && isName(full)) {
+          const parts = full.split(/\s+/);
+          profile.firstName = parts[0];
+          if (parts.length > 1) profile.lastName = parts.slice(1).join(" ");
+          changed = true;
+        }
+        put("email", email);
+        if (email) localStorage.setItem("xm_account_email", email);
+        if (picture && !localStorage.getItem("xm_user_avatar")) {
+          localStorage.setItem("xm_user_avatar", picture);
+        }
+        if (changed || !raw) localStorage.setItem("xm_user_profile", JSON.stringify(profile));
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    // One-time per session: bind a landing-page referral (?ref=CODE
+    // captured into priv_referral_code) and ensure the free subscription
+    // every account holds from signup. Idempotent server-side. Skipped
+    // when no usable token exists (would just 401): the session-expired
+    // banner above handles re-login, and the next successful login
+    // retries. Anonymous-connection claims are retired by the backend
+    // (POST /link-anonymous answers 410 by design -- source ownership
+    // can't be proven), so we no longer call it; users reconnect Deriv
+    // after signing in instead.
+    if (!linkedAnonymousRef.current) {
+      linkedAnonymousRef.current = true;
+      getAuthToken().then((tok) => {
+        if (!tok) {
+          linkedAnonymousRef.current = false;
+          return;
+        }
+        // Referral bind: first login wins server-side; the stored code
+        // is cleared once the backend accepts or definitively rejects
+        // it (unknown code = cleared too, it will never become valid).
+        try {
+          const ref = (localStorage.getItem("priv_referral_code") || "").trim();
+          if (ref) {
+            apiClient.bindReferral(ref).then(
+              () => {
+                try {
+                  localStorage.removeItem("priv_referral_code");
+                } catch {
+                  /* ignore */
+                }
+              },
+              () => {
+                /* retry next login; backend bind is idempotent */
+              }
+            );
+          }
+        } catch {
+          /* ignore */
+        }
+      });
+      // Persist name/email server-side so the admin CRM shows real names
+      // (previously only ever stored in this browser's localStorage).
+      // Server reads the authoritative profile from Auth0 /userinfo; the body
+      // is a fallback. Idempotent.
+      apiClient
+        .post("/api/v1/identity/sync", {
+          name: user?.name ?? null,
+          given_name: user?.given_name ?? null,
+          family_name: user?.family_name ?? null,
+          picture: user?.picture ?? null,
+        })
+        .catch(() => {
+          /* non-fatal: retried on next login */
+        });
+      apiClient.post("/api/v1/payment/subscriptions/ensure-free", {}).catch(() => {
+        /* non-fatal: billing page retries on view */
+      });
+    }
+  }, [isAuthenticated, getAccessTokenSilently, identityKey]);
+
+  const callbackProcessing = useBrokerOAuthCallbackHandler(({ broker, success, message }) => {
+    if (broker !== "deriv") return;
     if (success) {
       setDerivConnected(true);
     } else {
-      setDerivError(message || "connection_failed");
+      // DerivConnectCard reads + clears this to surface the failure.
+      try {
+        sessionStorage.setItem("priv_deriv_error", message || "connection_failed");
+      } catch (_) {
+        /* ignore */
+      }
     }
   });
 
-  if (isLoading || derivProcessing) {
+  useEffect(() => {
+    if (callbackProcessing) return; // avoid a redundant check right before the callback sets it directly
+    checkDerivConnected().then((connected) => {
+      setDerivConnected(connected);
+      setDerivChecked(true);
+    });
+    // A linked account can appear after this snapshot (claim finishes,
+    // token connect, refresh self-heal). DerivConnectCard broadcasts
+    // priv:deriv-linked when its list goes non-empty -- close the
+    // onboarding modal live instead of waiting for a reload.
+    const onLinked = () => {
+      setDerivConnected(true);
+      setDerivChecked(true);
+    };
+    window.addEventListener("priv:deriv-linked", onLinked);
+    return () => window.removeEventListener("priv:deriv-linked", onLinked);
+  }, [callbackProcessing]);
+
+  // PKCE return leg: Deriv redirected back with ?code&state. Exchange the
+  // code (proves the user consented at Deriv), hand the access token to the
+  // backend so execution/adapters are real, then reload into the app.
+  useEffect(() => {
+    if (window.location.pathname !== "/") return;
+    if (!isDerivCallback()) {
+      // A previous Connect attempt never produced a Deriv callback (user
+      // abandoned the Deriv tab, or Deriv bounced to marketing instead of
+      // authorizing). Say so plainly instead of silent nothing.
+      if (derivReturnEmpty()) {
+        const msg =
+          "Returned from Deriv without credentials — the Deriv tab was closed, or Deriv did not authorize this app. Try Connect again, or use the API-token option.";
+        setDerivChecked(true);
+        try {
+          sessionStorage.setItem("priv_deriv_error", msg);
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      return;
+    }
+    let cancelled = false;
+    // Genuine Deriv return: the pending flag has served its purpose.
+    clearDerivPending();
+    // Fire-and-forget stage telemetry so a stuck return leg is diagnosable
+    // server-side (stage only, no user data). Never throws.
+    const ping = (stage: string, detail?: string) => {
+      try {
+        const body = JSON.stringify({ stage, detail, user_id: getAppUserId() });
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(
+            "/api/v1/auth/deriv/callback-ping",
+            new Blob([body], { type: "application/json" })
+          );
+        } else {
+          fetch("/api/v1/auth/deriv/callback-ping", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body,
+            keepalive: true,
+          }).catch(() => {});
+        }
+      } catch (_) {
+        /* telemetry must never break the flow */
+      }
+    };
+    (async () => {
+      try {
+        ping("started");
+        // Validate ?code&state + CSRF locally, then let the BACKEND
+        // exchange the code (Deriv's token endpoint has no CORS
+        // allow-list for our origin -- a browser-side POST dies with a
+        // network error after the user already consented).
+        const { code, codeVerifier } = consumeValidatedCallback();
+        const res: any = await apiClient.post(
+          "/api/v1/auth/deriv/connect-code",
+          {
+            code,
+            code_verifier: codeVerifier,
+            user_id: getAppUserId(),
+          }
+        );
+        if (cancelled) return;
+        // Stash every account Deriv reported so the connect card can show
+        // a "found N accounts" notice after the reload below.
+        stashDerivConnectResult(res?.data?.data ?? res?.data ?? {});
+        ping("posted");
+        markDerivDone();
+        window.location.reload();
+      } catch (e: any) {
+        if (cancelled) return;
+        const msg = e instanceof DerivOAuthError
+          ? e.message
+          : (e?.message || "deriv_callback_failed");
+        ping("failed", msg);
+        setDerivChecked(true);
+        try {
+          // DerivConnectCard reads and clears this to show the failure
+          // inline.
+          sessionStorage.setItem("priv_deriv_error", msg);
+        } catch (_) {
+          /* ignore */
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // First-run onboarding: right after Auth0 sign-in, if this identity
+  // has never linked Deriv (and hasn't dismissed this), pop the connect
+  // card first -- demo mode runs on their real Deriv demo once linked.
+  const onboardKey =
+    `priv-onboarded-deriv:${user?.sub || getAppUserId()}`;
+  const [onboarding, setOnboarding] = useState(() => {
+    try {
+      return !localStorage.getItem(onboardKey);
+    } catch (_) {
+      return false;
+    }
+  });
+  const dismissOnboarding = () => {
+    try {
+      localStorage.setItem(onboardKey, new Date().toISOString());
+    } catch (_) {
+      /* ignore */
+    }
+    setOnboarding(false);
+  };
+  const showOnboardingBase =
+    onboarding && isAuthenticated && derivChecked && !derivConnected;
+
+  // Once accounts are confirmed connected, keep the modal up a few
+  // seconds as a visible confirmation (the card flips to "Linked"),
+  // then dismiss it for good -- the sidebar toggle takes over
+  // demo/live switching from there.
+  const [confirming, setConfirming] = useState(false);
+  useEffect(() => {
+    if (!(onboarding && isAuthenticated && derivChecked && derivConnected && !confirming)) return;
+    setConfirming(true);
+    const t = window.setTimeout(() => {
+      dismissOnboarding();
+    }, 4000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onboarding, isAuthenticated, derivChecked, derivConnected]);
+  const showOnboarding = showOnboardingBase || (confirming && onboarding && isAuthenticated);
+
+  if (isLoading || callbackProcessing) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-white/40 text-sm font-mono">Loading…</div>
@@ -156,19 +412,78 @@ export default function LoginGate({ children }: LoginGateProps) {
     );
   }
 
-  if (error) {
+  // Dead-end fix: an Auth0 error used to render a full-screen message
+  // with no escape -- the user was stuck until a hard refresh. Now:
+  // retry re-runs the Auth0 flow, and "continue anyway" lets them into
+  // the app signed-out (the backend enforces verified identity where it
+  // matters, and demo mode still works).
+  if (error && !dismissedAuthError) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center px-4">
-        <div className="text-rose-300 text-sm font-mono max-w-md text-center">
-          Authentication error: {error.message}
+        <div className="max-w-md text-center space-y-4">
+          <div className="text-rose-300 text-sm font-mono">
+            Authentication error: {error.message}
+          </div>
+          <p className="text-zinc-500 text-xs font-mono">
+            You can retry signing in, or continue to the app without a
+            session (demo mode works; account actions will ask you to
+            sign in again).
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => loginWithRedirect()}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono rounded transition-colors cursor-pointer"
+            >
+              Retry sign-in
+            </button>
+            <button
+              onClick={() => setDismissedAuthError(true)}
+              className="px-4 py-2 border border-white/10 text-zinc-400 hover:text-white text-xs font-mono rounded transition-colors cursor-pointer"
+            >
+              Continue anyway
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
-  if (!isAuthenticated && !derivConnected) {
-    return <LoginScreen derivError={derivError} />;
-  }
-
-  return <>{children}</>;
+  return (
+    <>
+      {isAuthenticated && sessionExpired && (
+        <div className="fixed top-0 left-0 right-0 z-[10001] bg-amber-500/95 text-black text-xs font-mono py-2 px-4 flex items-center justify-center gap-3">
+          <span>Session expired — Deriv linking and account actions need a fresh sign-in.</span>
+          <button
+            onClick={() => loginWithRedirect()}
+            className="underline font-bold hover:text-white"
+          >
+            Sign in again
+          </button>
+        </div>
+      )}
+      {children}
+      {showOnboarding && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md bg-zinc-950 border border-white/10 rounded-2xl p-6 space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold text-white">Connect your Deriv account</h2>
+              <p className="text-xs text-zinc-400 font-mono mt-1 leading-relaxed">
+                One last step: click below, log in (or sign up) on Deriv's
+                site in any tab, approve the connect screen, and you'll land
+                back here linked. Then switch demo or live anytime with the
+                sidebar toggle.
+              </p>
+            </div>
+            <DerivConnectCard />
+            <button
+              onClick={dismissOnboarding}
+              className="w-full py-2 text-xs font-mono text-zinc-500 hover:text-zinc-300 underline"
+            >
+              Skip for now
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
