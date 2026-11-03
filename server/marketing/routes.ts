@@ -164,6 +164,11 @@ marketingRouter.get("/engine/status", (_req, res) => {
     ai: { provider: aiProvider, ready: Boolean(aiGenerate) },
     tts: { engine: "local SAPI (System.Speech)", rate: -1 },
     plates: { provider: "Amazon Bedrock", model: "stability.stable-image-ultra-v1:1", region: "us-west-2" },
+    creative: {
+      styles: ["cartoon", "doodle", "presenter"],
+      gpu: { instance: process.env.PRIV_GPU_INSTANCE || "i-0f5aaebf6d440da5c", region: process.env.PRIV_GPU_REGION || "us-east-1" },
+      disclosure: "presenter masters are stamped AI-generated for the platform label",
+    },
   });
 });
 
@@ -223,6 +228,22 @@ marketingRouter.post("/engine/tts", async (req, res) => {
       m4a: d.m4a && { ...d.m4a, url: assetUrl(d.m4a.rel) },
       installed: d.installed && { ...d.installed, url: assetUrl(d.installed.rel) },
     });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// Creative engine: a full 1-minute ad in cartoon / doodle / presenter style,
+// generated on our GPU box and mastered by the house compositor.
+marketingRouter.post("/engine/creative", async (req, res) => {
+  try {
+    const spec = req.body?.spec ?? req.body;
+    if (!spec?.style || !Array.isArray(spec?.scenes) || !spec.scenes.length) {
+      throw Object.assign(new Error("spec needs style and scenes[]"), { status: 400 });
+    }
+    const r = await runStudio(["studio.py", "creative", "--spec", await writeSpec(spec)], 20 * 60 * 1000);
+    if (!r.ok) throw Object.assign(new Error((r.stderr || r.stdout).slice(-600)), { status: 400 });
+    ok(res, { ...r.json, url: assetUrl(r.json.rel) });
   } catch (err) {
     fail(res, err);
   }

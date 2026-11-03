@@ -15,6 +15,7 @@ import {
   Mic,
   Image as ImageIcon,
   PenLine,
+  Wand2,
 } from "lucide-react";
 import { userHeader } from "../lib/userHeader";
 
@@ -528,6 +529,22 @@ function EngineTab({ catalog }: { catalog: Catalog | null }) {
   const [plateStyle, setPlateStyle] = useState("campaign");
   const [plateOut, setPlateOut] = useState<any>(null);
 
+  // Creative Ad Lab
+  const [creativeStyle, setCreativeStyle] = useState("doodle");
+  const [creativeSpec, setCreativeSpec] = useState(`{
+  "style": "doodle",
+  "name": "demo-doodle-60s",
+  "size": [1080, 1920],
+  "target": 60,
+  "scenes": [
+    { "vo": "Most people learn this after a bad week. Write the exit before the entry.", "headline": "Exit first", "doodles": [["underline", 540, 1500, 700], ["star", 200, 300, 70]] },
+    { "vo": "Every ticket ships entry, two targets and a stop that trails to breakeven.", "plate": "vt-holo-signal", "doodles": [["circle", 540, 800, 320]] },
+    { "vo": "Your money never leaves your own broker.", "plate": "vt-vault-door", "doodles": [["arrow", 250, 500, 830, 420]] },
+    { "vo": "Priv. Start free. No card required.", "end": true }
+  ]
+}`);
+  const [creativeOut, setCreativeOut] = useState<any>(null);
+
   const spots = catalog?.video_spots || [];
   const voices = catalog?.voices || [];
 
@@ -589,6 +606,21 @@ function EngineTab({ catalog }: { catalog: Catalog | null }) {
     }
   };
 
+  const genCreative = async () => {
+    setBusy("creative");
+    setError(null);
+    setCreativeOut(null);
+    try {
+      const spec = JSON.parse(creativeSpec);
+      spec.style = creativeStyle;
+      setCreativeOut(await ms("/api/marketing/engine/creative", { json: { spec } }));
+    } catch (e: any) {
+      setError(e.message.includes("Unexpected token") || e.message.includes("JSON") ? "Creative spec is not valid JSON" : e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <ErrorBar error={error} />
@@ -605,6 +637,12 @@ function EngineTab({ catalog }: { catalog: Catalog | null }) {
         </span>
         <span className="text-zinc-500">
           Renderer: <span className={status?.python ? "text-emerald-300" : "text-amber-300"}>{status?.python ? "local Pillow+ffmpeg" : "python missing"}</span>
+        </span>
+        <span className="text-zinc-500">
+          Creative: <span className="text-zinc-300">{(status?.creative?.styles || []).join(" / ") || "cartoon / doodle / presenter"}</span>
+        </span>
+        <span className="text-zinc-500">
+          GPU: <span className="text-zinc-300">{status?.creative?.gpu?.instance || "…"}</span>
         </span>
       </div>
 
@@ -712,6 +750,43 @@ function EngineTab({ catalog }: { catalog: Catalog | null }) {
                 <div>{plateOut.name} · {plateOut.ratio} · {plateOut.seconds}s</div>
                 <div className="text-zinc-500">{plateOut.rel}</div>
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Creative Ad Lab */}
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3 lg:col-span-2">
+          <div className="flex items-center gap-2 text-xs font-mono font-bold text-rose-300">
+            <Wand2 className="w-3.5 h-3.5" /> CREATIVE AD LAB
+            <span className="text-zinc-600 font-normal normal-case">— 1-minute ads in cartoon / doodle / presenter, rendered on our GPU</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {["doodle", "cartoon", "presenter"].map((s) => (
+              <button key={s} onClick={() => setCreativeStyle(s)} className={`${creativeStyle === s ? btnPrimary : btnGhost} cursor-pointer`}>
+                {s}
+              </button>
+            ))}
+            <span className="ml-auto text-[10px] font-mono text-zinc-500 self-center">
+              {creativeStyle === "presenter"
+                ? "⚠ realistic presenter → AI-disclosure label applied on Meta/YouTube"
+                : "stylized → no AI label needed"}
+            </span>
+          </div>
+          <textarea value={creativeSpec} onChange={(e) => setCreativeSpec(e.target.value)} rows={14} className={`${inputCls} font-mono text-xs`} spellCheck={false} />
+          <button onClick={genCreative} disabled={busy !== null} className={btnPrimary}>
+            {busy === "creative" ? <Loader2 className="w-3 h-3 inline animate-spin mr-1" /> : <Wand2 className="w-3 h-3 inline mr-1" />}
+            Render {creativeStyle} ad
+          </button>
+          {creativeOut && (
+            <div className="space-y-2">
+              <div className="text-[10px] font-mono text-zinc-500">
+                {creativeOut.style} · {creativeOut.name} · {creativeOut.size?.[0]}×{creativeOut.size?.[1]} · target {creativeOut.target}s · rendered {creativeOut.seconds}s
+                {creativeOut.disclosure ? " · AI-disclosed" : ""}
+              </div>
+              <video src={creativeOut.url} controls className="w-full max-h-[28rem] rounded-lg bg-black" />
+              <a href={creativeOut.url} target="_blank" rel="noreferrer" className="text-xs font-mono text-rose-300 hover:underline inline-flex items-center gap-1">
+                <ExternalLink className="w-3 h-3" /> {creativeOut.url}
+              </a>
             </div>
           )}
         </div>

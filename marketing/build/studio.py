@@ -27,6 +27,7 @@ import poster_specs  # noqa: E402
 import posters  # noqa: E402
 import videos  # noqa: E402
 import ads  # noqa: E402
+import engine_runtime  # noqa: E402
 
 ASSETS = os.path.abspath(os.path.join(posters.OUT, ".."))
 CUSTOM_DIR = os.path.join(posters.OUT, "custom")
@@ -141,6 +142,9 @@ def catalog():
         ],
         "plate_ratios": ["16:9", "9:16", "4:5", "1:1"],
         "plate_styles": ["campaign", "ads"],
+        "creative_styles": ["cartoon", "doodle", "presenter"],
+        "creative_gpu": {"instance": engine_runtime.GPU_INSTANCE,
+                         "region": engine_runtime.REGION},
         "paths": {
             "posters": os.path.relpath(posters.OUT, ASSETS),
             "videos": os.path.relpath(VIDEO_DIR, ASSETS),
@@ -421,10 +425,67 @@ def engine_plate(spec):
     }
 
 
+def engine_creative(spec):
+    """Creative engine: one 1-minute ad in cartoon / doodle / presenter style.
+
+    spec: { style, name?, size?, target?, out?, seed?, scenes:[...] }
+      - cartoon:   scenes carry {prompt, vo, end?}  -> AnimateDiff on the GPU
+      - doodle:    scenes carry {vo, plate?, headline?, doodles?, end?} (local)
+      - presenter: scenes carry {vo, end?}          -> MuseTalk on the GPU
+
+    Everything is generated in-house (SD/AnimateDiff/MuseTalk on our A10G, the
+    presenter face via Bedrock), then assembled by the house compositor into a
+    -13 LUFS master in assets/videos/. Presenter masters are stamped with an
+    AI-disclosure line for the platform label.
+    """
+    style = _slug(spec.get("style"), "")
+    if style not in ("cartoon", "doodle", "presenter"):
+        raise SystemExit("style must be cartoon | doodle | presenter")
+    scenes = spec.get("scenes")
+    if not isinstance(scenes, list) or not scenes:
+        raise SystemExit("scenes[] is required")
+    name = _slug(spec.get("name"), f"{style}-ad")
+    size = spec.get("size") or [1080, 1920]
+    if isinstance(size, str):
+        w, h = size.lower().split("x")
+        size = [int(w), int(h)]
+    cfg = {
+        "size": [int(size[0]), int(size[1])],
+        "target": spec.get("target") if spec.get("target") is not None else 60,
+        "out": spec.get("out") or f"priv-{name}-{size[0]}x{size[1]}.mp4",
+        "seed": spec.get("seed"),
+        "scenes": scenes,
+    }
+    if spec.get("white_at") is not None:
+        cfg["white_at"] = int(spec["white_at"])
+
+    import importlib
+    mod = importlib.import_module(style)
+    log = io.StringIO()
+    t0 = time.time()
+    with contextlib.redirect_stdout(log):
+        out_path = mod.build(name, cfg)
+    rel, url = _rel_url(out_path)
+    return {
+        "style": style,
+        "name": name,
+        "out": os.path.basename(out_path),
+        "rel": rel,
+        "url": url,
+        "size": cfg["size"],
+        "target": cfg["target"],
+        "seconds": round(time.time() - t0, 1),
+        "exists": os.path.exists(out_path),
+        "disclosure": (style == "presenter"),
+        "log": log.getvalue().splitlines(),
+    }
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("command",
-                    choices=["catalog", "poster", "video", "tts", "plate"])
+                    choices=["catalog", "poster", "video", "tts", "plate",
+                             "creative"])
     ap.add_argument("--spec", help="path to a JSON spec")
     ap.add_argument("--slug", help="poster slug to re-render")
     ap.add_argument("--formats", help="comma-separated formats")
@@ -452,6 +513,8 @@ def main():
         payload = engine_tts(json.load(open(args.spec, encoding="utf-8-sig")))
     elif args.command == "plate":
         payload = engine_plate(json.load(open(args.spec, encoding="utf-8-sig")))
+    elif args.command == "creative":
+        payload = engine_creative(json.load(open(args.spec, encoding="utf-8-sig")))
     else:
         payload = render_video(json.load(open(args.spec, encoding="utf-8-sig")))
     json.dump(payload, sys.stdout, ensure_ascii=False)
