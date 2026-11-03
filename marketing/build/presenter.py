@@ -27,8 +27,8 @@ OUT_VID = ads.OUT_VID
 DISCLOSURE = "AI-generated presenter"
 
 # GPU-side MuseTalk driver: one portrait + one audio -> one talking clip.
-# Calls the MuseTalk inference entrypoint from the cloned code tree, pointed
-# at the pre-downloaded weights. Output lands at spec['out'].
+# MuseTalk reads the task from a YAML (video_path/audio_path), not CLI args,
+# so we emit a per-scene config and point --inference_config at it.
 _PRESENTER_PY = r"""
 import glob
 import json
@@ -39,22 +39,28 @@ import sys
 
 spec = json.load(open(sys.argv[1]))
 CODE = "/opt/priv/code/MuseTalk"
-MODELS = "/opt/priv/models/musetalk"
-os.environ.setdefault("MUSETALK_MODEL_DIR", MODELS)
-# the MuseTalk package isn't pip-installed; run with the code tree on the path
-sys.path.insert(0, CODE)
 os.environ["PYTHONPATH"] = CODE + os.pathsep + os.environ.get("PYTHONPATH", "")
 
 out_dir = os.path.dirname(spec["out"]) or "/tmp"
 os.makedirs(out_dir, exist_ok=True)
 
-# MuseTalk's own realtime inference entrypoint, run under its Python 3.11 venv.
+# per-scene task config (MuseTalk's expected schema)
+task_cfg = os.path.join(out_dir, "task.yaml")
+with open(task_cfg, "w") as fh:
+    fh.write("task_0:\n")
+    fh.write(f' video_path: "{spec["portrait"]}"\n')
+    fh.write(f' audio_path: "{spec["audio"]}"\n')
+    fh.write(" preparation: True\n")
+    fh.write(" bbox_shift: 5\n")
+
 PY311 = os.environ.get("MUSETALK_PY", "/opt/priv/venv-musetalk/bin/python")
 cmd = [
     PY311, os.path.join(CODE, "scripts", "inference.py"),
-    "--inference_config", os.path.join(CODE, "configs", "inference", "realtime.yaml"),
-    "--video_path", spec["portrait"],
-    "--audio_path", spec["audio"],
+    "--inference_config", task_cfg,
+    "--unet_config", os.path.join(CODE, "models", "musetalkV15", "musetalk.json"),
+    "--unet_model_path", os.path.join(CODE, "models", "musetalkV15", "unet.pth"),
+    "--whisper_dir", os.path.join(CODE, "models", "whisper"),
+    "--version", "v15",
     "--result_dir", out_dir,
     "--fps", str(spec.get("fps", 25)),
     "--batch_size", "1",
@@ -103,16 +109,40 @@ def _render_scene(portrait_box, wav_box, idx, name):
 
 
 def _disclose(clip, size, tag):
-    """Burn the AI-disclosure line into the clip (top-centre, small, always on)."""
+    """Stamp the AI-disclosure onto every frame.
+
+    ffmpeg's drawtext needs fontconfig, which is not configured on this host's
+    build (it crashes with exit 3221225477). Render the label as a transparent
+    PNG with our brand font once, then overlay it -- identical result, no
+    fontconfig dependency.
+    """
     import subprocess
+
+    from PIL import Image, ImageDraw
+
+    import brand as B
+
+    w, h = size
+    fs = int(min(size) * 0.035)
+    f = B.font("mono", fs)
+    label = DISCLOSURE
+    tw = B.text_w(label, f)
+    asc, desc = f.getmetrics()
+    pad = int(fs * 0.6)
+    overlay = Image.new("RGBA", (tw + pad * 2, asc + desc + pad * 2), (0, 0, 0, 0))
+    d = ImageDraw.Draw(overlay)
+    d.rectangle((0, 0, overlay.width - 1, overlay.height - 1),
+                fill=(0, 0, 0, 115))
+    d.text((pad, pad), label, font=f, fill=(255, 255, 255, 255))
+    ov = os.path.join(ads.TMP, f"{tag}-disclosure.png")
+    overlay.save(ov)
+
+    x = (w - overlay.width) // 2
+    y = int(h * 0.04)
     out = os.path.join(ads.TMP, f"{tag}-disclosed.mp4")
-    y = int(size[1] * 0.04)
     subprocess.run(
-        [ads.FFMPEG, "-y", "-i", clip,
-         "-vf", "drawtext=text='" + DISCLOSURE + "':"
-                f"fontcolor=white:fontsize={int(min(size) * 0.035)}:"
-                f"box=1:boxcolor=black@0.45:boxborderw=8:"
-                f"x=(w-text_w)/2:y={y}",
+        [ads.FFMPEG, "-y", "-i", clip, "-i", ov,
+         "-filter_complex", f"[0:v][1:v]overlay={x}:{y}",
          "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "copy", out],
         capture_output=True, text=True, check=True)
     return out
