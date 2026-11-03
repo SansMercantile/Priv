@@ -1,5 +1,9 @@
 node_modules/
 build/
+!marketing/build/
+marketing/build/.studio/
+__pycache__/
+*.pyc
 dist/
 coverage/
 .DS_Store
