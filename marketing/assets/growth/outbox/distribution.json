@@ -1,0 +1,1056 @@
+{
+  "base": "https://priv.sansmercantile.com/marketing-assets/videos",
+  "generated": "2026-11-03T04:21:49.335703Z",
+  "packs": [
+    {
+      "angle": "custody",
+      "copy": {
+        "facebook": {
+          "angle": "custody",
+          "chars": 213,
+          "disclosed": false,
+          "hook": "Your money never leaves your own broker.",
+          "hook_score": 60,
+          "platform": "facebook",
+          "tags": [],
+          "text": "Your money never leaves your own broker.\n\nPriv connects to your own broker through official OAuth and holds no client funds. Your money stays yours.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-custody-15s-vertical-1080x1920.mp4"
+        },
+        "instagram": {
+          "angle": "custody",
+          "chars": 226,
+          "disclosed": false,
+          "hook": "Your money never leaves your own broker.",
+          "hook_score": 60,
+          "platform": "instagram",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Your money never leaves your own broker.\n\nPriv connects to your own broker through official OAuth and holds no client funds. Your money stays yours.\n\ud83d\udd17 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-custody-15s-vertical-1080x1920.mp4"
+        },
+        "linkedin": {
+          "angle": "custody",
+          "chars": 256,
+          "disclosed": false,
+          "hook": "Your money never leaves your own broker.",
+          "hook_score": 60,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Your money never leaves your own broker.\n\nPriv connects to your own broker through official OAuth and holds no client funds. Your money stays yours.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-custody-15s-vertical-1080x1920.mp4"
+        },
+        "tiktok": {
+          "angle": "custody",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Your money never leaves your own broker.",
+          "hook_score": 60,
+          "platform": "tiktok",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Your money never leaves your own broker.\nPriv connects to your own broker through official OAuth and holds no client funds. Your money stays yours.\nStart free \u2014 no card required\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-custody-15s-vertical-1080x1920.mp4"
+        },
+        "whatsapp": {
+          "angle": "custody",
+          "chars": 211,
+          "disclosed": false,
+          "hook": "Your money never leaves your own broker.",
+          "hook_score": 60,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "Your money never leaves your own broker.\n\nPriv connects to your own broker through official OAuth and holds no client funds. Your money stays yours.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-custody-15s-vertical-1080x1920.mp4"
+        },
+        "x": {
+          "angle": "custody",
+          "chars": 257,
+          "disclosed": false,
+          "hook": "Your money never leaves your own broker.",
+          "hook_score": 60,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "Your money never leaves your own broker.\n\nPriv connects to your own broker through official OAuth and holds no client funds. Your money stays yours.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-custody-15s-vertical-1080x1920.mp4"
+        },
+        "youtube": {
+          "angle": "custody",
+          "chars": 257,
+          "disclosed": false,
+          "hook": "Your money never leaves your own broker.",
+          "hook_score": 60,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Your money never leaves your own broker.\n\nPriv connects to your own broker through official OAuth and holds no client funds. Your money stays yours.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "Your money never leaves your own broker. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-custody-15s-vertical-1080x1920.mp4"
+        }
+      },
+      "file": "priv-ad-custody-15s-vertical-1080x1920.mp4",
+      "hook": "Your money never leaves your own broker.",
+      "kind": "ad",
+      "orientation": "vertical",
+      "seconds": 15,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-custody-15s-vertical-1080x1920.mp4"
+    },
+    {
+      "angle": "desk",
+      "copy": {
+        "facebook": {
+          "angle": "desk",
+          "chars": 213,
+          "disclosed": false,
+          "hook": "An autonomous trading desk, in your pocket.",
+          "hook_score": 46,
+          "platform": "facebook",
+          "tags": [],
+          "text": "An autonomous trading desk, in your pocket.\n\nFive deliberating agents, a 28-second decision cycle and signals delivered the moment a setup resolves.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-desk-15s-wide-1920x1080.mp4"
+        },
+        "linkedin": {
+          "angle": "desk",
+          "chars": 256,
+          "disclosed": false,
+          "hook": "An autonomous trading desk, in your pocket.",
+          "hook_score": 46,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "An autonomous trading desk, in your pocket.\n\nFive deliberating agents, a 28-second decision cycle and signals delivered the moment a setup resolves.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-desk-15s-wide-1920x1080.mp4"
+        },
+        "whatsapp": {
+          "angle": "desk",
+          "chars": 211,
+          "disclosed": false,
+          "hook": "An autonomous trading desk, in your pocket.",
+          "hook_score": 46,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "An autonomous trading desk, in your pocket.\n\nFive deliberating agents, a 28-second decision cycle and signals delivered the moment a setup resolves.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-desk-15s-wide-1920x1080.mp4"
+        },
+        "x": {
+          "angle": "desk",
+          "chars": 257,
+          "disclosed": false,
+          "hook": "An autonomous trading desk, in your pocket.",
+          "hook_score": 46,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "An autonomous trading desk, in your pocket.\n\nFive deliberating agents, a 28-second decision cycle and signals delivered the moment a setup resolves.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-desk-15s-wide-1920x1080.mp4"
+        },
+        "youtube": {
+          "angle": "desk",
+          "chars": 257,
+          "disclosed": false,
+          "hook": "An autonomous trading desk, in your pocket.",
+          "hook_score": 46,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "An autonomous trading desk, in your pocket.\n\nFive deliberating agents, a 28-second decision cycle and signals delivered the moment a setup resolves.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "An autonomous trading desk, in your pocket. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-desk-15s-wide-1920x1080.mp4"
+        }
+      },
+      "file": "priv-ad-desk-15s-wide-1920x1080.mp4",
+      "hook": "An autonomous trading desk, in your pocket.",
+      "kind": "ad",
+      "orientation": "wide",
+      "seconds": 15,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-desk-15s-wide-1920x1080.mp4"
+    },
+    {
+      "angle": "hook",
+      "copy": {
+        "facebook": {
+          "angle": "hook",
+          "chars": 178,
+          "disclosed": false,
+          "hook": "Nobody taught you this in demo.",
+          "hook_score": 68,
+          "platform": "facebook",
+          "tags": [],
+          "text": "Nobody taught you this in demo.\n\nWrite the exit before the entry. Every setup ships with the stop already stated.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-hook-15s-vertical-1080x1920.mp4"
+        },
+        "instagram": {
+          "angle": "hook",
+          "chars": 191,
+          "disclosed": false,
+          "hook": "Nobody taught you this in demo.",
+          "hook_score": 68,
+          "platform": "instagram",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Nobody taught you this in demo.\n\nWrite the exit before the entry. Every setup ships with the stop already stated.\n\ud83d\udd17 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-hook-15s-vertical-1080x1920.mp4"
+        },
+        "linkedin": {
+          "angle": "hook",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Nobody taught you this in demo.",
+          "hook_score": 68,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Nobody taught you this in demo.\n\nWrite the exit before the entry. Every setup ships with the stop already stated.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-hook-15s-vertical-1080x1920.mp4"
+        },
+        "tiktok": {
+          "angle": "hook",
+          "chars": 186,
+          "disclosed": false,
+          "hook": "Nobody taught you this in demo.",
+          "hook_score": 68,
+          "platform": "tiktok",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Nobody taught you this in demo.\nWrite the exit before the entry. Every setup ships with the stop already stated.\nStart free \u2014 no card required\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-hook-15s-vertical-1080x1920.mp4"
+        },
+        "whatsapp": {
+          "angle": "hook",
+          "chars": 176,
+          "disclosed": false,
+          "hook": "Nobody taught you this in demo.",
+          "hook_score": 68,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "Nobody taught you this in demo.\n\nWrite the exit before the entry. Every setup ships with the stop already stated.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-hook-15s-vertical-1080x1920.mp4"
+        },
+        "x": {
+          "angle": "hook",
+          "chars": 222,
+          "disclosed": false,
+          "hook": "Nobody taught you this in demo.",
+          "hook_score": 68,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "Nobody taught you this in demo.\n\nWrite the exit before the entry. Every setup ships with the stop already stated.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-hook-15s-vertical-1080x1920.mp4"
+        },
+        "youtube": {
+          "angle": "hook",
+          "chars": 222,
+          "disclosed": false,
+          "hook": "Nobody taught you this in demo.",
+          "hook_score": 68,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Nobody taught you this in demo.\n\nWrite the exit before the entry. Every setup ships with the stop already stated.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "Nobody taught you this in demo. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-hook-15s-vertical-1080x1920.mp4"
+        }
+      },
+      "file": "priv-ad-hook-15s-vertical-1080x1920.mp4",
+      "hook": "Nobody taught you this in demo.",
+      "kind": "ad",
+      "orientation": "vertical",
+      "seconds": 15,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-hook-15s-vertical-1080x1920.mp4"
+    },
+    {
+      "angle": "modes",
+      "copy": {
+        "facebook": {
+          "angle": "modes",
+          "chars": 192,
+          "disclosed": false,
+          "hook": "One market. Seven timeframes.",
+          "hook_score": 42,
+          "platform": "facebook",
+          "tags": [],
+          "text": "One market. Seven timeframes.\n\n1m to 1D on the same instrument \u2014 when they disagree, the disagreement is the signal, not a bug.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-modes-15s-vertical-1080x1920.mp4"
+        },
+        "instagram": {
+          "angle": "modes",
+          "chars": 205,
+          "disclosed": false,
+          "hook": "One market. Seven timeframes.",
+          "hook_score": 42,
+          "platform": "instagram",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "One market. Seven timeframes.\n\n1m to 1D on the same instrument \u2014 when they disagree, the disagreement is the signal, not a bug.\n\ud83d\udd17 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-modes-15s-vertical-1080x1920.mp4"
+        },
+        "linkedin": {
+          "angle": "modes",
+          "chars": 235,
+          "disclosed": false,
+          "hook": "One market. Seven timeframes.",
+          "hook_score": 42,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "One market. Seven timeframes.\n\n1m to 1D on the same instrument \u2014 when they disagree, the disagreement is the signal, not a bug.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-modes-15s-vertical-1080x1920.mp4"
+        },
+        "tiktok": {
+          "angle": "modes",
+          "chars": 200,
+          "disclosed": false,
+          "hook": "One market. Seven timeframes.",
+          "hook_score": 42,
+          "platform": "tiktok",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "One market. Seven timeframes.\n1m to 1D on the same instrument \u2014 when they disagree, the disagreement is the signal, not a bug.\nStart free \u2014 no card required\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-modes-15s-vertical-1080x1920.mp4"
+        },
+        "whatsapp": {
+          "angle": "modes",
+          "chars": 190,
+          "disclosed": false,
+          "hook": "One market. Seven timeframes.",
+          "hook_score": 42,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "One market. Seven timeframes.\n\n1m to 1D on the same instrument \u2014 when they disagree, the disagreement is the signal, not a bug.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-modes-15s-vertical-1080x1920.mp4"
+        },
+        "x": {
+          "angle": "modes",
+          "chars": 236,
+          "disclosed": false,
+          "hook": "One market. Seven timeframes.",
+          "hook_score": 42,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "One market. Seven timeframes.\n\n1m to 1D on the same instrument \u2014 when they disagree, the disagreement is the signal, not a bug.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-modes-15s-vertical-1080x1920.mp4"
+        },
+        "youtube": {
+          "angle": "modes",
+          "chars": 236,
+          "disclosed": false,
+          "hook": "One market. Seven timeframes.",
+          "hook_score": 42,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "One market. Seven timeframes.\n\n1m to 1D on the same instrument \u2014 when they disagree, the disagreement is the signal, not a bug.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "One market. Seven timeframes. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-modes-15s-vertical-1080x1920.mp4"
+        }
+      },
+      "file": "priv-ad-modes-15s-vertical-1080x1920.mp4",
+      "hook": "One market. Seven timeframes.",
+      "kind": "ad",
+      "orientation": "vertical",
+      "seconds": 15,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-modes-15s-vertical-1080x1920.mp4"
+    },
+    {
+      "angle": "proof",
+      "copy": {
+        "facebook": {
+          "angle": "proof",
+          "chars": 197,
+          "disclosed": false,
+          "hook": "Prove it before you risk it.",
+          "hook_score": 60,
+          "platform": "facebook",
+          "tags": [],
+          "text": "Prove it before you risk it.\n\nBacktest the strategy on the same seven timeframes the desk watches, then run it. Auditable every run.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-proof-30s-vertical-1080x1920.mp4"
+        },
+        "instagram": {
+          "angle": "proof",
+          "chars": 210,
+          "disclosed": false,
+          "hook": "Prove it before you risk it.",
+          "hook_score": 60,
+          "platform": "instagram",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Prove it before you risk it.\n\nBacktest the strategy on the same seven timeframes the desk watches, then run it. Auditable every run.\n\ud83d\udd17 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-proof-30s-vertical-1080x1920.mp4"
+        },
+        "linkedin": {
+          "angle": "proof",
+          "chars": 240,
+          "disclosed": false,
+          "hook": "Prove it before you risk it.",
+          "hook_score": 60,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Prove it before you risk it.\n\nBacktest the strategy on the same seven timeframes the desk watches, then run it. Auditable every run.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-proof-30s-vertical-1080x1920.mp4"
+        },
+        "tiktok": {
+          "angle": "proof",
+          "chars": 205,
+          "disclosed": false,
+          "hook": "Prove it before you risk it.",
+          "hook_score": 60,
+          "platform": "tiktok",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Prove it before you risk it.\nBacktest the strategy on the same seven timeframes the desk watches, then run it. Auditable every run.\nStart free \u2014 no card required\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-proof-30s-vertical-1080x1920.mp4"
+        },
+        "whatsapp": {
+          "angle": "proof",
+          "chars": 195,
+          "disclosed": false,
+          "hook": "Prove it before you risk it.",
+          "hook_score": 60,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "Prove it before you risk it.\n\nBacktest the strategy on the same seven timeframes the desk watches, then run it. Auditable every run.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-proof-30s-vertical-1080x1920.mp4"
+        },
+        "x": {
+          "angle": "proof",
+          "chars": 241,
+          "disclosed": false,
+          "hook": "Prove it before you risk it.",
+          "hook_score": 60,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "Prove it before you risk it.\n\nBacktest the strategy on the same seven timeframes the desk watches, then run it. Auditable every run.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-proof-30s-vertical-1080x1920.mp4"
+        },
+        "youtube": {
+          "angle": "proof",
+          "chars": 241,
+          "disclosed": false,
+          "hook": "Prove it before you risk it.",
+          "hook_score": 60,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Prove it before you risk it.\n\nBacktest the strategy on the same seven timeframes the desk watches, then run it. Auditable every run.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "Prove it before you risk it. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-proof-30s-vertical-1080x1920.mp4"
+        }
+      },
+      "file": "priv-ad-proof-30s-vertical-1080x1920.mp4",
+      "hook": "Prove it before you risk it.",
+      "kind": "ad",
+      "orientation": "vertical",
+      "seconds": 30,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-proof-30s-vertical-1080x1920.mp4"
+    },
+    {
+      "angle": "signal",
+      "copy": {
+        "facebook": {
+          "angle": "signal",
+          "chars": 176,
+          "disclosed": false,
+          "hook": "Every ticket ships complete.",
+          "hook_score": 34,
+          "platform": "facebook",
+          "tags": [],
+          "text": "Every ticket ships complete.\n\nEntry, TP1, TP2 and a stop that trails to breakeven \u2014 never a bare buy/sell line.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-signal-15s-wide-1920x1080.mp4"
+        },
+        "linkedin": {
+          "angle": "signal",
+          "chars": 219,
+          "disclosed": false,
+          "hook": "Every ticket ships complete.",
+          "hook_score": 34,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Every ticket ships complete.\n\nEntry, TP1, TP2 and a stop that trails to breakeven \u2014 never a bare buy/sell line.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-signal-15s-wide-1920x1080.mp4"
+        },
+        "whatsapp": {
+          "angle": "signal",
+          "chars": 174,
+          "disclosed": false,
+          "hook": "Every ticket ships complete.",
+          "hook_score": 34,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "Every ticket ships complete.\n\nEntry, TP1, TP2 and a stop that trails to breakeven \u2014 never a bare buy/sell line.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-signal-15s-wide-1920x1080.mp4"
+        },
+        "x": {
+          "angle": "signal",
+          "chars": 220,
+          "disclosed": false,
+          "hook": "Every ticket ships complete.",
+          "hook_score": 34,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "Every ticket ships complete.\n\nEntry, TP1, TP2 and a stop that trails to breakeven \u2014 never a bare buy/sell line.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-signal-15s-wide-1920x1080.mp4"
+        },
+        "youtube": {
+          "angle": "signal",
+          "chars": 220,
+          "disclosed": false,
+          "hook": "Every ticket ships complete.",
+          "hook_score": 34,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Every ticket ships complete.\n\nEntry, TP1, TP2 and a stop that trails to breakeven \u2014 never a bare buy/sell line.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "Every ticket ships complete. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-signal-15s-wide-1920x1080.mp4"
+        }
+      },
+      "file": "priv-ad-signal-15s-wide-1920x1080.mp4",
+      "hook": "Every ticket ships complete.",
+      "kind": "ad",
+      "orientation": "wide",
+      "seconds": 15,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-signal-15s-wide-1920x1080.mp4"
+    },
+    {
+      "angle": "bumper",
+      "copy": {
+        "facebook": {
+          "angle": "bumper",
+          "chars": 153,
+          "disclosed": false,
+          "hook": "Start free. No card required.",
+          "hook_score": 42,
+          "platform": "facebook",
+          "tags": [],
+          "text": "Start free. No card required.\n\nOne market, seven timeframes, full custody of your money.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-bumper-6s-1920x1080.mp4"
+        },
+        "linkedin": {
+          "angle": "bumper",
+          "chars": 196,
+          "disclosed": false,
+          "hook": "Start free. No card required.",
+          "hook_score": 42,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Start free. No card required.\n\nOne market, seven timeframes, full custody of your money.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-bumper-6s-1920x1080.mp4"
+        },
+        "whatsapp": {
+          "angle": "bumper",
+          "chars": 151,
+          "disclosed": false,
+          "hook": "Start free. No card required.",
+          "hook_score": 42,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "Start free. No card required.\n\nOne market, seven timeframes, full custody of your money.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-bumper-6s-1920x1080.mp4"
+        },
+        "x": {
+          "angle": "bumper",
+          "chars": 197,
+          "disclosed": false,
+          "hook": "Start free. No card required.",
+          "hook_score": 42,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "Start free. No card required.\n\nOne market, seven timeframes, full custody of your money.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-bumper-6s-1920x1080.mp4"
+        },
+        "youtube": {
+          "angle": "bumper",
+          "chars": 197,
+          "disclosed": false,
+          "hook": "Start free. No card required.",
+          "hook_score": 42,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Start free. No card required.\n\nOne market, seven timeframes, full custody of your money.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "Start free. No card required. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-bumper-6s-1920x1080.mp4"
+        }
+      },
+      "file": "priv-bumper-6s-1920x1080.mp4",
+      "hook": "Start free. No card required.",
+      "kind": "campaign",
+      "orientation": "wide",
+      "seconds": 6,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-bumper-6s-1920x1080.mp4"
+    },
+    {
+      "angle": "explainer",
+      "copy": {
+        "facebook": {
+          "angle": "explainer",
+          "chars": 188,
+          "disclosed": false,
+          "hook": "Priv, explained in sixty seconds.",
+          "hook_score": 24,
+          "platform": "facebook",
+          "tags": [],
+          "text": "Priv, explained in sixty seconds.\n\nLive signals, strategy backtesting, multi-agent execution and full custody \u2014 in one app.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-explainer-60s-1920x1080.mp4"
+        },
+        "linkedin": {
+          "angle": "explainer",
+          "chars": 231,
+          "disclosed": false,
+          "hook": "Priv, explained in sixty seconds.",
+          "hook_score": 24,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Priv, explained in sixty seconds.\n\nLive signals, strategy backtesting, multi-agent execution and full custody \u2014 in one app.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-explainer-60s-1920x1080.mp4"
+        },
+        "whatsapp": {
+          "angle": "explainer",
+          "chars": 186,
+          "disclosed": false,
+          "hook": "Priv, explained in sixty seconds.",
+          "hook_score": 24,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "Priv, explained in sixty seconds.\n\nLive signals, strategy backtesting, multi-agent execution and full custody \u2014 in one app.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-explainer-60s-1920x1080.mp4"
+        },
+        "x": {
+          "angle": "explainer",
+          "chars": 232,
+          "disclosed": false,
+          "hook": "Priv, explained in sixty seconds.",
+          "hook_score": 24,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "Priv, explained in sixty seconds.\n\nLive signals, strategy backtesting, multi-agent execution and full custody \u2014 in one app.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-explainer-60s-1920x1080.mp4"
+        },
+        "youtube": {
+          "angle": "explainer",
+          "chars": 232,
+          "disclosed": false,
+          "hook": "Priv, explained in sixty seconds.",
+          "hook_score": 24,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Priv, explained in sixty seconds.\n\nLive signals, strategy backtesting, multi-agent execution and full custody \u2014 in one app.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "Priv, explained in sixty seconds. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-explainer-60s-1920x1080.mp4"
+        }
+      },
+      "file": "priv-explainer-60s-1920x1080.mp4",
+      "hook": "Priv, explained in sixty seconds.",
+      "kind": "campaign",
+      "orientation": "wide",
+      "seconds": 60,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-explainer-60s-1920x1080.mp4"
+    },
+    {
+      "angle": "hero",
+      "copy": {
+        "facebook": {
+          "angle": "hero",
+          "chars": 177,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "facebook",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-hero-30s-1920x1080.mp4"
+        },
+        "linkedin": {
+          "angle": "hero",
+          "chars": 220,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-hero-30s-1920x1080.mp4"
+        },
+        "whatsapp": {
+          "angle": "hero",
+          "chars": 175,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-hero-30s-1920x1080.mp4"
+        },
+        "x": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-hero-30s-1920x1080.mp4"
+        },
+        "youtube": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "Entry. Two targets. One stop. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-hero-30s-1920x1080.mp4"
+        }
+      },
+      "file": "priv-hero-30s-1920x1080.mp4",
+      "hook": "Entry. Two targets. One stop.",
+      "kind": "campaign",
+      "orientation": "wide",
+      "seconds": 30,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-hero-30s-1920x1080.mp4"
+    },
+    {
+      "angle": "hero",
+      "copy": {
+        "facebook": {
+          "angle": "hero",
+          "chars": 177,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "facebook",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-hero-30s-vertical-1080x1920.mp4"
+        },
+        "instagram": {
+          "angle": "hero",
+          "chars": 190,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "instagram",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\ud83d\udd17 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-hero-30s-vertical-1080x1920.mp4"
+        },
+        "linkedin": {
+          "angle": "hero",
+          "chars": 220,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-hero-30s-vertical-1080x1920.mp4"
+        },
+        "tiktok": {
+          "angle": "hero",
+          "chars": 185,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "tiktok",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\nStart free \u2014 no card required\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-hero-30s-vertical-1080x1920.mp4"
+        },
+        "whatsapp": {
+          "angle": "hero",
+          "chars": 175,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-hero-30s-vertical-1080x1920.mp4"
+        },
+        "x": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-hero-30s-vertical-1080x1920.mp4"
+        },
+        "youtube": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "Entry. Two targets. One stop. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-hero-30s-vertical-1080x1920.mp4"
+        }
+      },
+      "file": "priv-hero-30s-vertical-1080x1920.mp4",
+      "hook": "Entry. Two targets. One stop.",
+      "kind": "campaign",
+      "orientation": "vertical",
+      "seconds": 30,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-hero-30s-vertical-1080x1920.mp4"
+    },
+    {
+      "angle": "teaser",
+      "copy": {
+        "facebook": {
+          "angle": "teaser",
+          "chars": 166,
+          "disclosed": false,
+          "hook": "Your exit is stated before you enter.",
+          "hook_score": 60,
+          "platform": "facebook",
+          "tags": [],
+          "text": "Your exit is stated before you enter.\n\nEntry, two targets and a stop \u2014 the moment the setup resolves.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-teaser-15s-vertical-1080x1920.mp4"
+        },
+        "instagram": {
+          "angle": "teaser",
+          "chars": 179,
+          "disclosed": false,
+          "hook": "Your exit is stated before you enter.",
+          "hook_score": 60,
+          "platform": "instagram",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Your exit is stated before you enter.\n\nEntry, two targets and a stop \u2014 the moment the setup resolves.\n\ud83d\udd17 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-teaser-15s-vertical-1080x1920.mp4"
+        },
+        "linkedin": {
+          "angle": "teaser",
+          "chars": 209,
+          "disclosed": false,
+          "hook": "Your exit is stated before you enter.",
+          "hook_score": 60,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Your exit is stated before you enter.\n\nEntry, two targets and a stop \u2014 the moment the setup resolves.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-teaser-15s-vertical-1080x1920.mp4"
+        },
+        "tiktok": {
+          "angle": "teaser",
+          "chars": 174,
+          "disclosed": false,
+          "hook": "Your exit is stated before you enter.",
+          "hook_score": 60,
+          "platform": "tiktok",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Your exit is stated before you enter.\nEntry, two targets and a stop \u2014 the moment the setup resolves.\nStart free \u2014 no card required\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-teaser-15s-vertical-1080x1920.mp4"
+        },
+        "whatsapp": {
+          "angle": "teaser",
+          "chars": 164,
+          "disclosed": false,
+          "hook": "Your exit is stated before you enter.",
+          "hook_score": 60,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "Your exit is stated before you enter.\n\nEntry, two targets and a stop \u2014 the moment the setup resolves.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-teaser-15s-vertical-1080x1920.mp4"
+        },
+        "x": {
+          "angle": "teaser",
+          "chars": 210,
+          "disclosed": false,
+          "hook": "Your exit is stated before you enter.",
+          "hook_score": 60,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "Your exit is stated before you enter.\n\nEntry, two targets and a stop \u2014 the moment the setup resolves.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-teaser-15s-vertical-1080x1920.mp4"
+        },
+        "youtube": {
+          "angle": "teaser",
+          "chars": 210,
+          "disclosed": false,
+          "hook": "Your exit is stated before you enter.",
+          "hook_score": 60,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Your exit is stated before you enter.\n\nEntry, two targets and a stop \u2014 the moment the setup resolves.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "Your exit is stated before you enter. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-teaser-15s-vertical-1080x1920.mp4"
+        }
+      },
+      "file": "priv-teaser-15s-vertical-1080x1920.mp4",
+      "hook": "Your exit is stated before you enter.",
+      "kind": "campaign",
+      "orientation": "vertical",
+      "seconds": 15,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-teaser-15s-vertical-1080x1920.mp4"
+    }
+  ],
+  "policy": "Staged for upload. Copy is compliance-gated; paste per platform or wire a publisher token."
+}
