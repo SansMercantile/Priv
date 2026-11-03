@@ -21,15 +21,20 @@ REGION = os.environ.get("PRIV_GPU_REGION", "us-east-1")
 # Video/avatar box (A10G, 23GB) -- cartoon, doodle, presenter all render here.
 GPU_INSTANCE = os.environ.get("PRIV_GPU_INSTANCE", "i-0f5aaebf6d440da5c")
 GPU_PY = os.environ.get("PRIV_GPU_PY", "/opt/pytorch/bin/python")
+# MuseTalk runs in its own Python 3.11 venv -- it pins numpy 1.23 / tensorflow
+# 2.12 and mmpose won't build on the box's bleeding-edge Python 3.13.
+GPU_MUSETALK_PY = os.environ.get("PRIV_GPU_MUSETALK_PY",
+                                 "/opt/priv/venv-musetalk/bin/python")
 GPU_WORK = os.environ.get("PRIV_GPU_WORK", "/opt/priv/work")
 
 # Music box (T4) -- already serving MusicGen in a docker container on :8080.
 MUSIC_HOST = os.environ.get("PRIV_MUSIC_HOST", "44.204.170.68")
 MUSIC_PORT = int(os.environ.get("PRIV_MUSIC_PORT", "8080"))
 
-# File shuttle bucket (the Lambda bucket is private; a dedicated prefix keeps
-# creative work away from the growth ledger/reports).
-BUCKET = os.environ.get("PRIV_GPU_BUCKET", "pr-growth-agent")
+# File shuttle bucket. The GPU box's role can write here and our local
+# credentials can read; probed live -- the Lambda bucket is NOT writable by
+# the box, so do not point this back at pr-growth-agent.
+BUCKET = os.environ.get("PRIV_GPU_BUCKET", "sans-mercantile-mezzo-embodiment")
 PREFIX = os.environ.get("PRIV_GPU_PREFIX", "creative")
 
 MODELS = "/opt/priv/models"

@@ -27,25 +27,46 @@ OUT_VID = ads.OUT_VID
 DISCLOSURE = "AI-generated presenter"
 
 # GPU-side MuseTalk driver: one portrait + one audio -> one talking clip.
-# Runs the MuseTalk inference entrypoint shipped with the model snapshot.
+# Calls the MuseTalk inference entrypoint from the cloned code tree, pointed
+# at the pre-downloaded weights. Output lands at spec['out'].
 _PRESENTER_PY = r"""
-import json, subprocess, sys, os
+import glob
+import json
+import os
+import shutil
+import subprocess
+import sys
 
 spec = json.load(open(sys.argv[1]))
-M = "/opt/priv/models/musetalk"
-# MuseTalk's own inference script; config layout matches the HF snapshot.
+CODE = "/opt/priv/code/MuseTalk"
+MODELS = "/opt/priv/models/musetalk"
+os.environ.setdefault("MUSETALK_MODEL_DIR", MODELS)
+# the MuseTalk package isn't pip-installed; run with the code tree on the path
+sys.path.insert(0, CODE)
+os.environ["PYTHONPATH"] = CODE + os.pathsep + os.environ.get("PYTHONPATH", "")
+
+out_dir = os.path.dirname(spec["out"]) or "/tmp"
+os.makedirs(out_dir, exist_ok=True)
+
+# MuseTalk's own realtime inference entrypoint, run under its Python 3.11 venv.
+PY311 = os.environ.get("MUSETALK_PY", "/opt/priv/venv-musetalk/bin/python")
 cmd = [
-    "/opt/pytorch/bin/python", f"{M}/inference.py",
-    "--inference_config", f"{M}/configs/inference/realtime.yaml",
+    PY311, os.path.join(CODE, "scripts", "inference.py"),
+    "--inference_config", os.path.join(CODE, "configs", "inference", "realtime.yaml"),
     "--video_path", spec["portrait"],
     "--audio_path", spec["audio"],
-    "--result_dir", os.path.dirname(spec["out"]),
-    "--output_vid_name", os.path.basename(spec["out"]),
+    "--result_dir", out_dir,
     "--fps", str(spec.get("fps", 25)),
     "--batch_size", "1",
 ]
-r = subprocess.run(cmd, capture_output=True, text=True, cwd=M)
+r = subprocess.run(cmd, capture_output=True, text=True, cwd=CODE)
 print(r.stdout[-1500:])
+# MuseTalk names its own output file; move the newest mp4 to spec['out']
+if not os.path.exists(spec["out"]):
+    cands = sorted(glob.glob(os.path.join(out_dir, "**", "*.mp4"),
+                             recursive=True), key=os.path.getmtime)
+    if cands:
+        shutil.copy(cands[-1], spec["out"])
 if r.returncode != 0 or not os.path.exists(spec["out"]):
     sys.stderr.write(r.stderr[-2000:])
     raise SystemExit(1)

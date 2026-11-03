@@ -27,6 +27,8 @@ NEG = ("photoreal, realistic person, human face, blurry, watermark, text, "
        "letters, words, signature, nsfw, low quality")
 
 # GPU-side generator: one scene spec in, one mp4 out. Uploaded once per run.
+# The official guoyww/animatediff repo ships raw motion-module .ckpt files, so
+# the adapter loads via from_single_file; SD1.5 is the full diffusers tree.
 _SCENE_PY = r"""
 import json, sys, torch
 from diffusers import AnimateDiffPipeline, MotionAdapter, DDIMScheduler
@@ -34,14 +36,14 @@ from diffusers.utils import export_to_video
 
 spec = json.load(open(sys.argv[1]))
 M = "/opt/priv/models"
-adapter = MotionAdapter.from_pretrained(f"{M}/animatediff/v3",
-                                        torch_dtype=torch.float16)
+adapter = MotionAdapter.from_single_file(f"{M}/animatediff/v3_sd15_mm.ckpt",
+                                         torch_dtype=torch.float16)
 pipe = AnimateDiffPipeline.from_pretrained(
     f"{M}/sd15", motion_adapter=adapter, torch_dtype=torch.float16)
 pipe.scheduler = DDIMScheduler.from_config(
     pipe.scheduler.config, clip_sample=False, beta_schedule="linear")
 pipe = pipe.to("cuda")
-pipe.enable_vae_slicing()
+pipe.vae.enable_slicing()
 g = torch.Generator("cuda").manual_seed(spec.get("seed", 42))
 out = pipe(prompt=spec["prompt"], negative_prompt=spec.get("negative", ""),
            num_frames=spec["frames"], num_inference_steps=spec["steps"],
