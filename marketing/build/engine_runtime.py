@@ -48,21 +48,50 @@ def _s3():
     return boto3.client("s3", region_name=REGION)
 
 
-def run(cmd, timeout=600, poll=5):
-    """Run a shell command on the GPU box; return (status, stdout, stderr)."""
-    r = _ssm().send_command(InstanceIds=[GPU_INSTANCE],
-                            DocumentName="AWS-RunShellScript",
-                            Parameters={"commands": [cmd]},
-                            TimeoutSeconds=timeout)
-    cid = r["Command"]["CommandId"]
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        time.sleep(poll)
-        out = _ssm().get_command_invocation(CommandId=cid, InstanceId=GPU_INSTANCE)
-        if out["Status"] not in ("Pending", "InProgress", "Delayed"):
-            return out["Status"], out.get("StandardOutputContent", ""), \
-                out.get("StandardErrorContent", "")
-    return "TimedOut", "", f"command exceeded {timeout}s"
+def _transient(exc):
+    """True for the intermittent AWS network failures this host hits: DNS
+    resolution blips and dropped connections to SSM/S3 endpoints. Retrying
+    these is correct; only a genuine failure should abort a render."""
+    s = str(exc).lower()
+    return any(k in s for k in (
+        "getaddrinfo failed", "name or service not known", "endpointconnectionerror",
+        "connection was closed", "connect timeout", "read timeout", "timed out",
+        "connection aborted", "remote end closed connection",
+    ))
+
+
+def run(cmd, timeout=600, poll=5, retries=12):
+    """Run a shell command on the GPU box; return (status, stdout, stderr).
+
+    Retries transient AWS network failures (this host drops to us-east-1
+    intermittently, sometimes for a minute or two) instead of aborting a long
+    render on a momentary blip. The backoff rides out those outages.
+    """
+    last = None
+    for attempt in range(retries + 1):
+        try:
+            r = _ssm().send_command(InstanceIds=[GPU_INSTANCE],
+                                    DocumentName="AWS-RunShellScript",
+                                    Parameters={"commands": [cmd]},
+                                    TimeoutSeconds=timeout)
+            cid = r["Command"]["CommandId"]
+            deadline = time.time() + timeout
+            while time.time() < deadline:
+                time.sleep(poll)
+                out = _ssm().get_command_invocation(CommandId=cid, InstanceId=GPU_INSTANCE)
+                if out["Status"] not in ("Pending", "InProgress", "Delayed"):
+                    return out["Status"], out.get("StandardOutputContent", ""), \
+                        out.get("StandardErrorContent", "")
+            return "TimedOut", "", f"command exceeded {timeout}s"
+        except Exception as e:                    # noqa: BLE001
+            last = e
+            if not _transient(e) or attempt == retries:
+                raise
+            wait = min(8 * (attempt + 1), 45)
+            print(f"  [net] transient AWS failure, retry {attempt + 1}/{retries} "
+                  f"in {wait}s...")
+            time.sleep(wait)
+    raise last
 
 
 def run_checked(cmd, timeout=600, poll=5, log=print):
@@ -89,14 +118,26 @@ def push(local_path, key, content_type=None):
     extra = {}
     if content_type:
         extra["ContentType"] = content_type
-    _s3().upload_file(local_path, BUCKET, key, ExtraArgs=extra)
-    return f"s3://{BUCKET}/{key}"
+    for attempt in range(13):
+        try:
+            _s3().upload_file(local_path, BUCKET, key, ExtraArgs=extra)
+            return f"s3://{BUCKET}/{key}"
+        except Exception as e:                    # noqa: BLE001
+            if not _transient(e) or attempt == 12:
+                raise
+            time.sleep(min(8 * (attempt + 1), 45))
 
 
 def pull(key, local_path):
     os.makedirs(os.path.dirname(local_path), exist_ok=True)
-    _s3().download_file(BUCKET, key, local_path)
-    return local_path
+    for attempt in range(13):
+        try:
+            _s3().download_file(BUCKET, key, local_path)
+            return local_path
+        except Exception as e:                    # noqa: BLE001
+            if not _transient(e) or attempt == 12:
+                raise
+            time.sleep(min(8 * (attempt + 1), 45))
 
 
 def stage_up(local_path, name):
