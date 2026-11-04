@@ -108,7 +108,7 @@ def _render_scene(portrait_box, wav_box, idx, name):
     payload = dict(portrait=portrait_box, audio=wav_box, out=box_clip, fps=25)
     R.write_file(f"{work}/presenter-{idx:02d}.json", json.dumps(payload))
     R.run_checked(f"{R.GPU_PY} {R.GPU_WORK}/gen_presenter.py "
-                  f"{work}/presenter-{idx:02d}.json", timeout=420, log=None)
+                  f"{work}/presenter-{idx:02d}.json", timeout=900, poll=8, log=None)
     R.stage_down(box_clip, f"{name}-presenter-{idx:02d}.mp4", local)
     return local
 

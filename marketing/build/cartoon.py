@@ -84,7 +84,7 @@ def _render_scene(spec, idx, name, seed, size):
                    seed=seed + idx, **_gen_for(size))
     R.write_file(f"{work}/scene-{idx:02d}.json", json.dumps(payload))
     R.run_checked(f"{R.GPU_PY} {R.GPU_WORK}/gen_scene.py "
-                  f"{work}/scene-{idx:02d}.json", timeout=420, log=None)
+                  f"{work}/scene-{idx:02d}.json", timeout=900, poll=8, log=None)
     R.stage_down(box_clip, f"{name}-scene-{idx:02d}.mp4", local)
     return local
 
