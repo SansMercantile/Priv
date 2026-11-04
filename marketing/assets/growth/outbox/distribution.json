@@ -1,7 +1,165 @@
 {
   "base": "https://priv.sansmercantile.com/marketing-assets/videos",
-  "generated": "2026-11-03T04:21:49.335703Z",
+  "generated": "2026-11-04T09:02:53.957426Z",
   "packs": [
+    {
+      "angle": "hero",
+      "copy": {
+        "facebook": {
+          "angle": "hero",
+          "chars": 177,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "facebook",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-cartoon-60s-1080x1920.mp4"
+        },
+        "linkedin": {
+          "angle": "hero",
+          "chars": 220,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-cartoon-60s-1080x1920.mp4"
+        },
+        "whatsapp": {
+          "angle": "hero",
+          "chars": 175,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-cartoon-60s-1080x1920.mp4"
+        },
+        "x": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-cartoon-60s-1080x1920.mp4"
+        },
+        "youtube": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "Entry. Two targets. One stop. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-cartoon-60s-1080x1920.mp4"
+        }
+      },
+      "file": "priv-ad-cartoon-60s-1080x1920.mp4",
+      "hook": "Entry. Two targets. One stop.",
+      "kind": "ad",
+      "orientation": "wide",
+      "seconds": 60,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-cartoon-60s-1080x1920.mp4"
+    },
+    {
+      "angle": "hero",
+      "copy": {
+        "facebook": {
+          "angle": "hero",
+          "chars": 177,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "facebook",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-cartoon-60s-wide-1920x1080.mp4"
+        },
+        "linkedin": {
+          "angle": "hero",
+          "chars": 220,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-cartoon-60s-wide-1920x1080.mp4"
+        },
+        "whatsapp": {
+          "angle": "hero",
+          "chars": 175,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-cartoon-60s-wide-1920x1080.mp4"
+        },
+        "x": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-cartoon-60s-wide-1920x1080.mp4"
+        },
+        "youtube": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "Entry. Two targets. One stop. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-cartoon-60s-wide-1920x1080.mp4"
+        }
+      },
+      "file": "priv-ad-cartoon-60s-wide-1920x1080.mp4",
+      "hook": "Entry. Two targets. One stop.",
+      "kind": "ad",
+      "orientation": "wide",
+      "seconds": 60,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-cartoon-60s-wide-1920x1080.mp4"
+    },
     {
       "angle": "custody",
       "copy": {
@@ -189,6 +347,164 @@
       "orientation": "wide",
       "seconds": 15,
       "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-desk-15s-wide-1920x1080.mp4"
+    },
+    {
+      "angle": "hero",
+      "copy": {
+        "facebook": {
+          "angle": "hero",
+          "chars": 177,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "facebook",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-doodle-60s-1080x1920.mp4"
+        },
+        "linkedin": {
+          "angle": "hero",
+          "chars": 220,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-doodle-60s-1080x1920.mp4"
+        },
+        "whatsapp": {
+          "angle": "hero",
+          "chars": 175,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-doodle-60s-1080x1920.mp4"
+        },
+        "x": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-doodle-60s-1080x1920.mp4"
+        },
+        "youtube": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "Entry. Two targets. One stop. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-doodle-60s-1080x1920.mp4"
+        }
+      },
+      "file": "priv-ad-doodle-60s-1080x1920.mp4",
+      "hook": "Entry. Two targets. One stop.",
+      "kind": "ad",
+      "orientation": "wide",
+      "seconds": 60,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-doodle-60s-1080x1920.mp4"
+    },
+    {
+      "angle": "hero",
+      "copy": {
+        "facebook": {
+          "angle": "hero",
+          "chars": 177,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "facebook",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-doodle-60s-wide-1920x1080.mp4"
+        },
+        "linkedin": {
+          "angle": "hero",
+          "chars": 220,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-doodle-60s-wide-1920x1080.mp4"
+        },
+        "whatsapp": {
+          "angle": "hero",
+          "chars": 175,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-doodle-60s-wide-1920x1080.mp4"
+        },
+        "x": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-doodle-60s-wide-1920x1080.mp4"
+        },
+        "youtube": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "Entry. Two targets. One stop. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-doodle-60s-wide-1920x1080.mp4"
+        }
+      },
+      "file": "priv-ad-doodle-60s-wide-1920x1080.mp4",
+      "hook": "Entry. Two targets. One stop.",
+      "kind": "ad",
+      "orientation": "wide",
+      "seconds": 60,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-doodle-60s-wide-1920x1080.mp4"
     },
     {
       "angle": "hook",
@@ -407,6 +723,164 @@
       "orientation": "vertical",
       "seconds": 15,
       "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-modes-15s-vertical-1080x1920.mp4"
+    },
+    {
+      "angle": "hero",
+      "copy": {
+        "facebook": {
+          "angle": "hero",
+          "chars": 177,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "facebook",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-presenter-60s-1080x1920.mp4"
+        },
+        "linkedin": {
+          "angle": "hero",
+          "chars": 220,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-presenter-60s-1080x1920.mp4"
+        },
+        "whatsapp": {
+          "angle": "hero",
+          "chars": 175,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-presenter-60s-1080x1920.mp4"
+        },
+        "x": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-presenter-60s-1080x1920.mp4"
+        },
+        "youtube": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "Entry. Two targets. One stop. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-presenter-60s-1080x1920.mp4"
+        }
+      },
+      "file": "priv-ad-presenter-60s-1080x1920.mp4",
+      "hook": "Entry. Two targets. One stop.",
+      "kind": "ad",
+      "orientation": "wide",
+      "seconds": 60,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-presenter-60s-1080x1920.mp4"
+    },
+    {
+      "angle": "hero",
+      "copy": {
+        "facebook": {
+          "angle": "hero",
+          "chars": 177,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "facebook",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-presenter-60s-wide-1920x1080.mp4"
+        },
+        "linkedin": {
+          "angle": "hero",
+          "chars": 220,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-presenter-60s-wide-1920x1080.mp4"
+        },
+        "whatsapp": {
+          "angle": "hero",
+          "chars": 175,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-presenter-60s-wide-1920x1080.mp4"
+        },
+        "x": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-presenter-60s-wide-1920x1080.mp4"
+        },
+        "youtube": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "Entry. Two targets. One stop. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-presenter-60s-wide-1920x1080.mp4"
+        }
+      },
+      "file": "priv-ad-presenter-60s-wide-1920x1080.mp4",
+      "hook": "Entry. Two targets. One stop.",
+      "kind": "ad",
+      "orientation": "wide",
+      "seconds": 60,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-ad-presenter-60s-wide-1920x1080.mp4"
     },
     {
       "angle": "proof",
@@ -674,6 +1148,243 @@
       "orientation": "wide",
       "seconds": 6,
       "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-bumper-6s-1920x1080.mp4"
+    },
+    {
+      "angle": "hero",
+      "copy": {
+        "facebook": {
+          "angle": "hero",
+          "chars": 177,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "facebook",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-demo-cartoon-smoke-1080x1920.mp4"
+        },
+        "linkedin": {
+          "angle": "hero",
+          "chars": 220,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-demo-cartoon-smoke-1080x1920.mp4"
+        },
+        "whatsapp": {
+          "angle": "hero",
+          "chars": 175,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-demo-cartoon-smoke-1080x1920.mp4"
+        },
+        "x": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-demo-cartoon-smoke-1080x1920.mp4"
+        },
+        "youtube": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "Entry. Two targets. One stop. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-demo-cartoon-smoke-1080x1920.mp4"
+        }
+      },
+      "file": "priv-demo-cartoon-smoke-1080x1920.mp4",
+      "hook": "Entry. Two targets. One stop.",
+      "kind": "campaign",
+      "orientation": "wide",
+      "seconds": null,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-demo-cartoon-smoke-1080x1920.mp4"
+    },
+    {
+      "angle": "hero",
+      "copy": {
+        "facebook": {
+          "angle": "hero",
+          "chars": 177,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "facebook",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-demo-doodle-smoke-1080x1920.mp4"
+        },
+        "linkedin": {
+          "angle": "hero",
+          "chars": 220,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-demo-doodle-smoke-1080x1920.mp4"
+        },
+        "whatsapp": {
+          "angle": "hero",
+          "chars": 175,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-demo-doodle-smoke-1080x1920.mp4"
+        },
+        "x": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-demo-doodle-smoke-1080x1920.mp4"
+        },
+        "youtube": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "Entry. Two targets. One stop. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-demo-doodle-smoke-1080x1920.mp4"
+        }
+      },
+      "file": "priv-demo-doodle-smoke-1080x1920.mp4",
+      "hook": "Entry. Two targets. One stop.",
+      "kind": "campaign",
+      "orientation": "wide",
+      "seconds": null,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-demo-doodle-smoke-1080x1920.mp4"
+    },
+    {
+      "angle": "hero",
+      "copy": {
+        "facebook": {
+          "angle": "hero",
+          "chars": 177,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "facebook",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-demo-presenter-smoke-1080x1920.mp4"
+        },
+        "linkedin": {
+          "angle": "hero",
+          "chars": 220,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "linkedin",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required\nhttps://priv.sansmercantile.com\n\n#productlaunch\n#markets\n#technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-demo-presenter-smoke-1080x1920.mp4"
+        },
+        "whatsapp": {
+          "angle": "hero",
+          "chars": 175,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "whatsapp",
+          "tags": [],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\nStart free \u2014 no card required: https://priv.sansmercantile.com",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-demo-presenter-smoke-1080x1920.mp4"
+        },
+        "x": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "x",
+          "tags": [
+            "#productlaunch",
+            "#markets",
+            "#technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required \u2192 https://priv.sansmercantile.com\n#productlaunch #markets #technicalsanalysis",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-demo-presenter-smoke-1080x1920.mp4"
+        },
+        "youtube": {
+          "angle": "hero",
+          "chars": 221,
+          "disclosed": false,
+          "hook": "Entry. Two targets. One stop.",
+          "hook_score": 42,
+          "platform": "youtube",
+          "tags": [
+            "productlaunch",
+            "markets",
+            "technicalsanalysis"
+          ],
+          "text": "Entry. Two targets. One stop.\n\nThe whole ticket is stated before you enter. No bare lines, no guessing the exit.\n\nStart free \u2014 no card required: https://priv.sansmercantile.com\n\n#productlaunch #markets #technicalsanalysis",
+          "title": "Entry. Two targets. One stop. | Priv",
+          "video": "https://priv.sansmercantile.com/marketing-assets/videos/priv-demo-presenter-smoke-1080x1920.mp4"
+        }
+      },
+      "file": "priv-demo-presenter-smoke-1080x1920.mp4",
+      "hook": "Entry. Two targets. One stop.",
+      "kind": "campaign",
+      "orientation": "wide",
+      "seconds": null,
+      "url": "https://priv.sansmercantile.com/marketing-assets/videos/priv-demo-presenter-smoke-1080x1920.mp4"
     },
     {
       "angle": "explainer",
