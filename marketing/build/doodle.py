@@ -121,13 +121,14 @@ def _scene_frame(size, art, doodles, headline, t, hand):
         kind, *args = item
         DOODLES[kind](d, *args, t, INK + (255,), max(4, int(min(size) * 0.01)))
 
-    # headline writes on at the bottom
+    # headline writes on near the bottom (higher in wide so it clears the CTA)
     if headline:
         f = B.font("display", int(min(size) * 0.06))
         shown = max(1, int(len(headline) * min(1.0, t * 1.3)))
         txt = headline[:shown]
         tw = B.text_w(txt, f)
-        d.text(((w - tw) / 2, h - int(h * 0.14)), txt, font=f, fill=ACCENT + (255,))
+        hy = h - int(h * (0.14 if size[1] >= size[0] else 0.20))
+        d.text(((w - tw) / 2, hy), txt, font=f, fill=ACCENT + (255,))
     return im
 
 

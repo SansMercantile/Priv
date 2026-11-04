@@ -19,7 +19,16 @@ OUT_VID = ads.OUT_VID
 
 # AnimateDiff is happiest at 16 frames / small canvas; the A10G (23GB) holds
 # SD1.5 + the motion adapter at 512x288 and we scale up in the compositor.
+# The canvas is chosen per render: a square-ish frame reads better cropped to
+# 9:16 vertical; a landscape frame is native for 16:9 wide.
 GEN = dict(width=512, height=288, frames=16, steps=25, guidance=7.5, fps=8)
+
+
+def _gen_for(size):
+    w, h = size
+    if h > w:                                  # vertical target -> taller canvas
+        return {**GEN, "width": 448, "height": 448}
+    return dict(GEN)                           # landscape target -> 16:9 canvas
 
 STYLE = ("clean 2D flat cartoon, bold navy and gold palette, simple geometric "
          "shapes, smooth looping motion, explainer-animation look, high quality")
@@ -58,17 +67,24 @@ def _upload_generator():
     R.write_file(f"{R.GPU_WORK}/gen_scene.py", _SCENE_PY)
 
 
-def _render_scene(spec, idx, name, seed):
-    """One AnimateDiff scene -> a local mp4 clip path."""
+def _render_scene(spec, idx, name, seed, size):
+    """One AnimateDiff scene -> a local mp4 clip path.
+
+    Idempotent: if the clip is already staged locally from an earlier
+    (interrupted) run, reuse it instead of regenerating on the GPU.
+    """
     work = f"{R.GPU_WORK}/{name}"
     box_clip = f"{work}/scene-{idx:02d}.mp4"
+    local = os.path.join(ads.TMP, f"{name}-{idx:02d}-cartoon.mp4")
+    if os.path.exists(local):
+        print(f"  scene {idx:02d} cached")
+        return local
     prompt = f"{spec['prompt']}, {STYLE}"
     payload = dict(prompt=prompt, negative=NEG, out=box_clip,
-                   seed=seed + idx, **GEN)
+                   seed=seed + idx, **_gen_for(size))
     R.write_file(f"{work}/scene-{idx:02d}.json", json.dumps(payload))
     R.run_checked(f"{R.GPU_PY} {R.GPU_WORK}/gen_scene.py "
                   f"{work}/scene-{idx:02d}.json", timeout=420, log=None)
-    local = os.path.join(ads.TMP, f"{name}-{idx:02d}-cartoon.mp4")
     R.stage_down(box_clip, f"{name}-scene-{idx:02d}.mp4", local)
     return local
 
@@ -88,7 +104,7 @@ def build(name, cfg):
             clips.append(_end_card_clip(name, cfg, i))
             print(f"  scene {i + 1:02d} end-card")
             continue
-        clips.append(_render_scene(sc, i + 1, name, seed))
+        clips.append(_render_scene(sc, i + 1, name, seed, cfg["size"]))
         print(f"  scene {i + 1:02d} generated")
 
     return EA.build(name, cfg, clips)

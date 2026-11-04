@@ -97,13 +97,18 @@ def _make_portrait(name, size, seed):
 
 
 def _render_scene(portrait_box, wav_box, idx, name):
+    """One MuseTalk scene -> a local clip. Idempotent: reuse a clip staged by
+    an earlier (interrupted) run instead of re-rendering on the GPU."""
     work = f"{R.GPU_WORK}/{name}"
     box_clip = f"{work}/presenter-{idx:02d}.mp4"
+    local = os.path.join(ads.TMP, f"{name}-{idx:02d}-presenter.mp4")
+    if os.path.exists(local):
+        print(f"  scene {idx:02d} cached")
+        return local
     payload = dict(portrait=portrait_box, audio=wav_box, out=box_clip, fps=25)
     R.write_file(f"{work}/presenter-{idx:02d}.json", json.dumps(payload))
     R.run_checked(f"{R.GPU_PY} {R.GPU_WORK}/gen_presenter.py "
                   f"{work}/presenter-{idx:02d}.json", timeout=420, log=None)
-    local = os.path.join(ads.TMP, f"{name}-{idx:02d}-presenter.mp4")
     R.stage_down(box_clip, f"{name}-presenter-{idx:02d}.mp4", local)
     return local
 
