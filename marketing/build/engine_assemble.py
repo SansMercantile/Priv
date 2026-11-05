@@ -16,10 +16,50 @@ import os
 
 import brand as B
 import ads
+import engine_runtime as R
 
 OUT_VID = ads.OUT_VID
 TMP = ads.TMP
 XFADE = ads.XFADE
+
+# default score per style, ducked well under the voice. MusicGen on our T4 box;
+# a None/off value ships VO-only, and any music failure degrades to VO-only
+# rather than blocking the render.
+MUSIC = {
+    "cartoon": dict(prompt="upbeat minimal corporate explainer bed, light "
+                           "marimba and soft synth pulse, no vocals, loopable",
+                    level=0.16),
+    "doodle": dict(prompt="gentle acoustic whiteboard explainer bed, soft "
+                          "ukulele and light percussion, no vocals, loopable",
+                   level=0.15),
+    "presenter": dict(prompt="confident corporate underscore, subtle piano and "
+                             "warm pad, no vocals, loopable",
+                      level=0.12),
+}
+
+
+def _music_bed(cfg, name, seconds):
+    """Fetch a MusicGen score for the whole cut, trimmed to length, ducked.
+
+    Returns a local wav path or None. Never raises -- a music failure must not
+    block a render.
+    """
+    spec = cfg.get("music", "__auto__")
+    style = cfg.get("_style", "cartoon")
+    if spec in (None, False, "off", "none"):
+        return None
+    if spec == "__auto__":
+        spec = MUSIC.get(style, MUSIC["cartoon"])
+    if isinstance(spec, str):
+        spec = dict(prompt=spec, level=0.15)
+    try:
+        wav = os.path.join(TMP, f"{name}-music.wav")
+        R.music(spec["prompt"], int(seconds) + 2, wav)
+        print(f"  music {os.path.basename(wav)} ({spec['prompt'][:40]}...)")
+        return wav, float(spec.get("level", 0.15))
+    except Exception as e:                    # noqa: BLE001
+        print(f"  music skipped ({str(e)[:80]})")
+        return None
 
 
 def synthesize_voice(scenes, name):
@@ -120,11 +160,36 @@ def build(name, cfg, clips):
     ads.assemble(fitted, voiced, starts, total, raw, ass, logo, cta,
                  ec_start, cta_from, ec_start, cta_y, size,
                  cfg.get("white_at", -1))
+
+    # music bed, ducked under the voice (second pass, pre-master)
+    bed = _music_bed(cfg, name, total)
+    if bed:
+        raw = _duck_music(raw, bed, name)
+
     mb = ads.master(raw, out)
     loud = ads.loudness(out)
     extra = f"  crest {mb['crest']}dB" if mb else ""
+    extra += "  +music" if bed else ""
     print(f"  -> {out}  {total:.2f}s  loudness "
           f"{loud if loud is None else round(loud, 1)} LUFS{extra}")
+    return out
+
+
+def _duck_music(raw, bed, name):
+    """Mix a MusicGen score under the voice: bed at `level`, VO untouched, with
+    a short fade-out on the tail. Returns the new raw path (music pass)."""
+    import subprocess
+    wav, level = bed
+    out = os.path.join(TMP, f"{name}-raw-music.mp4")
+    subprocess.run(
+        [ads.FFMPEG, "-y", "-i", raw, "-i", wav,
+         "-filter_complex",
+         f"[1:a]volume={level},afade=t=out:st=0:d=0[m];"
+         f"[0:a][m]amix=inputs=2:duration=first:normalize=0[a]",
+         "-map", "0:v", "-map", "[a]", "-c:v", "copy",
+         "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+         "-movflags", "+faststart", out],
+        capture_output=True, text=True, check=True)
     return out
 
 

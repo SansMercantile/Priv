@@ -176,8 +176,8 @@ def build(name, cfg):
         clips.append(_render_scene(sc, i + 1, name, size, seconds))
         print(f"  scene {i + 1:02d} doodled ({seconds:.1f}s)")
 
-    return EA.build(name, {**cfg, "_vo_paths": vo_paths, "_vo_dur": vo_dur},
-                    clips)
+    return EA.build(name, {**cfg, "_style": "doodle",
+                           "_vo_paths": vo_paths, "_vo_dur": vo_dur}, clips)
 
 
 def _end_card_clip(name, cfg, idx):

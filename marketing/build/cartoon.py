@@ -107,7 +107,7 @@ def build(name, cfg):
         clips.append(_render_scene(sc, i + 1, name, seed, cfg["size"]))
         print(f"  scene {i + 1:02d} generated")
 
-    return EA.build(name, cfg, clips)
+    return EA.build(name, {**cfg, "_style": "cartoon"}, clips)
 
 
 def _end_card_clip(name, cfg, idx):

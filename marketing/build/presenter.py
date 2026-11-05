@@ -184,8 +184,8 @@ def build(name, cfg):
         print(f"  scene {i + 1:02d} presenter+disclosure")
 
     # voice is already synthesized; tell the assembler to reuse it
-    return EA.build(name, {**cfg, "_vo_paths": vo_paths, "_vo_dur": vo_dur},
-                    clips)
+    return EA.build(name, {**cfg, "_style": "presenter",
+                           "_vo_paths": vo_paths, "_vo_dur": vo_dur}, clips)
 
 
 def _end_card_clip(name, cfg, idx):

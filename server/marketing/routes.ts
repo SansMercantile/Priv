@@ -168,6 +168,8 @@ marketingRouter.get("/engine/status", (_req, res) => {
       styles: ["cartoon", "doodle", "presenter"],
       gpu: { instance: process.env.PRIV_GPU_INSTANCE || "i-0f5aaebf6d440da5c", region: process.env.PRIV_GPU_REGION || "us-east-1" },
       disclosure: "presenter masters are stamped AI-generated for the platform label",
+      musicBed: { provider: "MusicGen (own T4 box)", note: "ducked under VO; degrades to VO-only if the music box is unreachable" },
+      url2video: { flow: "scrape page -> AI script -> creative render" },
     },
   });
 });
@@ -244,6 +246,63 @@ marketingRouter.post("/engine/creative", async (req, res) => {
     const r = await runStudio(["studio.py", "creative", "--spec", await writeSpec(spec)], 20 * 60 * 1000);
     if (!r.ok) throw Object.assign(new Error((r.stderr || r.stdout).slice(-600)), { status: 400 });
     ok(res, { ...r.json, url: assetUrl(r.json.rel) });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// URL-to-video: paste a product/page link, get a rendered ad. The page brief
+// and scene script are drafted here (this layer holds the AI client); the
+// scenes then render through the same creative engine as every other ad.
+marketingRouter.post("/engine/url2video", async (req, res) => {
+  try {
+    if (!aiGenerate) {
+      throw Object.assign(new Error("AI provider not wired yet"), { status: 503 });
+    }
+    const url = String(req.body?.url || "").trim();
+    if (!/^https?:\/\//i.test(url)) {
+      throw Object.assign(new Error("a valid http(s) url is required"), { status: 400 });
+    }
+    const style = String(req.body?.style || "doodle");
+    const sceneCount = Math.min(9, Math.max(3, Number(req.body?.scenes) || 5));
+
+    // 1) fetch + reduce the page to a brief (Python helper, no AI needed)
+    const briefR = await runStudio(["studio.py", "urlbrief", "--spec", await writeSpec({ url })], 60000);
+    if (!briefR.ok) throw Object.assign(new Error((briefR.stderr || briefR.stdout).slice(-500)), { status: 400 });
+    const brief = briefR.json;
+
+    // 2) draft the scene script with the app's own AI provider
+    const prompt = [
+      "You are the in-house copywriter for a video ad.",
+      `Write a ${sceneCount}-scene ${style} ad script for this product/offer as a strict JSON array only (no markdown, no preamble): [{"vo":"..."}]. Each vo is a short punchy spoken line (5-12 words). The final scene's vo is a call to action and that object also has "end": true.`,
+      "Voice: confident, concrete, no hype, short sentences. Never claim guaranteed wins, risk-free profit, or a win rate.",
+      `PRODUCT BRIEF:\nTitle: ${brief.title}\nDescription: ${brief.description}\nKey text: ${String(brief.text || "").slice(0, 2200)}\nPrices seen: ${(brief.prices || []).join(", ") || "none"}\nURL: ${url}`,
+      "Return ONLY the JSON array.",
+    ].join("\n");
+    const raw = (await aiGenerate(prompt)).trim();
+    const m = raw.match(/\[[\s\S]*\]/);
+    if (!m) throw Object.assign(new Error("script writer returned no scene array"), { status: 502 });
+    let scenes: any[];
+    try {
+      scenes = JSON.parse(m[0]);
+    } catch {
+      throw Object.assign(new Error("script writer returned invalid JSON"), { status: 502 });
+    }
+    if (!Array.isArray(scenes) || !scenes.length) {
+      throw Object.assign(new Error("script writer returned an empty scene list"), { status: 502 });
+    }
+
+    // 3) render through the creative engine
+    const spec = {
+      style,
+      name: String(req.body?.name || `url2video-${style}`),
+      size: req.body?.size || [1080, 1920],
+      target: Number(req.body?.target) || 30,
+      scenes,
+    };
+    const r = await runStudio(["studio.py", "creative", "--spec", await writeSpec(spec)], 20 * 60 * 1000);
+    if (!r.ok) throw Object.assign(new Error((r.stderr || r.stdout).slice(-600)), { status: 400 });
+    ok(res, { ...r.json, url: assetUrl(r.json.rel), brief: { title: brief.title, prices: brief.prices }, scenes });
   } catch (err) {
     fail(res, err);
   }

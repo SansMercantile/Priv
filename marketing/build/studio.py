@@ -143,6 +143,8 @@ def catalog():
         "plate_ratios": ["16:9", "9:16", "4:5", "1:1"],
         "plate_styles": ["campaign", "ads"],
         "creative_styles": ["cartoon", "doodle", "presenter"],
+        "url2video": True,
+        "music_bed": True,
         "creative_gpu": {"instance": engine_runtime.GPU_INSTANCE,
                          "region": engine_runtime.REGION},
         "paths": {
@@ -481,11 +483,25 @@ def engine_creative(spec):
     }
 
 
+def engine_urlbrief(spec):
+    """URL-to-video step 1: fetch a page and return its creative brief as JSON.
+
+    spec: { url } -> { url, title, description, text, prices }. The API layer
+    drafts the scene script from this brief (it holds the AI client), then
+    hands scenes to the creative engine.
+    """
+    url = str(spec.get("url") or "").strip()
+    if not url:
+        raise SystemExit("url is required")
+    import url2video
+    return url2video.fetch_page(url)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("command",
                     choices=["catalog", "poster", "video", "tts", "plate",
-                             "creative"])
+                             "creative", "urlbrief"])
     ap.add_argument("--spec", help="path to a JSON spec")
     ap.add_argument("--slug", help="poster slug to re-render")
     ap.add_argument("--formats", help="comma-separated formats")
@@ -493,6 +509,8 @@ def main():
 
     if args.command == "catalog":
         payload = catalog()
+    elif args.command == "urlbrief":
+        payload = engine_urlbrief(json.load(open(args.spec, encoding="utf-8-sig")))
     elif args.command == "poster":
         if args.slug:
             formats = [f.strip() for f in (args.formats or "").split(",") if f.strip()]

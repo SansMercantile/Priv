@@ -5,6 +5,7 @@ import {
   Copy,
   ExternalLink,
   FolderOpen,
+  Link2,
   Loader2,
   Palette,
   Play,
@@ -545,6 +546,12 @@ function EngineTab({ catalog }: { catalog: Catalog | null }) {
 }`);
   const [creativeOut, setCreativeOut] = useState<any>(null);
 
+  // URL-to-Video
+  const [u2vUrl, setU2vUrl] = useState("");
+  const [u2vStyle, setU2vStyle] = useState("doodle");
+  const [u2vScenes, setU2vScenes] = useState("5");
+  const [u2vOut, setU2vOut] = useState<any>(null);
+
   const spots = catalog?.video_spots || [];
   const voices = catalog?.voices || [];
 
@@ -616,6 +623,21 @@ function EngineTab({ catalog }: { catalog: Catalog | null }) {
       setCreativeOut(await ms("/api/marketing/engine/creative", { json: { spec } }));
     } catch (e: any) {
       setError(e.message.includes("Unexpected token") || e.message.includes("JSON") ? "Creative spec is not valid JSON" : e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const genUrl2Video = async () => {
+    setBusy("u2v");
+    setError(null);
+    setU2vOut(null);
+    try {
+      setU2vOut(await ms("/api/marketing/engine/url2video", {
+        json: { url: u2vUrl.trim(), style: u2vStyle, scenes: Number(u2vScenes) || 5 },
+      }));
+    } catch (e: any) {
+      setError(e.message);
     } finally {
       setBusy(null);
     }
@@ -754,11 +776,55 @@ function EngineTab({ catalog }: { catalog: Catalog | null }) {
           )}
         </div>
 
+        {/* URL-to-Video */}
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3 lg:col-span-2">
+          <div className="flex items-center gap-2 text-xs font-mono font-bold text-rose-300">
+            <Link2 className="w-3.5 h-3.5" /> URL-TO-VIDEO
+            <span className="text-zinc-600 font-normal normal-case">— paste a product link, get a rendered ad (scrape → script → render)</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+            <input value={u2vUrl} onChange={(e) => setU2vUrl(e.target.value)} className={`${inputCls} sm:col-span-2`} placeholder="https://your-product.com/page" />
+            <select value={u2vStyle} onChange={(e) => setU2vStyle(e.target.value)} className={inputCls}>
+              <option value="doodle">doodle</option>
+              <option value="cartoon">cartoon</option>
+              <option value="presenter">presenter</option>
+            </select>
+            <select value={u2vScenes} onChange={(e) => setU2vScenes(e.target.value)} className={inputCls}>
+              {["3", "4", "5", "6", "7", "8"].map((n) => (
+                <option key={n} value={n}>{n} scenes</option>
+              ))}
+            </select>
+          </div>
+          <button onClick={genUrl2Video} disabled={busy !== null || !/^https?:\/\//i.test(u2vUrl.trim())} className={btnPrimary}>
+            {busy === "u2v" ? <Loader2 className="w-3 h-3 inline animate-spin mr-1" /> : <Link2 className="w-3 h-3 inline mr-1" />}
+            Generate ad from URL
+          </button>
+          {u2vOut && (
+            <div className="space-y-2">
+              <div className="text-[10px] font-mono text-zinc-500">
+                {u2vOut.style} · {u2vOut.name} · {u2vOut.size?.[0]}×{u2vOut.size?.[1]} · target {u2vOut.target}s · rendered {u2vOut.seconds}s
+                {u2vOut.brief?.title ? ` · "${String(u2vOut.brief.title).slice(0, 50)}"` : ""}
+              </div>
+              {u2vOut.scenes && (
+                <div className="text-[11px] font-mono text-zinc-400 bg-black/40 border border-zinc-900 rounded-lg p-3 space-y-0.5">
+                  {u2vOut.scenes.map((s: any, i: number) => (
+                    <div key={i}><span className="text-zinc-600">{String(i + 1).padStart(2, "0")}</span> {s.vo}{s.end ? " → CTA" : ""}</div>
+                  ))}
+                </div>
+              )}
+              <video src={u2vOut.url} controls className="w-full max-h-[28rem] rounded-lg bg-black" />
+              <a href={u2vOut.url} target="_blank" rel="noreferrer" className="text-xs font-mono text-rose-300 hover:underline inline-flex items-center gap-1">
+                <ExternalLink className="w-3 h-3" /> {u2vOut.url}
+              </a>
+            </div>
+          )}
+        </div>
+
         {/* Creative Ad Lab */}
         <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3 lg:col-span-2">
           <div className="flex items-center gap-2 text-xs font-mono font-bold text-rose-300">
             <Wand2 className="w-3.5 h-3.5" /> CREATIVE AD LAB
-            <span className="text-zinc-600 font-normal normal-case">— 1-minute ads in cartoon / doodle / presenter, rendered on our GPU</span>
+            <span className="text-zinc-600 font-normal normal-case">— 1-minute ads in cartoon / doodle / presenter, rendered on our GPU · MusicGen score added automatically</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {["doodle", "cartoon", "presenter"].map((s) => (
