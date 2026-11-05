@@ -108,8 +108,10 @@ def render(kind, spec):
         rows = "".join(
             f"<tr><td class=\"bad\">{esc(b)}</td><td class=\"good\">{esc(a)}</td></tr>"
             for b, a in before_after)
+        product_name = spec.get("product_name", "Priv")
         ba_html = (f"<section><h2>{esc(spec.get('ba_title','Before / after'))}</h2>"
-                   f"<table><thead><tr><th>Without Priv</th><th>With Priv</th></tr>"
+                   f"<table><thead><tr><th>Without {esc(product_name)}</th>"
+                   f"<th>With {esc(product_name)}</th></tr>"
                    f"</thead><tbody>{rows}</tbody></table></section>")
 
     card_html = "".join(

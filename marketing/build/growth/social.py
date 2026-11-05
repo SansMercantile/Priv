@@ -26,6 +26,7 @@ TAG_SETS = {
     "trading": ["trading", "forex", "propfirms", "algotrading", "fintech"],
     "build":   ["buildinpublic", "fintech", "indiehacker", "saas"],
     "product": ["productlaunch", "markets", "technicalsanalysis"],
+    "education": ["edtech", "immersivelearning", "xr", "educchat", "stem"],
 }
 
 DISCLOSURE = "[I built this] "
@@ -33,7 +34,9 @@ DISCLOSURE = "[I built this] "
 
 def _tags(kind, platform):
     spec = PLATFORMS[platform]
-    pool = TAG_SETS.get(kind, TAG_SETS["trading"])
+    # A product may override the tag pool via stats.SOCIAL_TAGS (e.g. KEV uses
+    # education tags); otherwise fall back to the per-kind trading sets.
+    pool = getattr(stats, "SOCIAL_TAGS", None) or TAG_SETS.get(kind, TAG_SETS["trading"])
     if platform == "x":
         return [f"#{t}" for t in pool[:3]]
     if platform == "reddit":

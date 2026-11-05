@@ -101,7 +101,8 @@ def media_kit():
             "iOS and Linux, and is available free to start."),
         facts=[stats.line(k, with_source=True)
                for k in ("category", "price_free", "timeframes", "cycle",
-                         "agents", "platforms", "custody")],
+                         "agents", "platforms", "custody")
+               if stats.get(k)],
         assets=["logo pack (SVG/PNG)", "product screenshots (unaltered)",
                 "risk line (must accompany every published claim)"],
         updated=today,

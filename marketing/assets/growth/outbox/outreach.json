@@ -1,25 +1,44 @@
 {
-  "generated": "2026-11-03T04:21:49.343705Z",
+  "generated": "2026-11-05T02:46:14.224099Z",
   "items": [
     {
-      "item": "Priv media kit refresh",
+      "item": "KEV media kit refresh",
+      "kind": "press",
+      "payload": {
+        "assets": [
+          "logo pack",
+          "product screenshots (unaltered)",
+          "honest-note line (must accompany every claim)"
+        ],
+        "category": "Immersive School",
+        "facts": [
+          "11 campus floors  [campus model (11 floors, 199 rooms)]",
+          "199 rooms  [campus model]",
+          "14 bookable facilities  [Virtual School facility list]",
+          "2,234 anatomical structures  [Human Atlas (BodyParts3D 4.0 index)]",
+          "4 interactive 3D labs  [chemistry / gravity / cell / light]",
+          "185+ curriculum subjects  [curriculum graph]",
+          "6 languages in full parity  [i18n locale parity check]",
+          "100% of 3D models precached  [PWA precache manifest]"
+        ],
+        "name": "KEV media kit",
+        "note": "KEV is educational software; no learning-outcome or performance claims. Immersive scenes are teaching visualisations; Motion Gym is on-device analysis.",
+        "parent": "Sans Mercantile",
+        "tagline": "KEV is an immersive school: a 3D campus, studio-grade science labs, level-adaptive AI tutors and an offline classroom, on any device.",
+        "website": "https://kev.sansmercantile.com"
+      }
+    },
+    {
+      "item": "educator outreach: 3 school / MAT innovation leads",
       "kind": "press"
     },
     {
-      "item": "3 partner pitches to trading educators",
-      "kind": "affiliate"
-    },
-    {
-      "item": "Two minutes of your time on Priv?",
+      "item": "invite pilot families to review (no incentives)",
       "kind": "review"
     },
     {
-      "item": "Two minutes of your time on Priv?",
-      "kind": "review"
-    },
-    {
-      "item": "partner swipe pack refreshed",
-      "kind": "affiliate"
+      "item": "first LinkedIn article -> ClickUp review queue for Pascaline",
+      "kind": "article"
     }
   ],
   "policy": "Prepared for a human to send. Never auto-sent."

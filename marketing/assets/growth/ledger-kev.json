@@ -1,0 +1,406 @@
+{
+  "meta": [],
+  "updated": 1793846774,
+  "variants": {
+    "carousel-contrast-no-cartoon-school-a-real-one-walk-to-22a959": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "contrast",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "carousel",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "No cartoon school. A real one, in 3D.",
+        "id": "carousel-contrast-no-cartoon-school-a-real-one-walk-to-22a959",
+        "predicted": 66
+      }
+    },
+    "carousel-identity-no-cartoon-school-a-real-one-walk-to-ae81f8": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "identity",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "carousel",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "No cartoon school. A real one, in 3D.",
+        "id": "carousel-identity-no-cartoon-school-a-real-one-walk-to-ae81f8",
+        "predicted": 66
+      }
+    },
+    "carousel-mechanism-no-cartoon-school-a-real-one-walk-t-0c59c3": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "mechanism",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "carousel",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "No cartoon school. A real one, in 3D.",
+        "id": "carousel-mechanism-no-cartoon-school-a-real-one-walk-t-0c59c3",
+        "predicted": 66
+      }
+    },
+    "carousel-proof-no-cartoon-school-a-real-one-walk-to-cl-20033f": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "proof",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "carousel",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "No cartoon school. A real one, in 3D.",
+        "id": "carousel-proof-no-cartoon-school-a-real-one-walk-to-cl-20033f",
+        "predicted": 66
+      }
+    },
+    "static-contrast-no-cartoon-school-a-real-one-walk-to-c-06d42e": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "contrast",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "static",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "No cartoon school. A real one, in 3D.",
+        "id": "static-contrast-no-cartoon-school-a-real-one-walk-to-c-06d42e",
+        "predicted": 63
+      }
+    },
+    "static-contrast-pe-that-reads-your-movement-n-walk-to-6d28e5": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "contrast",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "static",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "PE that reads your movement, not your data.",
+        "id": "static-contrast-pe-that-reads-your-movement-n-walk-to-6d28e5",
+        "predicted": 59
+      }
+    },
+    "static-identity-no-cartoon-school-a-real-one-walk-to-c-6f5649": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "identity",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "static",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "No cartoon school. A real one, in 3D.",
+        "id": "static-identity-no-cartoon-school-a-real-one-walk-to-c-6f5649",
+        "predicted": 63
+      }
+    },
+    "static-identity-pe-that-reads-your-movement-n-walk-to-8ca663": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "identity",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "static",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "PE that reads your movement, not your data.",
+        "id": "static-identity-pe-that-reads-your-movement-n-walk-to-8ca663",
+        "predicted": 59
+      }
+    },
+    "static-mechanism-no-cartoon-school-a-real-one-walk-to-f05e4e": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "mechanism",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "static",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "No cartoon school. A real one, in 3D.",
+        "id": "static-mechanism-no-cartoon-school-a-real-one-walk-to-f05e4e",
+        "predicted": 63
+      }
+    },
+    "static-mechanism-pe-that-reads-your-movement-n-walk-to-f7d9c8": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "mechanism",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "static",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "PE that reads your movement, not your data.",
+        "id": "static-mechanism-pe-that-reads-your-movement-n-walk-to-f7d9c8",
+        "predicted": 59
+      }
+    },
+    "static-proof-no-cartoon-school-a-real-one-walk-to-clas-53a2ab": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "proof",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "static",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "No cartoon school. A real one, in 3D.",
+        "id": "static-proof-no-cartoon-school-a-real-one-walk-to-clas-53a2ab",
+        "predicted": 63
+      }
+    },
+    "static-proof-pe-that-reads-your-movement-n-walk-to-cla-f9a3d7": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "proof",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "static",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "PE that reads your movement, not your data.",
+        "id": "static-proof-pe-that-reads-your-movement-n-walk-to-cla-f9a3d7",
+        "predicted": 59
+      }
+    },
+    "video-contrast-no-cartoon-school-a-real-one-walk-to-cl-ef42b0": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "contrast",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "video",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "No cartoon school. A real one, in 3D.",
+        "id": "video-contrast-no-cartoon-school-a-real-one-walk-to-cl-ef42b0",
+        "predicted": 69
+      }
+    },
+    "video-contrast-pe-that-reads-your-movement-n-walk-to-c-137e32": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "contrast",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "video",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "PE that reads your movement, not your data.",
+        "id": "video-contrast-pe-that-reads-your-movement-n-walk-to-c-137e32",
+        "predicted": 65
+      }
+    },
+    "video-identity-no-cartoon-school-a-real-one-walk-to-cl-274555": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "identity",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "video",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "No cartoon school. A real one, in 3D.",
+        "id": "video-identity-no-cartoon-school-a-real-one-walk-to-cl-274555",
+        "predicted": 69
+      }
+    },
+    "video-identity-pe-that-reads-your-movement-n-walk-to-c-48ca13": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "identity",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "video",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "PE that reads your movement, not your data.",
+        "id": "video-identity-pe-that-reads-your-movement-n-walk-to-c-48ca13",
+        "predicted": 65
+      }
+    },
+    "video-mechanism-no-cartoon-school-a-real-one-walk-to-c-78a253": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "mechanism",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "video",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "No cartoon school. A real one, in 3D.",
+        "id": "video-mechanism-no-cartoon-school-a-real-one-walk-to-c-78a253",
+        "predicted": 69
+      }
+    },
+    "video-mechanism-pe-that-reads-your-movement-n-walk-to-687442": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "mechanism",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "video",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "PE that reads your movement, not your data.",
+        "id": "video-mechanism-pe-that-reads-your-movement-n-walk-to-687442",
+        "predicted": 65
+      }
+    },
+    "video-proof-no-cartoon-school-a-real-one-walk-to-class-9b4f3d": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "proof",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "video",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "No cartoon school. A real one, in 3D.",
+        "id": "video-proof-no-cartoon-school-a-real-one-walk-to-class-9b4f3d",
+        "predicted": 69
+      }
+    },
+    "video-proof-pe-that-reads-your-movement-n-walk-to-clas-699bc4": {
+      "clicks": 0,
+      "conversions": 0,
+      "created": 1793846647,
+      "history": [],
+      "impressions": 0,
+      "revenue": 0.0,
+      "spend": 0.0,
+      "status": "active",
+      "variant": {
+        "angle": "proof",
+        "body": "Eleven floors, 199 rooms and 14 bookable facilities \u2014 the whole school, explorable and gated to your role.",
+        "cta": "Start free \u2014 walk the campus",
+        "format": "video",
+        "headline": "Walk to class through a 3D campus.",
+        "hook": "PE that reads your movement, not your data.",
+        "id": "video-proof-pe-that-reads-your-movement-n-walk-to-clas-699bc4",
+        "predicted": 65
+      }
+    }
+  }
+}

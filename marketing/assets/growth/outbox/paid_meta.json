@@ -5,7 +5,7 @@
       "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
       "billing_event": "IMPRESSIONS",
       "daily_budget": 20,
-      "name": "priv-growth-2026-11-03 \u00b7 ['US', 'CA', 'GB', 'AU']",
+      "name": "kev-growth-2026-11-05 \u00b7 ['US', 'CA', 'GB', 'AU']",
       "optimization_goal": "LEAD_GENERATION",
       "start_time": "now",
       "status": "PAUSED",
@@ -16,24 +16,24 @@
           {
             "interests": [
               {
-                "id": "Forex trading",
-                "name": "Forex trading"
+                "id": "Educational technology",
+                "name": "Educational technology"
               },
               {
-                "id": "Day trading",
-                "name": "Day trading"
+                "id": "Homeschooling",
+                "name": "Homeschooling"
               },
               {
-                "id": "Technical analysis",
-                "name": "Technical analysis"
+                "id": "E-learning",
+                "name": "E-learning"
               },
               {
-                "id": "Algorithmic trading",
-                "name": "Algorithmic trading"
+                "id": "Parenting",
+                "name": "Parenting"
               },
               {
-                "id": "Financial markets",
-                "name": "Financial markets"
+                "id": "STEM education",
+                "name": "STEM education"
               }
             ]
           }
@@ -53,7 +53,7 @@
       }
     },
     "campaign": {
-      "name": "priv-growth-2026-11-03",
+      "name": "kev-growth-2026-11-05",
       "objective": "LEADS",
       "special_ad_categories": [],
       "status": "PAUSED"
@@ -71,16 +71,16 @@
           "object_story_spec": {
             "link_data": {
               "call_to_action_action_type": "WATCH_MORE",
-              "caption": "priv.sansmercantile.com",
+              "caption": "kev.sansmercantile.com",
               "description": "",
-              "link": "https://priv.sansmercantile.com",
-              "message": "Nobody taught you this in demo.",
+              "link": "https://kev.sansmercantile.com",
+              "message": "No cartoon school. A real one, in 3D.",
               "name": "Entry. Two targets. One stop."
             },
             "page_id": "${PAGE_ID}"
           }
         },
-        "name": "priv-growth-2026-11-03 \u00b7 video \u00b7 0",
+        "name": "kev-growth-2026-11-05 \u00b7 video \u00b7 0",
         "status": "PAUSED"
       },
       {
@@ -95,16 +95,16 @@
           "object_story_spec": {
             "link_data": {
               "call_to_action_action_type": "WATCH_MORE",
-              "caption": "priv.sansmercantile.com",
+              "caption": "kev.sansmercantile.com",
               "description": "",
-              "link": "https://priv.sansmercantile.com",
-              "message": "Nobody taught you this in demo.",
+              "link": "https://kev.sansmercantile.com",
+              "message": "No cartoon school. A real one, in 3D.",
               "name": "Entry. Two targets. One stop."
             },
             "page_id": "${PAGE_ID}"
           }
         },
-        "name": "priv-growth-2026-11-03 \u00b7 video \u00b7 1",
+        "name": "kev-growth-2026-11-05 \u00b7 video \u00b7 1",
         "status": "PAUSED"
       },
       {
@@ -119,16 +119,16 @@
           "object_story_spec": {
             "link_data": {
               "call_to_action_action_type": "WATCH_MORE",
-              "caption": "priv.sansmercantile.com",
+              "caption": "kev.sansmercantile.com",
               "description": "",
-              "link": "https://priv.sansmercantile.com",
-              "message": "Nobody taught you this in demo.",
+              "link": "https://kev.sansmercantile.com",
+              "message": "No cartoon school. A real one, in 3D.",
               "name": "Entry. Two targets. One stop."
             },
             "page_id": "${PAGE_ID}"
           }
         },
-        "name": "priv-growth-2026-11-03 \u00b7 video \u00b7 2",
+        "name": "kev-growth-2026-11-05 \u00b7 video \u00b7 2",
         "status": "PAUSED"
       },
       {
@@ -143,16 +143,16 @@
           "object_story_spec": {
             "link_data": {
               "call_to_action_action_type": "LEARN_MORE",
-              "caption": "priv.sansmercantile.com",
+              "caption": "kev.sansmercantile.com",
               "description": "",
-              "link": "https://priv.sansmercantile.com",
-              "message": "Nobody taught you this in demo.",
+              "link": "https://kev.sansmercantile.com",
+              "message": "No cartoon school. A real one, in 3D.",
               "name": "Entry. Two targets. One stop."
             },
             "page_id": "${PAGE_ID}"
           }
         },
-        "name": "priv-growth-2026-11-03 \u00b7 static \u00b7 3",
+        "name": "kev-growth-2026-11-05 \u00b7 static \u00b7 3",
         "status": "PAUSED"
       },
       {
@@ -167,16 +167,16 @@
           "object_story_spec": {
             "link_data": {
               "call_to_action_action_type": "LEARN_MORE",
-              "caption": "priv.sansmercantile.com",
+              "caption": "kev.sansmercantile.com",
               "description": "",
-              "link": "https://priv.sansmercantile.com",
-              "message": "Nobody taught you this in demo.",
+              "link": "https://kev.sansmercantile.com",
+              "message": "No cartoon school. A real one, in 3D.",
               "name": "Entry. Two targets. One stop."
             },
             "page_id": "${PAGE_ID}"
           }
         },
-        "name": "priv-growth-2026-11-03 \u00b7 static \u00b7 4",
+        "name": "kev-growth-2026-11-05 \u00b7 static \u00b7 4",
         "status": "PAUSED"
       },
       {
@@ -191,20 +191,20 @@
           "object_story_spec": {
             "link_data": {
               "call_to_action_action_type": "LEARN_MORE",
-              "caption": "priv.sansmercantile.com",
+              "caption": "kev.sansmercantile.com",
               "description": "",
-              "link": "https://priv.sansmercantile.com",
-              "message": "Nobody taught you this in demo.",
+              "link": "https://kev.sansmercantile.com",
+              "message": "No cartoon school. A real one, in 3D.",
               "name": "Entry. Two targets. One stop."
             },
             "page_id": "${PAGE_ID}"
           }
         },
-        "name": "priv-growth-2026-11-03 \u00b7 static \u00b7 5",
+        "name": "kev-growth-2026-11-05 \u00b7 static \u00b7 5",
         "status": "PAUSED"
       }
     ],
-    "disclaimer": "Trading involves risk. Past performance is not indicative of future results.",
+    "disclaimer": "KEV is educational software. Immersive scenes are teaching visualisations; Motion Gym is on-device movement analysis, not medical monitoring.",
     "rules": {
       "kill_ctr_below": 0.005,
       "min_spend_no_conversion": 3.0,

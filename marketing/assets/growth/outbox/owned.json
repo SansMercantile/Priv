@@ -1,24 +1,17 @@
 {
   "files": [
-    "public/growth/compare/priv-vs-copy-trading.html",
-    "public/growth/compare/priv-vs-manual-trading.html",
-    "public/growth/compare/priv-vs-signal-groups.html",
-    "public/growth/features/autonomous-execution.html",
-    "public/growth/features/custody-and-control.html",
-    "public/growth/features/live-signals.html",
-    "public/growth/features/platforms.html",
-    "public/growth/features/strategy-lab.html",
-    "public/growth/partners.html",
-    "public/growth/press/media-kit.html",
-    "public/growth/risk.html",
+    "public/growth/explore/campus.html",
+    "public/growth/explore/frontier.html",
+    "public/growth/explore/labs.html",
+    "public/growth/explore/motion-gym.html",
+    "public/growth/explore/offline.html",
+    "public/growth/explore/tutors.html",
+    "public/growth/for/primary.html",
+    "public/growth/for/secondary.html",
+    "public/growth/for/university.html",
     "public/growth/sitemap.xml",
-    "public/growth/tool/backtest-explainer.html",
-    "public/growth/tool/timeframe-picker.html",
-    "public/growth/trust/reviews.html",
-    "public/growth/usecase/night-shift.html",
-    "public/growth/usecase/part-time-trader.html",
-    "public/growth/usecase/swing-trader.html"
+    "public/growth/trust/privacy.html"
   ],
-  "message": "growth: refresh 18 landing pages (2026-11-03)",
+  "message": "kev growth: 11 landing pages (2026-11-05)",
   "target": "SansMercantile/Nexus@main"
 }
