@@ -20,8 +20,19 @@ ASSETS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
 VIDEOS = os.path.join(ASSETS, "videos")
 PUBLIC = "https://priv.sansmercantile.com/marketing-assets/videos"
 
-# angle -> (hook, body). Keys are matched against the filename.
+# angle -> (hook, body). Keys are matched against the filename; the more
+# specific multi-word keys are checked before the single-word ones below.
 ANGLES = {
+    # the new creative-engine ads (style-tagged filenames)
+    "cartoon": ("Trading, explained in sixty seconds.",
+                "One market, seven timeframes, watched around the clock — "
+                "every ticket ships entry, two targets and a stop."),
+    "doodle":  ("Exit before entry.",
+                "Most people learn this after a bad week. Every setup ships "
+                "with the stop already stated — your money stays yours."),
+    "presenter": ("An autonomous trading desk, on camera.",
+                  "Every signal ships the entry, two targets and a stop — "
+                  "and your money never leaves your own broker."),
     "custody": ("Your money never leaves your own broker.",
                 "Priv connects to your own broker through official OAuth and "
                 "holds no client funds. Your money stays yours."),
