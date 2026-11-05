@@ -55,14 +55,19 @@ if path == "client":
     # Chatterbox (MIT) -- client-facing, watermarked
     import torch
     from chatterbox.tts import ChatterboxTTS
-    m = ChatterboxTTS.from_pretrained(model + "/chatterbox", device="cuda")
+    m = ChatterboxTTS.from_local(model + "/chatterbox", device="cuda")
     wav = m.generate(text, audio_prompt_path=ref)
     import torchaudio
     torchaudio.save(out, wav, m.sr)
 else:
-    # XTTS v2 (CPML, non-commercial) -- in-house only
+    # XTTS v2 (CPML, non-commercial) -- in-house only; load local weights by path
     from TTS.api import TTS
-    tts = TTS(model + "/xtts_v2", gpu=True)
+    import os
+    tts = TTS(gpu=True)
+    tts.load_tts_model_by_path(
+        model_path=os.path.join(model, "xtts_v2", "model.pth"),
+        config_path=os.path.join(model, "xtts_v2", "config.json"),
+        gpu=True)
     tts.tts_to_file(text=text, file_path=out, speaker_wav=ref, language="en")
 
 print("wrote", out)
@@ -70,7 +75,9 @@ print("wrote", out)
 
 INSTALL_SH = r"""
 set -euo pipefail
-PY=/opt/pytorch/bin/python
+# the box's base /opt/pytorch torch is broken for chatterbox (ncclCommResume
+# symbol mismatch); the MuseTalk py3.11 venv (torch 2.1.2) is the working env.
+PY=/opt/priv/venv-musetalk/bin/python
 M=/opt/priv/models/voice
 mkdir -p "$M"
 $PY -m pip install --quiet --upgrade pip
@@ -135,7 +142,7 @@ def clone(text, ref_audio, path, name=None, consent=None):
     payload = dict(path=path, text=text, ref=ref_box, out=box_out)
     R.write_file(f"{work}/clone.json", json.dumps(payload))
     R.write_file(f"{work}/clone_voice.py", _CLONE_PY)
-    R.run_checked(f"{R.GPU_PY} {work}/clone_voice.py {work}/clone.json",
+    R.run_checked(f"{R.GPU_MUSETALK_PY} {work}/clone_voice.py {work}/clone.json",
                   timeout=600, log=None)
     R.stage_down(box_out, f"{name}-clone.wav", out_wav)
 
