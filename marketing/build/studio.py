@@ -521,11 +521,25 @@ def engine_image(spec):
     return image_studio.run(spec)
 
 
+def engine_voice_clone(spec):
+    """Voice cloning: spec { path: client|inhouse, text, ref, consent, name? }.
+    client = Chatterbox (MIT, client-facing); inhouse = XTTS v2 (NON-COMMERCIAL
+    internal only). consent (who consented) is mandatory.
+    """
+    import voice_clone
+    ref = spec.get("ref")
+    if ref and not os.path.isabs(ref):
+        cand = os.path.join(ASSETS, str(ref).lstrip("/").replace("marketing-assets/", ""))
+        if os.path.exists(cand):
+            spec = {**spec, "ref": cand}
+    return voice_clone.run(spec)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("command",
                     choices=["catalog", "poster", "video", "tts", "plate",
-                             "creative", "urlbrief", "image"])
+                             "creative", "urlbrief", "image", "voiceclone"])
     ap.add_argument("--spec", help="path to a JSON spec")
     ap.add_argument("--slug", help="poster slug to re-render")
     ap.add_argument("--formats", help="comma-separated formats")
@@ -537,6 +551,8 @@ def main():
         payload = engine_urlbrief(json.load(open(args.spec, encoding="utf-8-sig")))
     elif args.command == "image":
         payload = engine_image(json.load(open(args.spec, encoding="utf-8-sig")))
+    elif args.command == "voiceclone":
+        payload = engine_voice_clone(json.load(open(args.spec, encoding="utf-8-sig")))
     elif args.command == "poster":
         if args.slug:
             formats = [f.strip() for f in (args.formats or "").split(",") if f.strip()]

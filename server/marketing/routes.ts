@@ -322,6 +322,27 @@ marketingRouter.post("/engine/url2video", async (req, res) => {
   }
 });
 
+// Voice cloning: path=client (Chatterbox, MIT, client-facing) or path=inhouse
+// (XTTS v2, NON-COMMERCIAL internal only). consent is mandatory -- we only
+// clone voices we have rights to.
+marketingRouter.post("/engine/voiceclone", async (req, res) => {
+  try {
+    const spec = req.body?.spec ?? req.body;
+    if (!spec?.path || !spec?.text || !spec?.ref) {
+      throw Object.assign(new Error("path, text and ref are required"), { status: 400 });
+    }
+    if (!spec?.consent) {
+      throw Object.assign(new Error("consent is required -- name who consented to this voice clone"), { status: 400 });
+    }
+    const specFile = await writeSpec(spec);
+    const r = await enqueueGpu(() => runStudio(["studio.py", "voiceclone", "--spec", specFile], 10 * 60 * 1000));
+    if (!r.ok) throw Object.assign(new Error((r.stderr || r.stdout).slice(-600)), { status: 400 });
+    ok(res, { ...r.json, url: assetUrl(r.json.wav?.rel) });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
 // Image / product-photo suite: Bedrock edit models (remove-background,
 // inpaint, outpaint, erase-object, style-transfer, generate, product_shot).
 marketingRouter.post("/engine/image", async (req, res) => {
