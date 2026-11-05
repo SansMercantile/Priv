@@ -13,8 +13,8 @@
     "build": "electron-builder --linux AppImage --mac dmg zip"
   },
   "devDependencies": {
-    "electron": "^31.3.10",
-    "electron-builder": "^24.13.3"
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0"
   },
   "build": {
     "appId": "com.sansmercantile.privcore",
