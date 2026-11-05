@@ -552,6 +552,21 @@ function EngineTab({ catalog }: { catalog: Catalog | null }) {
   const [u2vScenes, setU2vScenes] = useState("5");
   const [u2vOut, setU2vOut] = useState<any>(null);
 
+  // Image Studio
+  const [imgOp, setImgOp] = useState("generate");
+  const [imgPrompt, setImgPrompt] = useState("");
+  const [imgSetting, setImgSetting] = useState("");
+  const [imgFile, setImgFile] = useState("");
+  const [imgRatio, setImgRatio] = useState("1:1");
+  const [imgOut, setImgOut] = useState<any>(null);
+
+  // Voice Clone
+  const [vcPath, setVcPath] = useState("client");
+  const [vcText, setVcText] = useState("");
+  const [vcRef, setVcRef] = useState("");
+  const [vcConsent, setVcConsent] = useState("");
+  const [vcOut, setVcOut] = useState<any>(null);
+
   const spots = catalog?.video_spots || [];
   const voices = catalog?.voices || [];
 
@@ -635,6 +650,40 @@ function EngineTab({ catalog }: { catalog: Catalog | null }) {
     try {
       setU2vOut(await ms("/api/marketing/engine/url2video", {
         json: { url: u2vUrl.trim(), style: u2vStyle, scenes: Number(u2vScenes) || 5 },
+      }));
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const genImage = async () => {
+    setBusy("image");
+    setError(null);
+    setImgOut(null);
+    try {
+      const spec: any = { op: imgOp };
+      if (imgOp === "generate") spec.prompt = imgPrompt;
+      if (imgOp === "generate") spec.ratio = imgRatio;
+      if (imgOp === "product_shot") { spec.image = imgFile; spec.setting = imgSetting; }
+      if (["inpaint", "style_transfer"].includes(imgOp)) { spec.image = imgFile; spec.prompt = imgPrompt; }
+      if (["remove_background", "erase_object", "outpaint"].includes(imgOp)) spec.image = imgFile;
+      setImgOut(await ms("/api/marketing/engine/image", { json: { spec } }));
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const genVoiceClone = async () => {
+    setBusy("voiceclone");
+    setError(null);
+    setVcOut(null);
+    try {
+      setVcOut(await ms("/api/marketing/engine/voiceclone", {
+        json: { spec: { path: vcPath, text: vcText, ref: vcRef, consent: vcConsent } },
       }));
     } catch (e: any) {
       setError(e.message);
@@ -816,6 +865,87 @@ function EngineTab({ catalog }: { catalog: Catalog | null }) {
               <a href={u2vOut.url} target="_blank" rel="noreferrer" className="text-xs font-mono text-rose-300 hover:underline inline-flex items-center gap-1">
                 <ExternalLink className="w-3 h-3" /> {u2vOut.url}
               </a>
+            </div>
+          )}
+        </div>
+
+        {/* Image Studio */}
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
+          <div className="flex items-center gap-2 text-xs font-mono font-bold text-rose-300">
+            <ImageIcon className="w-3.5 h-3.5" /> IMAGE STUDIO
+          </div>
+          <select value={imgOp} onChange={(e) => setImgOp(e.target.value)} className={inputCls}>
+            <option value="generate">generate (text → image)</option>
+            <option value="product_shot">product shot (cut out → branded setting)</option>
+            <option value="remove_background">remove background</option>
+            <option value="inpaint">inpaint (edit a region)</option>
+            <option value="outpaint">outpaint (extend frame)</option>
+            <option value="style_transfer">style transfer (re-style)</option>
+            <option value="erase_object">erase object</option>
+          </select>
+          {imgOp === "generate" && (
+            <>
+              <input value={imgPrompt} onChange={(e) => setImgPrompt(e.target.value)} className={inputCls} placeholder="Describe the image" />
+              <select value={imgRatio} onChange={(e) => setImgRatio(e.target.value)} className={inputCls}>
+                {(catalog?.plate_ratios || ["16:9", "9:16", "4:5", "1:1"]).map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </>
+          )}
+          {imgOp === "product_shot" && (
+            <>
+              <input value={imgFile} onChange={(e) => setImgFile(e.target.value)} className={inputCls} placeholder="image path (asset-relative or absolute)" />
+              <input value={imgSetting} onChange={(e) => setImgSetting(e.target.value)} className={inputCls} placeholder="setting — e.g. a marble desk with soft gold light" />
+            </>
+          )}
+          {["inpaint", "style_transfer", "remove_background", "erase_object", "outpaint"].includes(imgOp) && (
+            <input value={imgFile} onChange={(e) => setImgFile(e.target.value)} className={inputCls} placeholder="image path (asset-relative or absolute)" />
+          )}
+          {["inpaint", "style_transfer"].includes(imgOp) && (
+            <input value={imgPrompt} onChange={(e) => setImgPrompt(e.target.value)} className={inputCls} placeholder="prompt for the edit" />
+          )}
+          <button onClick={genImage} disabled={busy !== null} className={btnPrimary}>
+            {busy === "image" ? <Loader2 className="w-3 h-3 inline animate-spin mr-1" /> : <ImageIcon className="w-3 h-3 inline mr-1" />}
+            Run
+          </button>
+          {imgOut && (
+            <div className="space-y-1">
+              <a href={imgOut.url} target="_blank" rel="noreferrer" className="block bg-black/50 rounded-lg overflow-hidden w-40">
+                <img src={imgOut.url} alt={imgOut.op} className="w-full object-contain" />
+              </a>
+              <div className="text-[10px] font-mono text-zinc-500">{imgOut.op} · {imgOut.rel}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Voice Clone */}
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
+          <div className="flex items-center gap-2 text-xs font-mono font-bold text-rose-300">
+            <Mic className="w-3.5 h-3.5" /> VOICE CLONE
+          </div>
+          <select value={vcPath} onChange={(e) => setVcPath(e.target.value)} className={inputCls}>
+            <option value="client">client — Chatterbox (MIT, client-facing)</option>
+            <option value="inhouse">inhouse — XTTS v2 (NON-COMMERCIAL internal only)</option>
+          </select>
+          {vcPath === "inhouse" && (
+            <div className="text-[10px] font-mono text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg p-2">
+              Internal use only — Coqui licence is non-commercial; never ship this in client-facing output.
+            </div>
+          )}
+          <textarea value={vcText} onChange={(e) => setVcText(e.target.value)} rows={2} className={inputCls} placeholder="Text for the cloned voice to speak" />
+          <input value={vcRef} onChange={(e) => setVcRef(e.target.value)} className={inputCls} placeholder="reference voice (asset-relative or absolute wav/mp3)" />
+          <input value={vcConsent} onChange={(e) => setVcConsent(e.target.value)} className={inputCls} placeholder="consent — who consented (e.g. self, founder-name) *required*" />
+          <button onClick={genVoiceClone} disabled={busy !== null || !vcText.trim() || !vcRef.trim() || !vcConsent.trim()} className={btnPrimary}>
+            {busy === "voiceclone" ? <Loader2 className="w-3 h-3 inline animate-spin mr-1" /> : <Mic className="w-3 h-3 inline mr-1" />}
+            Clone voice
+          </button>
+          {vcOut && (
+            <div className="space-y-2">
+              <div className="text-[10px] font-mono text-zinc-500">
+                {vcOut.path} · {vcOut.license}{vcOut.commercial === false ? " · non-commercial" : ""}
+              </div>
+              <audio src={vcOut.url} controls className="w-full" />
             </div>
           )}
         </div>

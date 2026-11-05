@@ -26,6 +26,17 @@ import brand as B
 REGION = "us-west-2"
 OUT = os.path.join(B.ASSETS, "images")
 
+# The Stability edit models are NOT available for on-demand invoke by bare
+# model ID in these regions -- they must go through the US cross-region
+# inference profile ("us." prefix). Generation (Ultra) works either way.
+MODELS = {
+    "remove_background": "us.stability.stable-image-remove-background-v1:0",
+    "inpaint": "us.stability.stable-image-inpaint-v1:0",
+    "outpaint": "us.stability.stable-outpaint-v1:0",
+    "erase_object": "us.stability.stable-image-erase-object-v1:0",
+    "style_transfer": "us.stability.stable-style-transfer-v1:0",
+}
+
 
 def _client():
     return boto3.client("bedrock-runtime", region_name=REGION)
@@ -57,7 +68,7 @@ def _save(data, name, sub=""):
 def remove_background(image, name=None):
     """Cut the subject out -> transparent-background PNG."""
     body = {"image": base64.b64encode(_img_bytes(image)).decode()}
-    data = _invoke("stability.stable-image-remove-background-v1:0", body)
+    data = _invoke(MODELS["remove_background"], body)
     return _save(data, name or f"cutout-{time.strftime('%Y%m%d-%H%M%S')}.png")
 
 
@@ -72,7 +83,7 @@ def inpaint(image, prompt, name=None, mask=None, grow=0.05):
     }
     if mask is not None:
         body["mask"] = base64.b64encode(_img_bytes(mask)).decode()
-    data = _invoke("stability.stable-image-inpaint-v1:0", body)
+    data = _invoke(MODELS["inpaint"], body)
     return _save(data, name or f"inpaint-{time.strftime('%Y%m%d-%H%M%S')}.png")
 
 
@@ -83,7 +94,7 @@ def outpaint(image, name=None, left=0, right=0, up=0, down=0, prompt=""):
         "left": left, "right": right, "up": up, "down": down,
         "prompt": prompt, "output_format": "png",
     }
-    data = _invoke("stability.stable-outpaint-v1:0", body)
+    data = _invoke(MODELS["outpaint"], body)
     return _save(data, name or f"outpaint-{time.strftime('%Y%m%d-%H%M%S')}.png")
 
 
@@ -94,7 +105,7 @@ def erase_object(image, mask, name=None):
         "mask": base64.b64encode(_img_bytes(mask)).decode(),
         "output_format": "png",
     }
-    data = _invoke("stability.stable-image-erase-object-v1:0", body)
+    data = _invoke(MODELS["erase_object"], body)
     return _save(data, name or f"erase-{time.strftime('%Y%m%d-%H%M%S')}.png")
 
 
@@ -107,7 +118,7 @@ def style_transfer(image, prompt, name=None, strength=0.6):
         "image_strength": max(0.0, min(1.0, 1.0 - strength)),
         "output_format": "png",
     }
-    data = _invoke("stability.stable-style-transfer-v1:0", body)
+    data = _invoke(MODELS["style_transfer"], body)
     return _save(data, name or f"style-{time.strftime('%Y%m%d-%H%M%S')}.png")
 
 
