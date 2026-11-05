@@ -17,6 +17,18 @@ import {
 
 export const marketingRouter = express.Router();
 
+// ── GPU render mutex ─────────────────────────────────────────────────────────
+// The A10G video box and the T4 music box both run a single SSM agent; two or
+// more heavy renders at once starve the agent and it drops (ConnectionLost),
+// which is exactly what killed both boxes earlier. All GPU-bound creative work
+// (creative renders, URL-to-video, plate gen) serialises through this queue.
+let gpuChain: Promise<unknown> = Promise.resolve();
+function enqueueGpu<T>(job: () => Promise<T>): Promise<T> {
+  const next = gpuChain.then(job, job);
+  gpuChain = next.catch(() => {});
+  return next;
+}
+
 // ── engine dependency injection ──────────────────────────────────────────────
 // The AI script writer reuses whatever provider server.ts already has wired
 // (Bedrock or Gemini via getAIClient). server.ts calls setEngineAI() at boot
@@ -243,7 +255,8 @@ marketingRouter.post("/engine/creative", async (req, res) => {
     if (!spec?.style || !Array.isArray(spec?.scenes) || !spec.scenes.length) {
       throw Object.assign(new Error("spec needs style and scenes[]"), { status: 400 });
     }
-    const r = await runStudio(["studio.py", "creative", "--spec", await writeSpec(spec)], 20 * 60 * 1000);
+    const specFile = await writeSpec(spec);
+    const r = await enqueueGpu(() => runStudio(["studio.py", "creative", "--spec", specFile], 20 * 60 * 1000));
     if (!r.ok) throw Object.assign(new Error((r.stderr || r.stdout).slice(-600)), { status: 400 });
     ok(res, { ...r.json, url: assetUrl(r.json.rel) });
   } catch (err) {
@@ -300,7 +313,8 @@ marketingRouter.post("/engine/url2video", async (req, res) => {
       target: Number(req.body?.target) || 30,
       scenes,
     };
-    const r = await runStudio(["studio.py", "creative", "--spec", await writeSpec(spec)], 20 * 60 * 1000);
+    const specFile = await writeSpec(spec);
+    const r = await enqueueGpu(() => runStudio(["studio.py", "creative", "--spec", specFile], 20 * 60 * 1000));
     if (!r.ok) throw Object.assign(new Error((r.stderr || r.stdout).slice(-600)), { status: 400 });
     ok(res, { ...r.json, url: assetUrl(r.json.rel), brief: { title: brief.title, prices: brief.prices }, scenes });
   } catch (err) {
