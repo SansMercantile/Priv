@@ -322,6 +322,20 @@ marketingRouter.post("/engine/url2video", async (req, res) => {
   }
 });
 
+// Image / product-photo suite: Bedrock edit models (remove-background,
+// inpaint, outpaint, erase-object, style-transfer, generate, product_shot).
+marketingRouter.post("/engine/image", async (req, res) => {
+  try {
+    const spec = req.body?.spec ?? req.body;
+    if (!spec?.op) throw Object.assign(new Error("op is required"), { status: 400 });
+    const r = await runStudio(["studio.py", "image", "--spec", await writeSpec(spec)], 180000);
+    if (!r.ok) throw Object.assign(new Error((r.stderr || r.stdout).slice(-500)), { status: 400 });
+    ok(res, { ...r.json, url: assetUrl(r.json.rel) });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
 // Plate Foundry: one ad-hoc background via Amazon Bedrock Stable Image Ultra.
 marketingRouter.post("/engine/plate", async (req, res) => {
   try {

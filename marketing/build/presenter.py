@@ -86,13 +86,39 @@ FACE_PROMPT = (
     "symmetrical, mouth closed, clearly a composite studio portrait"
 )
 
+# Synthetic avatar roster -- a small set of distinct, clearly-synthetic
+# presenters (Creatify's 1,500-avatar library, scoped to a house roster). Each
+# is rendered once via Bedrock and reused; every one is synthetic by design so
+# the AI-disclosure + no-real-person rules always hold. Distinct seeds keep the
+# faces stable across renders.
+AVATARS = {
+    "default": dict(seed=11, prompt=FACE_PROMPT),
+    "founder": dict(seed=23, prompt=(
+        "confident founder-type presenter, short dark hair, charcoal blazer, "
+        "head-and-shoulders studio portrait, facing camera, deep navy backdrop "
+        "with soft gold rim light, editorial advertising photography, "
+        "photorealistic, mouth closed, clearly a composite studio portrait")),
+    "analyst": dict(seed=37, prompt=(
+        "analytical presenter, glasses, neat professional appearance, "
+        "head-and-shoulders studio portrait, facing camera, deep navy backdrop "
+        "with soft cyan rim light, editorial advertising photography, "
+        "photorealistic, mouth closed, clearly a composite studio portrait")),
+    "desk-host": dict(seed=51, prompt=(
+        "friendly desk presenter, warm expression, smart casual knit, "
+        "head-and-shoulders studio portrait, facing camera, deep navy backdrop "
+        "with soft gold rim light, editorial advertising photography, "
+        "photorealistic, mouth closed, clearly a composite studio portrait")),
+}
 
-def _make_portrait(name, size, seed):
+
+def _make_portrait(name, size, seed, avatar="default"):
     """Render the synthetic presenter face in-house via Bedrock."""
     ratio = "9:16" if size[1] >= size[0] else "16:9"
+    a = AVATARS.get(avatar, AVATARS["default"])
     path, provider = backgrounds.generate_one(
-        FACE_PROMPT, ratio=ratio, name=f"{name}-presenter", seed=seed)
-    print(f"  portrait {os.path.basename(path)} [{provider}]")
+        a["prompt"], ratio=ratio, name=f"{name}-presenter-{avatar}",
+        seed=a["seed"] if avatar != "default" else seed)
+    print(f"  portrait {os.path.basename(path)} [{provider}] avatar={avatar}")
     return path
 
 
@@ -154,20 +180,21 @@ def _disclose(clip, size, tag):
 
 
 def build(name, cfg):
-    """cfg: { size, target, out, scenes:[{vo, end?}], seed?, portrait? }."""
+    """cfg: { size, target, out, scenes:[{vo, end?}], seed?, portrait?, avatar? }."""
     scenes = cfg["scenes"]
     size = cfg["size"]
     seed = int(cfg.get("seed", 11))
+    avatar = str(cfg.get("avatar") or "default")
     R.write_file(f"{R.GPU_WORK}/gen_presenter.py", _PRESENTER_PY)
     print(f"\n=== presenter {name}  {size[0]}x{size[1]}  "
-          f"{len(scenes)} scenes ===")
+          f"{len(scenes)} scenes  avatar={avatar} ===")
 
     # voice first: the same takes drive both lip-sync and scene timing
     vo_paths, vo_dur = EA.synthesize_voice(scenes, name)
 
     # one synthetic portrait for the whole spot (consistency), unless the
     # caller supplied one
-    portrait = cfg.get("portrait") or _make_portrait(name, size, seed)
+    portrait = cfg.get("portrait") or _make_portrait(name, size, seed, avatar)
     portrait_box = R.stage_up(portrait, f"{name}-portrait.jpg")
 
     clips = []

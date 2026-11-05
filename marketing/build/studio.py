@@ -497,11 +497,35 @@ def engine_urlbrief(spec):
     return url2video.fetch_page(url)
 
 
+def engine_image(spec):
+    """Image / product-photo suite (Bedrock edit models).
+
+    spec: { op, ... } where op is remove_background | inpaint | outpaint |
+    erase_object | style_transfer | generate | product_shot. `image`/`mask`
+    are asset-relative paths or absolute paths.
+    """
+    import image_studio
+
+    def _resolve(p):
+        if not p:
+            return p
+        if os.path.isabs(p) and os.path.exists(p):
+            return p
+        cand = os.path.join(ASSETS, str(p).lstrip("/").replace("marketing-assets/", ""))
+        return cand if os.path.exists(cand) else p
+
+    spec = dict(spec)
+    for k in ("image", "mask"):
+        if spec.get(k):
+            spec[k] = _resolve(spec[k])
+    return image_studio.run(spec)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("command",
                     choices=["catalog", "poster", "video", "tts", "plate",
-                             "creative", "urlbrief"])
+                             "creative", "urlbrief", "image"])
     ap.add_argument("--spec", help="path to a JSON spec")
     ap.add_argument("--slug", help="poster slug to re-render")
     ap.add_argument("--formats", help="comma-separated formats")
@@ -511,6 +535,8 @@ def main():
         payload = catalog()
     elif args.command == "urlbrief":
         payload = engine_urlbrief(json.load(open(args.spec, encoding="utf-8-sig")))
+    elif args.command == "image":
+        payload = engine_image(json.load(open(args.spec, encoding="utf-8-sig")))
     elif args.command == "poster":
         if args.slug:
             formats = [f.strip() for f in (args.formats or "").split(",") if f.strip()]
