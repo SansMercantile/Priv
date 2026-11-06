@@ -95,7 +95,9 @@ All routes return the house envelope `{ success, data }` (or `{ success: false, 
 
 ## GPU box
 
-The creative engine renders on our own EC2 GPU instance (the A10G, `mezzo-wav2lip-render`). Root volume expanded 160 GB → 250 GB (the recurring disk wall is gone). A stopped `wav2lip-render-dedicated` (T4) is kept as a spare. A `musicgen-dedicated` (T4) serves background scores. All heavy renders serialise through a server-side promise-chain mutex so one job runs at a time — 4-way concurrent renders previously starved the boxes' single SSM agent into `ConnectionLost`.
+The creative engine renders on our own EC2 GPU instance (the A10G, `mezzo-wav2lip-render`). Root volume expanded 160 GB → 250 GB (the recurring disk wall is gone). A stopped `wav2lip-render-dedicated` (T4) is kept as a spare. A `musicgen-dedicated` (T4) serves background scores (`POST /invocations`, SageMaker TorchServe). All heavy renders serialise through a server-side promise-chain mutex so one job runs at a time.
+
+**Self-healing:** the boxes' snap `amazon-ssm-agent` used to wedge under load (ConnectionLost, needed an EC2 reboot). A cron watchdog (`marketing/build/ssm_agent_watchdog.sh`, installed on both boxes) now detects a dead/wedged agent locally and restarts the snap service within ~60s — proven live (stopped the agent, watchdog restarted it and SSM came back Online unaided). Restarts log to `/var/log/ssm-watchdog.log`.
 
 ---
 
