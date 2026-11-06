@@ -28,8 +28,26 @@ GPU_MUSETALK_PY = os.environ.get("PRIV_GPU_MUSETALK_PY",
 GPU_WORK = os.environ.get("PRIV_GPU_WORK", "/opt/priv/work")
 
 # Music box (T4) -- already serving MusicGen in a docker container on :8080.
-MUSIC_HOST = os.environ.get("PRIV_MUSIC_HOST", "44.204.170.68")
+# The GPU box must reach it over the PRIVATE IP: the shared security group only
+# opens :8080 to the VPC CIDR, so the public IP times out. Resolved dynamically
+# (instance id) so it survives instance replacement; PRIV_MUSIC_HOST overrides.
+MUSIC_INSTANCE = os.environ.get("PRIV_MUSIC_INSTANCE", "i-085cf8321ddb43e94")
 MUSIC_PORT = int(os.environ.get("PRIV_MUSIC_PORT", "8080"))
+
+
+def _music_host():
+    """Private IP of the music box (dynamic; falls back to the env/known IP)."""
+    if os.environ.get("PRIV_MUSIC_HOST"):
+        return os.environ["PRIV_MUSIC_HOST"]
+    try:
+        ec2 = boto3.client("ec2", region_name=REGION)
+        r = ec2.describe_instances(InstanceIds=[MUSIC_INSTANCE])
+        ip = r["Reservations"][0]["Instances"][0].get("PrivateIpAddress")
+        if ip:
+            return ip
+    except Exception:
+        pass
+    return "172.31.0.142"
 
 # File shuttle bucket. The GPU box's role can write here and our local
 # credentials can read; probed live -- the Lambda bucket is NOT writable by
@@ -175,25 +193,36 @@ def public_url(key):
 def music(prompt, seconds, out_wav):
     """Ask the MusicGen box for a track. Returns the local wav path.
 
-    The box serves a small HTTP API on localhost:8080; it is not reachable
-    from off-box, so we proxy the request through an SSM command on the GPU
-    box (same VPC) and pull the result back via S3.
+    The box is a SageMaker-style TorchServe endpoint (crazyjam-musicgen-large)
+    on the musicgen-dedicated T4. It serves `POST /invocations` with
+    `{"prompt","duration_seconds",...}` and returns raw WAV bytes. It is not
+    reachable from off-box, so we proxy the request through an SSM command on
+    the GPU video box (same VPC) and pull the WAV back via S3.
+
+    Generation takes ~4s per second of audio on the T4, so we budget
+    accordingly.
     """
+    seconds = max(1, int(seconds))
+    host = _music_host()
     key = f"{PREFIX}/music/{os.path.basename(out_wav)}"
     box_out = f"{GPU_WORK}/music/{os.path.basename(out_wav)}"
     body = base64.b64encode(
-        __import__("json").dumps({"prompt": prompt,
-                                  "duration": max(1, int(seconds))}).encode()
+        __import__("json").dumps({
+            "prompt": prompt,
+            "duration_seconds": seconds,
+            "guidance_scale": 3,
+            "do_sample": True,
+        }).encode()
     ).decode("ascii")
     cmd = (
         f"mkdir -p {GPU_WORK}/music && "
         f"echo '{body}' | base64 -d > /tmp/mq.json && "
-        f"curl -s -X POST http://{MUSIC_HOST}:{MUSIC_PORT}/generate "
+        f"curl -s -X POST http://{host}:{MUSIC_PORT}/invocations "
         f"-H 'Content-Type: application/json' --data-binary @/tmp/mq.json "
-        f"--output {box_out} --max-time 300 && "
+        f"--output {box_out} --max-time {seconds * 6 + 120} && "
         f"aws s3 cp {box_out} s3://{BUCKET}/{key}"
     )
-    status, out, err = run(cmd, timeout=330)
+    status, out, err = run(cmd, timeout=seconds * 6 + 150)
     if status != "Success":
         raise RuntimeError(f"music generation failed: {err or out}")
     return pull(key, out_wav)
