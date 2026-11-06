@@ -1,5 +1,8 @@
 import dotenv from "dotenv";
+// Load .env first, then .env.local on top (local overrides win, e.g. the AWS
+// Bedrock credentials that flip the AI provider). .env.local is gitignored.
 dotenv.config();
+dotenv.config({ path: ".env.local", override: true });
 
 // dd-trace uses native C++ bindings — load dynamically so Azure deployments
 // without the package don't crash at startup.
@@ -172,16 +175,25 @@ async function bedrockGenerateContent(request: any) {
 
   const prompt = buildPromptFromContents(request?.contents ?? request?.prompt ?? request);
   const url = `${bedrockEndpoint}/model/${encodeURIComponent(bedrockModel)}/converse`;
+  // Kimi K3 (and some others) reject the `temperature` field entirely. Only
+  // send it when BEDROCK_TEMPERATURE is explicitly set, so those models work
+  // out of the box.
+  const inferenceConfig: Record<string, number> = {
+    maxTokens: Math.max(16, Number(process.env.BEDROCK_MAX_TOKENS ?? 512)),
+  };
+  if (process.env.BEDROCK_TEMPERATURE !== undefined) {
+    inferenceConfig.temperature = Number(process.env.BEDROCK_TEMPERATURE);
+  }
   const payload = JSON.stringify({
     messages: [{ role: "user", content: [{ text: prompt }] }],
-    inferenceConfig: {
-      maxTokens: Math.max(16, Number(process.env.BEDROCK_MAX_TOKENS ?? 512)),
-      temperature: Number(process.env.BEDROCK_TEMPERATURE ?? 0.7),
-    },
+    inferenceConfig,
   });
 
   const { host, pathname } = new URL(url);
-  const amzDate = new Date().toISOString().replace(/[:-]|\.\d{3}/g, "") + "Z";
+  // toISOString() already ends in "Z"; the regex strips the dashes/colons/ms
+  // to yield AWS's required basic format (yyyyMMddTHHmmssZ). Appending another
+  // "Z" produced "...ZZ" and a 403 from Bedrock.
+  const amzDate = new Date().toISOString().replace(/[:-]|\.\d{3}/g, "");
   const dateStamp = amzDate.slice(0, 8);
   const payloadHash = hashSha256(payload);
 
