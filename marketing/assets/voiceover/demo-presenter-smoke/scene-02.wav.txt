@@ -1,0 +1,1 @@
+Every signal ships the entry, two targets and a stop.

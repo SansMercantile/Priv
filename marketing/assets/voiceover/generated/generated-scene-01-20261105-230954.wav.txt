@@ -1,0 +1,1 @@
+Priv is an autonomous trading desk. Every ticket ships entry, two targets and a stop.

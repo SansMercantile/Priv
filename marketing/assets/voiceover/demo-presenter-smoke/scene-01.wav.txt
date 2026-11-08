@@ -1,0 +1,1 @@
+Priv is an autonomous trading desk that keeps your money in your own broker.

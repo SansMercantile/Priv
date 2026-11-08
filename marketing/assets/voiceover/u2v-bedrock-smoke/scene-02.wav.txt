@@ -1,0 +1,1 @@
+Backtest every strategy before a single rand goes live.
