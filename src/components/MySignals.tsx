@@ -342,6 +342,27 @@ export default function MySignals() {
         : status === "OPEN"
         ? "bg-sky-500/10 text-sky-400"
         : "bg-white/10 text-zinc-400";
+    // Conviction score badge (0-100, directional): >=80 strong bullish,
+    // <=20 strong bearish, between = no edge. Falls back to parsing the
+    // composite power out of the basis text for older rows that predate
+    // the persisted score column.
+    let score: number | null = null;
+    if (typeof s.score === "number" && !Number.isNaN(s.score)) {
+      score = s.score;
+    } else if (s.basis) {
+      const m = /composite power\s+([0-9]+(?:\.[0-9]+)?)/i.exec(String(s.basis));
+      if (m) score = parseFloat(m[1]);
+    }
+    const scoreCls =
+      score === null
+        ? ""
+        : score >= 80
+        ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
+        : score <= 20
+        ? "bg-rose-500/15 text-rose-300 border-rose-500/40"
+        : "bg-amber-500/10 text-amber-300 border-amber-500/30";
+    const scoreLabel =
+      score === null ? "" : score >= 80 ? "strong" : score <= 20 ? "strong" : "weak";
     return (
       <div className={`flex items-center justify-between gap-2 p-2 rounded-lg border text-xs font-mono ${
         isNew ? "border-rose-500/40 bg-rose-500/5" : "border-white/10 bg-black/40"}`}>
@@ -355,6 +376,14 @@ export default function MySignals() {
           )}
           {pipsTxt && (
             <span className={`ml-1 text-[10px] font-bold ${pipsCls}`}>{pipsTxt}</span>
+          )}
+          {score !== null && (
+            <span
+              title={`Conviction score ${score.toFixed(0)}/100 — ≥80 strong bullish, ≤20 strong bearish, between = no edge (we only issue strong-conviction signals)`}
+              className={`ml-1.5 text-[9px] uppercase px-1.5 py-0.5 rounded border font-bold ${scoreCls}`}
+            >
+              {score.toFixed(0)} {scoreLabel}
+            </span>
           )}
           {isNew && (
             <span className="ml-1.5 text-[9px] uppercase px-1.5 py-0.5 rounded bg-[#e11d48]/20 text-rose-300">new</span>

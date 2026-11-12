@@ -21,6 +21,7 @@ import ProfilePage from "./components/profile/ProfilePage";
 import KycAdminReviewPage from "./components/profile/KycAdminReviewPage";
 import CrmPage from "./components/CrmPage";
 import MarketingStudio from "./components/MarketingStudio";
+import HelpCenter from "./components/help/HelpCenter";
 import UnifiedAssistant from "./ui/UnifiedAssistant";
 import GuidedWalkthrough from "./components/GuidedWalkthrough";
 import LoginGate from "./components/auth/LoginGate";
@@ -289,6 +290,9 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
                   <Route path="/dashboard/connections" element={<ConnectionsSection demoMode={demoMode} />} />
                   <Route path="/dashboard/billing" element={<Billing demoMode={demoMode} />} />
                   <Route path="/dashboard/profile" element={<ProfilePage demoMode={demoMode} />} />
+                  {/* Help & Learn: comprehensive tutorial + searchable FAQ +
+                      glossary. Client-facing, no gate. */}
+                  <Route path="/dashboard/help" element={<HelpCenter />} />
                   {/* KYC review is admin-only (same rule as Security/CRM;
                       the direct-URL path used to be unguarded). */}
                   <Route path="/dashboard/admin/kyc" element={<RequireAdmin><KycAdminReviewPage /></RequireAdmin>} />

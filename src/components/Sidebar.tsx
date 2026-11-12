@@ -3,12 +3,12 @@ import { NavLink } from "react-router-dom";
 import { useAuth0 } from "@auth0/auth0-react";
 import { LogOut } from "lucide-react";
 import apiClient from "../api/apiClient";
-import { 
-  LayoutDashboard, 
-  Brain, 
-  Users, 
-  ShieldCheck, 
-  Terminal, 
+import {
+  LayoutDashboard,
+  Brain,
+  Users,
+  ShieldCheck,
+  Terminal,
   Newspaper,
   History,
   Link2,
@@ -23,7 +23,8 @@ import {
   User,
   Radio,
   Contact,
-  Palette
+  Palette,
+  LifeBuoy
 } from "lucide-react";
 import logo from "../assets/images/logo_1779280505672.png";
 
@@ -169,7 +170,8 @@ export const navigationItems: SectionItem[] = [
   { name: "Multi-Agent Hub", icon: Users, path: "/dashboard/multi-agent" },
   { name: "History & Audit", icon: History, path: "/dashboard/history" },
   { name: "SANS Network Link", icon: Link2, path: "/dashboard/connections" },
-  { name: "Billing", icon: CreditCard, path: "/dashboard/billing" }
+  { name: "Billing", icon: CreditCard, path: "/dashboard/billing" },
+  { name: "Help & Learn", icon: LifeBuoy, path: "/dashboard/help" }
 ];
 // Removed from the main list (moved elsewhere in the product):
 // - Security Check   -> admin-only slot below (never shown to clients)
