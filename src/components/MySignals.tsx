@@ -317,8 +317,12 @@ export default function MySignals() {
       status.startsWith("CLOSED");
     const dir = String(s.direction || "").toUpperCase();
     const canTrade = !s.stale && !done && Boolean(s.symbol) && (dir === "BUY" || dir === "SELL");
+    // Event-driven signal (NFP/CPI/...): the trade targets the UNDERLYING
+    // (EUR/USD), not the event token. The display shows "NFP -- trade EUR/USD".
+    const isEvent = Boolean(s.event) && Boolean(s.underlying_symbol);
+    const tradeSymbol = isEvent ? String(s.underlying_symbol) : String(s.symbol);
     const trade = () => {
-      const p = new URLSearchParams({ trade_symbol: String(s.symbol), trade_side: dir });
+      const p = new URLSearchParams({ trade_symbol: tradeSymbol, trade_side: dir });
       if (Number(s.stop_loss) > 0) p.set("trade_sl", String(s.stop_loss));
       if (Number(s.take_profit_1) > 0) p.set("trade_tp", String(s.take_profit_1));
       if (s.id) p.set("trade_id", String(s.id));
@@ -367,7 +371,9 @@ export default function MySignals() {
       <div className={`flex items-center justify-between gap-2 p-2 rounded-lg border text-xs font-mono ${
         isNew ? "border-rose-500/40 bg-rose-500/5" : "border-white/10 bg-black/40"}`}>
         <div className="min-w-0">
-          <span className="text-white font-bold truncate">{s.display_name || s.symbol}</span>{" "}
+          <span className="text-white font-bold truncate">
+            {isEvent ? `${s.event} — trade ${s.underlying}` : (s.display_name || s.symbol)}
+          </span>{" "}
           <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded ${s.direction === "BUY" ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
             {s.direction}
           </span>{" "}
