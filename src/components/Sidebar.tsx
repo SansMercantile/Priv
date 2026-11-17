@@ -196,19 +196,25 @@ export default function Sidebar({
   // Admin-gated Compliance Desk + Security Check links: visible only when
   // the signed-in identity verifies as admin (GET /api/v1/admin/whoami).
   // Hidden on any failure -- never leaks the routes' existence to clients.
+  // Polled (like the signal badge) so a single transient Auth0/token blip on
+  // first paint can't hide the admin surfaces for the whole session -- it
+  // self-heals on the next tick.
   const [showCompliance, setShowCompliance] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const check = async () => {
       try {
         const res: any = await apiClient.get("/api/v1/admin/whoami");
-        if (!cancelled && res?.data?.data?.admin) setShowCompliance(true);
+        if (!cancelled) setShowCompliance(!!res?.data?.data?.admin);
       } catch (_) {
-        /* stay hidden */
+        /* stay hidden on this tick; retried on the next */
       }
-    })();
+    };
+    check();
+    const interval = window.setInterval(check, 15000);
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
     };
   }, []);
 
@@ -238,21 +244,25 @@ export default function Sidebar({
   // Strategies is a paid-tier surface: visible only once the real
   // subscription says tier != free (admins always pass). The server-side
   // route guard (RequirePaying in App.tsx) enforces the same rule on
-  // navigation; fail-closed while the check is in flight.
+  // navigation. Polled so a transient token/offline blip on first paint
+  // self-heals instead of hiding the surface for the whole session.
   const [isPaying, setIsPaying] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const check = async () => {
       try {
         const body: any = await apiClient.getMySubscription();
         const sub = body?.subscription ?? (body && typeof body === "object" ? body : null);
-        if (!cancelled && sub?.tier && sub.tier !== "free") setIsPaying(true);
+        if (!cancelled) setIsPaying(!!(sub?.tier && sub.tier !== "free"));
       } catch (_) {
-        /* no subscription / offline: stay hidden */
+        /* no subscription / offline this tick: keep last known state */
       }
-    })();
+    };
+    check();
+    const interval = window.setInterval(check, 15000);
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
     };
   }, []);
 
