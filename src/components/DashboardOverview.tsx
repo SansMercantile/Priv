@@ -317,15 +317,23 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
     };
   }, []);
 
-  // Real open positions across ALL of the caller's linked accounts
-  // (uid-scoped GET /api/v1/portfolio/positions), replacing the dead
-  // xm_positions localStorage feed that nothing has ever written --
-  // it left this table permanently empty. Rows keep the table's
-  // shape; the ticket shows which account holds the contract.
+  // Real open positions for the SELECTED account (demo<->live swap). The
+  // endpoint returns every linked account's positions, so resolve the
+  // active account for the current mode and keep only its rows -- the
+  // other account's positions must never bleed across the toggle.
   useEffect(() => {
     let cancelled = false;
     const syncRealPositions = async () => {
       try {
+        const mode = demoMode ? "demo" : "live";
+        const acctRes = await fetch(`/api/v1/auth/deriv/active-account?mode=${mode}`, {
+          headers: await userHeader(),
+        });
+        let activeBid: string | null = null;
+        if (acctRes.ok) {
+          const body = await acctRes.json();
+          activeBid = body?.data?.account?.broker_id || null;
+        }
         const res = await fetch("/api/v1/portfolio/positions", { headers: await userHeader() });
         if (!res.ok) throw new Error(String(res.status));
         const json = await res.json();
@@ -333,20 +341,22 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
         if (cancelled) return;
         setPositionsLoaded(true);
         setLivePositions(
-          rows.map((p: any) => {
-            const ct = String(p.contract_type || "").toUpperCase();
-            const side = ["PUT", "MULTDOWN", "SELL", "SHORT"].includes(ct) ? "SELL" : "BUY";
-            const acct = String(p.broker_id || "").split("_").slice(-1)[0];
-            return {
-              id: p.order_id ? `${acct}:${p.order_id}` : acct || "—",
-              symbol: p.symbol || "—",
-              side,
-              lots: p.quantity ?? "—",
-              entryPrice: typeof p.avg_cost === "number" ? p.avg_cost : null,
-              currentPrice: typeof p.current_price === "number" ? p.current_price : null,
-              pnl: typeof p.unrealized_pnl === "number" ? p.unrealized_pnl : null,
-            };
-          })
+          rows
+            .filter((p: any) => !activeBid || String(p.broker_id || "") === activeBid)
+            .map((p: any) => {
+              const ct = String(p.contract_type || "").toUpperCase();
+              const side = ["PUT", "MULTDOWN", "SELL", "SHORT"].includes(ct) ? "SELL" : "BUY";
+              const acct = String(p.broker_id || "").split("_").slice(-1)[0];
+              return {
+                id: p.order_id ? `${acct}:${p.order_id}` : acct || "—",
+                symbol: p.symbol || "—",
+                side,
+                lots: p.quantity ?? "—",
+                entryPrice: typeof p.avg_cost === "number" ? p.avg_cost : null,
+                currentPrice: typeof p.current_price === "number" ? p.current_price : null,
+                pnl: typeof p.unrealized_pnl === "number" ? p.unrealized_pnl : null,
+              };
+            })
         );
       } catch {
         if (!cancelled) {
@@ -362,7 +372,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ demoMode, 
       cancelled = true;
       clearInterval(t);
     };
-  }, []);
+  }, [demoMode]);
 
   // Real Deriv account info, from the backend connections list (see
   // oauth_api.py _list_user_connections) rather than the retired

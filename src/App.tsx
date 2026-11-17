@@ -267,7 +267,7 @@ function GatedApp({ initialDevice = "desktop" }: AppProps) {
                 {location.pathname.startsWith("/dashboard") && (
                 <Routes>
                   <Route path="/dashboard" element={<Dashboard demoMode={demoMode} />} />
-                  <Route path="/dashboard/terminal" element={<TradingTerminal />} />
+                  <Route path="/dashboard/terminal" element={<TradingTerminal demoMode={demoMode} />} />
                   <Route path="/dashboard/agi-core" element={<AGICore demoMode={demoMode} />} />
                   <Route path="/dashboard/multi-agent" element={<MultiAgent />} />
                   {/* Data Ingest moved under SANS Network Link as an

@@ -185,7 +185,7 @@ class TerminalErrorBoundary extends React.Component<
   }
 }
 
-function TradingTerminalInner() {
+function TradingTerminalInner({ demoMode }: { demoMode?: boolean }) {
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [account, setAccount] = useState<AccountInfo | null>(null);
   const [positions, setPositions] = useState<OpenPosition[]>([]);
@@ -229,7 +229,7 @@ function TradingTerminalInner() {
   // sleeps. Replaces the old client-side isAutoTrading/setInterval
   // mechanism, which died the moment the tab did and only ever
   // evaluated the single symbol on Dispatch.
-  const autotrader = useAutotrader(userHeader);
+  const autotrader = useAutotrader(userHeader, brokerId);
   const [scanAllMarkets, setScanAllMarkets] = useState(false);
   // Entry driver for the server-side agent: MAIN strategy (default),
   // the user's own issued signals, or the public global landing stream.
@@ -328,11 +328,18 @@ function TradingTerminalInner() {
   };
 
   const resolveBroker = async (): Promise<string | null> => {
+    // Prefer the demoMode PROP (App's account switcher) over the
+    // localStorage read so the terminal swaps the instant the user flips
+    // the switch, not on the next 8s poll.
     let mode: "demo" | "live" = "demo";
-    try {
-      mode = localStorage.getItem("demoMode") === "false" ? "live" : "demo";
-    } catch (_) {
-      /* ignore */
+    if (typeof demoMode === "boolean") {
+      mode = demoMode ? "demo" : "live";
+    } else {
+      try {
+        mode = localStorage.getItem("demoMode") === "false" ? "live" : "demo";
+      } catch (_) {
+        /* ignore */
+      }
     }
     setActiveMode(mode);
     try {
@@ -479,7 +486,9 @@ function TradingTerminalInner() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, []);
+    // demoMode dep: flip the account switcher -> re-resolve the active
+    // account immediately (clears the other mode's broker/positions).
+  }, [demoMode]);
 
   const [selectedSymbol, setSelectedSymbol] = useState(DEFAULT_SYMBOL);
   const { symbols: derivSymbols, loading: symbolsLoading, error: symbolsError } = useDerivSymbols(userHeader);
@@ -1868,10 +1877,10 @@ function TradingTerminalInner() {
   );
 }
 
-export default function TradingTerminal() {
+export default function TradingTerminal({ demoMode }: { demoMode?: boolean }) {
   return (
     <TerminalErrorBoundary>
-      <TradingTerminalInner />
+      <TradingTerminalInner demoMode={demoMode} />
     </TerminalErrorBoundary>
   );
 }

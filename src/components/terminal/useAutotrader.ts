@@ -29,7 +29,10 @@ const EMPTY: AgentStatus = { armed: false, cycles: 0, placements: 0, logs: [] };
 // The loop lives on the backend, so it keeps trading after the tab is
 // closed, the user logs out or the laptop sleeps; this hook only arms,
 // disarms and mirrors status. It never runs trades itself.
-export function useAutotrader(getHeaders: () => Promise<Record<string, string>>) {
+export function useAutotrader(
+  getHeaders: () => Promise<Record<string, string>>,
+  brokerId?: string | null,
+) {
   const [status, setStatus] = useState<AgentStatus>(EMPTY);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +40,10 @@ export function useAutotrader(getHeaders: () => Promise<Record<string, string>>)
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch("/api/autotrader/status", { headers: await getHeaders() });
+      // Scope status to the selected account so the dashboard swaps with
+      // the demo<->real switcher (each account runs its own agent).
+      const qs = brokerId ? `?broker_id=${encodeURIComponent(brokerId)}` : "";
+      const res = await fetch(`/api/autotrader/status${qs}`, { headers: await getHeaders() });
       if (!res.ok) return;
       const body = await res.json();
       if (alive.current) setStatus({ ...EMPTY, ...body });
@@ -45,7 +51,7 @@ export function useAutotrader(getHeaders: () => Promise<Record<string, string>>)
       /* transient: keep last known status */
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [brokerId]);
 
   useEffect(() => {
     alive.current = true;
@@ -84,7 +90,8 @@ export function useAutotrader(getHeaders: () => Promise<Record<string, string>>)
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/autotrader/disarm", { method: "POST", headers: await getHeaders() });
+      const qs = brokerId ? `?broker_id=${encodeURIComponent(brokerId)}` : "";
+      const res = await fetch(`/api/autotrader/disarm${qs}`, { method: "POST", headers: await getHeaders() });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof body?.detail === "string" ? body.detail : `HTTP ${res.status}`);
       setStatus({ ...EMPTY, ...body });
@@ -94,7 +101,7 @@ export function useAutotrader(getHeaders: () => Promise<Record<string, string>>)
       setBusy(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [brokerId]);
 
   return { status, busy, error, arm, disarm, refresh };
 }
