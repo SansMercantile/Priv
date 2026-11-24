@@ -553,15 +553,27 @@ export const PrivCopilot: React.FC = () => {
       // "/api/v1/support/", so the request hit the SPA fallback (GET -> index.html,
       // POST -> empty 405) and res.json() threw "Unexpected end of JSON input".
       const idToken = await getIdToken().catch(() => null);
-      const res = await fetch("/api/v1/support", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          ...(idToken ? { "X-Auth0-Id-Token": idToken } : {}),
-        },
-        body: JSON.stringify({ message: promptToSend, history }),
-      });
+      // Timeout the request: a slow synthesis (3 expert passes + judge, plus
+      // a throttled-model retry) can run 15-30s. Without a cap the widget
+      // sits on "Analyzing real market data..." forever when the proxy or
+      // browser gives up silently. Abort at 45s and say so plainly.
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 45000);
+      let res: Response;
+      try {
+        res = await fetch("/api/v1/support", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(idToken ? { "X-Auth0-Id-Token": idToken } : {}),
+          },
+          body: JSON.stringify({ message: promptToSend, history }),
+          signal: controller.signal,
+        });
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
       const data: SupportResponse = await res.json();
       const emotionNote = await emotionNotePromise;
       if (res.ok) {
@@ -574,9 +586,15 @@ export const PrivCopilot: React.FC = () => {
         setMessages((prev) => [...prev, { sender: "ai", text: errText }]);
       }
     } catch (err: any) {
+      const isTimeout = err?.name === "AbortError";
       setMessages((prev) => [
         ...prev,
-        { sender: "ai", text: `I couldn't reach the analysis engine: ${err.message || err}. Please try again shortly.` },
+        {
+          sender: "ai",
+          text: isTimeout
+            ? "That analysis is taking longer than usual (the market scan + model synthesis ran past 45s). Try again -- a repeat request is usually faster once the data is warm."
+            : `I couldn't reach the analysis engine: ${err?.message || err}. Please try again shortly.`,
+        },
       ]);
     } finally {
       setIsTyping(false);
