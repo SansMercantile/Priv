@@ -231,9 +231,28 @@ function TradingTerminalInner({ demoMode }: { demoMode?: boolean }) {
   // evaluated the single symbol on Dispatch.
   const autotrader = useAutotrader(userHeader, brokerId);
   const [scanAllMarkets, setScanAllMarkets] = useState(false);
+  // Persisted autotrader arm settings (conviction gate + AI bleed rescue),
+  // mirrored from GET /autotrader/settings. Defaulted to the strong-only
+  // profile until the saved values load.
+  const [atSettings, setAtSettings] = useState<{
+    min_trade_score: number;
+    ai_bleed_rescue: boolean;
+  }>({ min_trade_score: 80, ai_bleed_rescue: true });
   // Entry driver for the server-side agent: MAIN strategy (default),
   // the user's own issued signals, or the public global landing stream.
   const [signalSource, setSignalSource] = useState<"strategy" | "own_signals" | "global_stream">("strategy");
+
+  // Load the saved arm settings once (and whenever status refreshes expose
+  // them) so the toggles reflect the persisted profile, not just defaults.
+  useEffect(() => {
+    const s: any = autotrader.status?.settings;
+    if (s && typeof s === "object") {
+      setAtSettings({
+        min_trade_score: typeof s.min_trade_score === "number" ? s.min_trade_score : 80,
+        ai_bleed_rescue: typeof s.ai_bleed_rescue === "boolean" ? s.ai_bleed_rescue : true,
+      });
+    }
+  }, [autotrader.status?.settings]);
   const [autoLogs, setAutoLogs] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem("priv_auto_logs") || "[]");
@@ -243,6 +262,19 @@ function TradingTerminalInner({ demoMode }: { demoMode?: boolean }) {
   });
   const [autoAnalysis, setAutoAnalysis] = useState<AutonomousAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Mirror the persisted arm settings (conviction gate + AI bleed rescue)
+  // from the agent status once it loads, so the toggles show the saved
+  // values rather than the defaults. settings comes from GET /autotrader/status.
+  useEffect(() => {
+    const s = autotrader.status.settings;
+    if (s && typeof s === "object") {
+      setAtSettings({
+        min_trade_score: typeof s.min_trade_score === "number" ? s.min_trade_score : 80,
+        ai_bleed_rescue: typeof s.ai_bleed_rescue === "boolean" ? s.ai_bleed_rescue : true,
+      });
+    }
+  }, [autotrader.status.settings]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1727,6 +1759,57 @@ function TradingTerminalInner({ demoMode }: { demoMode?: boolean }) {
                 />
                 Scan all markets (rotate the full Deriv universe instead of only {selectedSymbol}){signalSource !== "strategy" ? " — signal modes pick symbols from tickets" : ""}
               </label>
+
+              {/* Conviction gate + AI bleed rescue. Both persist via
+                  PUT /autotrader/settings and apply from the next cycle.
+                  The gate is the strong-conviction floor: 80 = only the
+                  cleanest setups trade; lowering it lets "good" setups trade
+                  too (more of the user's manual calls, more weak-entry bleed).
+                  AI bleed rescue: a losing position whose higher timeframe
+                  flips is held through the noise unless a full multi-TF
+                  analysis confirms the setup is truly broken. */}
+              <div className="space-y-2 pt-1 border-t border-white/5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+                    Conviction gate
+                  </span>
+                  <select
+                    value={atSettings.min_trade_score}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      setAtSettings((p) => ({ ...p, min_trade_score: v }));
+                      void autotrader.saveSettings({ min_trade_score: v });
+                    }}
+                    className="bg-neutral-950 border border-white/10 rounded px-2 py-1 text-[10px] font-mono text-white"
+                    title="Entry conviction floor. 80 = strong-only (default). 70 = also trade 'good' setups. 60 = most permissive."
+                  >
+                    <option value={80}>80 · Strong only</option>
+                    <option value={70}>70 · Good+</option>
+                    <option value={60}>60 · Loose</option>
+                  </select>
+                </div>
+                <label className="flex items-center gap-2 text-[9px] font-mono text-zinc-400 uppercase tracking-wider select-none">
+                  <input
+                    type="checkbox"
+                    checked={atSettings.ai_bleed_rescue}
+                    onChange={(e) => {
+                      const v = e.target.checked;
+                      setAtSettings((p) => ({ ...p, ai_bleed_rescue: v }));
+                      void autotrader.saveSettings({ ai_bleed_rescue: v });
+                    }}
+                    className="accent-emerald-500"
+                  />
+                  AI bleed rescue
+                </label>
+                <p className="text-[9px] text-zinc-600 font-mono leading-relaxed">
+                  {atSettings.min_trade_score >= 80
+                    ? "Only the cleanest setups (80+) enter. "
+                    : `Setups scoring ${atSettings.min_trade_score}+ enter -- weaker entries, more of your manual calls. `}
+                  {atSettings.ai_bleed_rescue
+                    ? "Bleed rescue on: a losing trade is cut only after the full multi-TF analysis confirms the setup is broken."
+                    : "Bleed rescue off: a losing trade is cut the moment the higher timeframe flips."}
+                </p>
+              </div>
 
               <button
                 type="button"

@@ -21,6 +21,16 @@ export interface AgentStatus {
   armed_at?: string | null;
   last_cycle_at?: string | null;
   logs: string[];
+  // Persisted arm settings (GET /settings). Carried so the panel can show
+  // the conviction gate + AI-bleed-rescue toggles against the saved value.
+  settings?: {
+    asset_classes?: string[];
+    timeframes?: string[];
+    sessions?: string[];
+    weekend_only_247?: boolean;
+    min_trade_score?: number;
+    ai_bleed_rescue?: boolean;
+  };
 }
 
 const EMPTY: AgentStatus = { armed: false, cycles: 0, placements: 0, logs: [] };
@@ -103,5 +113,29 @@ export function useAutotrader(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brokerId]);
 
-  return { status, busy, error, arm, disarm, refresh };
+  // Persist an arm-settings patch (conviction gate / AI bleed rescue / etc.)
+  // to the profile. Applies to a running agent from its next cycle -- no
+  // re-arm needed. Then refreshes status so the panel reflects the saved value.
+  const saveSettings = useCallback(
+    async (patch: Record<string, unknown>) => {
+      try {
+        const res = await fetch("/api/autotrader/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...(await getHeaders()) },
+          body: JSON.stringify(patch),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(typeof body?.detail === "string" ? body.detail : `HTTP ${res.status}`);
+        await refresh();
+        return true;
+      } catch (e: any) {
+        setError(e?.message || "Could not save settings.");
+        return false;
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [refresh]
+  );
+
+  return { status, busy, error, arm, disarm, refresh, saveSettings };
 }
